@@ -1,0 +1,27 @@
+{
+    "name": "cv-maker",
+    "version": "0.1.0",
+    "private": true,
+    "license": "MIT",
+    "type": "module",
+    "scripts": {
+        "build": "node build.mjs",
+        "test": "node --test test/unit/*.test.mjs",
+        "serve": "node test/serve.mjs 7333"
+    },
+    "devDependencies": {
+        "@tiptap/core": "^3.0.1",
+        "@tiptap/extension-color": "^3.0.1",
+        "@tiptap/extension-text-align": "^3.0.1",
+        "@tiptap/extension-text-style": "^3.0.1",
+        "@tiptap/pm": "^3.0.1",
+        "@tiptap/starter-kit": "^3.0.1",
+        "docx": "9.5.1",
+        "esbuild": "^0.25.9",
+        "jsdom": "^26.1.0",
+        "lucide-react": "^0.523.0",
+        "react": "^19.1.1",
+        "react-dom": "^19.1.1",
+        "typescript": "^5.9.2"
+    }
+}

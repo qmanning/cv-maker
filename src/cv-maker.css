@@ -1,0 +1,105 @@
+/* CV Maker — only what Infospector's host.css (loaded at runtime) doesn't already give us.
+   Everything here leans on its --pt-* / glass tokens, so the two tools always look alike. */
+
+.cvm-root {
+  position: fixed; inset: 0; z-index: 2000; overflow: hidden;
+  background: radial-gradient(1200px 600px at 50% -10%, var(--pt-ground-2), transparent 60%), var(--pt-ground);
+  color: var(--pt-text); font: 13px/1.5 var(--pt-font); -webkit-font-smoothing: antialiased;
+}
+.cvm-root[data-ready="false"] { visibility: hidden; }
+/* concentric chrome, by Infospector's formula: its Radius + Padding dials (--glass-radius / --glass-pad) drive
+   every corner here too. Our 30px controls round to the dialed radius, capped at a full circle (15px). */
+.cvm-root { --cvm-ctl-r: min(var(--glass-radius, 40px), 15px); }
+/* Infospector's color picker mounts on <body>; lift it above this full-screen tool */
+body > .pt-cpick { z-index: 2100; }
+
+/* the bar: Infospector's #pt-bar, centered and sized to its contents */
+#pt-bar.cvm-bar { left: 50%; transform: translateX(-50%); width: min(860px, calc(100vw - 24px)); transition: none; }
+/* the buttons are never pushed off-screen: they keep their size, and the two fields (paper size, document
+   name) give up width and truncate instead */
+.cvm-bar > .pt-rbtn { flex: none; }
+.cvm-bar .pt-dim { flex: 0 1 auto; min-width: 52px; }   /* never less than "8…▾" */
+.cvm-bar .pt-dim-trigger { max-width: 100%; min-width: 0; overflow: hidden; }
+.cvm-bar .pt-dim-val { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cvm-bar .pt-chev { flex: none; }
+.cvm-bar .pt-omni { flex: 1 1 0; min-width: 72px; }
+.cvm-bar .pt-omni input { text-overflow: ellipsis; padding-right: 36px; }
+.cvm-bar .pt-omni .cvm-import { display: grid; }
+.cvm-narrow-only { display: none !important; }
+@media (max-width: 520px) { .cvm-bar .cvm-secondary { display: none; } .pt-menu-item.cvm-narrow-only { display: flex !important; } #pt-bar.cvm-bar { gap: 4px; } }
+@media (max-width: 620px) { .cvm-bar .cvm-label, .cvm-bar .pt-dim-scale { display: none; } .cvm-bar { gap: 5px; } }
+.cvm-bar .pt-rbtn svg, .cvm-fmt svg, .cvm-blocktools svg, .pt-menu-item svg { width: 17px; height: 17px; stroke-width: 2; }
+.cvm-bar .pt-badge-btn { font: 600 12.5px var(--pt-font); }
+.cvm-dirty { width: 7px; height: 7px; border-radius: 50%; background: var(--pt-open); flex: none; }
+.pt-menu-item.cvm-row { display: flex; align-items: center; gap: 9px; }
+.pt-menu-item.cvm-row .cvm-hint { margin-left: auto; color: var(--pt-text-faint); font-size: 11.5px; }
+.pt-menu-item.cvm-active { background: var(--pt-accent-soft); }
+
+/* the canvas: Infospector's #pt-stagewrap, but it scrolls (a page is taller than a window) */
+/* the paper is centered both ways (margin: auto inside a flex column centers without clipping when the
+   page is taller than the window); top pad = bar (12 + 52) + a 16px minimum gap */
+#pt-stagewrap.cvm-wrap { display: flex; flex-direction: column; overflow: auto; height: 100%; padding: 80px 28px 44px; transition: none; }
+#pt-stagewrap.cvm-wrap::before { position: fixed; }
+
+/* paper */
+.cvm-paper { position: relative; z-index: 1; margin: auto; flex: none; width: var(--cvm-page-w); transition: zoom 140ms cubic-bezier(.22,.61,.36,1); }   /* eases between zoom levels; during a live resize the fit is recomputed every frame anyway */
+.cvm-sheets { position: absolute; inset: 0; pointer-events: none; }
+.cvm-sheet { position: absolute; left: 0; right: 0; background: #fff; border: 1px solid rgba(204, 204, 204, 0.5); box-shadow: var(--pt-shadow); }
+.cvm-pageno { position: absolute; left: 0; right: 0; bottom: 12pt; text-align: center; font: 7pt/1 Helvetica, Arial, sans-serif; color: #555; }
+.cvm-overflow { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--pt-ruler); pointer-events: none; z-index: 3; }
+.cvm-overflow span { position: absolute; right: 4pt; top: 2pt; font: 600 6.5pt var(--pt-font); color: var(--pt-ruler); background: #fff; padding: 1pt 3pt; border-radius: 3pt; }
+.cvm-host { position: relative; z-index: 2; }
+.cvm-host .cv-page { background: transparent !important; position: relative; }
+.cvm-spacer { pointer-events: none; user-select: none; }
+
+/* export in progress — Infospector's screenshot scan (#pt-scan), per sheet: dim, faint scan lines, and the
+   accent sweep (its own `pt-scan` keyframes from host.css) until the file is ready */
+.cvm-scans { position: absolute; inset: 0; z-index: 4; pointer-events: none; opacity: 0; transition: opacity 160ms; }
+.cvm-scans.cvm-scanning { opacity: 1; pointer-events: auto; cursor: progress; }
+.cvm-scan { position: absolute; left: 0; right: 0; overflow: hidden; background: rgba(0, 0, 0, 0.45); }
+.cvm-scan::before { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(0deg, transparent 0 3px, rgba(255, 255, 255, 0.07) 3px 4px); }
+.cvm-scanning .cvm-scan::after { content: ""; position: absolute; left: 0; right: 0; height: 14%; top: -14%;
+  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--pt-accent) 55%, transparent) 60%, var(--pt-accent));
+  box-shadow: 0 2px 24px color-mix(in srgb, var(--pt-accent) 60%, transparent); animation: pt-scan 1.1s linear infinite; }
+
+/* edit-in-place regions */
+.cvm-host [data-cv-edit] { outline: none; border-radius: 1.5pt; cursor: text; transition: box-shadow 140ms; }
+.cvm-host [data-cv-edit]:hover { box-shadow: 0 0 0 1px color-mix(in srgb, var(--pt-accent) 45%, transparent); }
+.cvm-host [data-cv-edit].ProseMirror-focused { box-shadow: 0 0 0 1px var(--pt-accent), 0 0 0 4px var(--pt-accent-soft); }
+/* selected text: highlighter yellow (Infospector's selection yellow), text stays its own color */
+.cvm-host [data-cv-edit]::selection, .cvm-host [data-cv-edit] *::selection { background: color-mix(in srgb, var(--pt-region, #ffd83d) 65%, transparent); color: inherit; }
+.cvm-host [data-col-break] { position: relative; }
+.cvm-host [data-col-break]::before { content: "⇥ column"; position: absolute; top: -6.5pt; left: 0; font: 600 5pt var(--pt-font); letter-spacing: .3pt; text-transform: uppercase; color: var(--pt-guide-sel); pointer-events: none; }
+.cvm-host img { cursor: pointer; }
+.cvm-host img:hover { outline: 1px solid var(--pt-accent); outline-offset: 2px; }
+.cvm-host [data-cv-repeat].cvm-hot { box-shadow: -3pt 0 0 0 #fff, -4.5pt 0 0 0 var(--pt-accent); }
+
+/* format bar: a glass surface (.pt-menu-pop) that floats in place, just above the box being edited (JS positions it) */
+.pt-menu-pop.cvm-fmt { top: 0; left: 0; width: max-content; align-items: center; gap: 4px; padding: var(--glass-pad, 8px); border-radius: calc(var(--cvm-ctl-r) + var(--glass-pad, 8px) + 1px); z-index: 119; max-width: calc(100vw - 24px); flex-wrap: wrap; justify-content: center; }
+.pt-menu-pop.cvm-fmt.pt-open { display: flex; }
+.cvm-fbtn { width: 30px; height: 30px; flex: none; display: grid; place-items: center; border: 0; border-radius: var(--cvm-ctl-r); background: transparent; color: var(--pt-text); cursor: pointer; transition: background-color 160ms, color 160ms; }
+.cvm-fbtn:hover { background: var(--pt-accent-soft); }
+.cvm-fbtn[aria-pressed="true"] { background: var(--pt-accent); color: var(--pt-accent-ink, #fff); }
+.cvm-fbtn:disabled { opacity: .35; cursor: not-allowed; }
+.cvm-fsep { width: 1px; height: 20px; background: var(--pt-glass-brd-strong); margin: 0 4px; flex: none; }
+.cvm-field { display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 4px 0 8px; border-radius: var(--cvm-ctl-r); background: var(--pt-glass-2); color: var(--pt-text-dim); font-size: 11px; white-space: nowrap; }
+.cvm-field svg { width: 14px; height: 14px; }
+.cvm-field input, .cvm-field select { width: 46px; height: 24px; border: 1px solid transparent; border-radius: max(2px, calc(var(--cvm-ctl-r) - 3px)); background: color-mix(in srgb, var(--pt-text) 9%, transparent); color: var(--pt-text); font: 600 12px var(--pt-font); font-variant-numeric: tabular-nums; text-align: center; outline: none; }
+.cvm-field select { width: 84px; text-align: left; padding: 0 6px; -webkit-appearance: none; appearance: none; }
+.cvm-field input:focus, .cvm-field select:focus { border-color: var(--pt-accent); box-shadow: 0 0 0 3px var(--pt-accent-soft); }
+.cvm-field input[type="color"] { width: 24px; padding: 0; border-radius: 50%; overflow: hidden; cursor: pointer; }
+.cvm-field input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+.cvm-field input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 50%; }
+.cvm-link { display: flex; align-items: center; gap: 6px; flex-basis: 100%; padding: 4px 2px 2px; }
+.cvm-link input { flex: 1; min-width: 260px; height: 28px; padding: 0 10px; border-radius: 14px; border: 1px solid var(--pt-glass-brd-strong); background: color-mix(in srgb, var(--pt-text) 9%, transparent); color: var(--pt-text); font: 12.5px var(--pt-font); outline: none; }
+.cvm-link input:focus { border-color: var(--pt-accent); }
+
+/* block tools (duplicate / move / delete a repeatable block) + image popover */
+.pt-menu-pop.cvm-blocktools { min-width: 0; padding: var(--glass-pad, 8px); border-radius: calc(var(--cvm-ctl-r) + var(--glass-pad, 8px) + 1px); z-index: 118; }
+.pt-menu-pop.cvm-blocktools.pt-open { display: flex; flex-direction: column; gap: 2px; }
+.pt-menu-pop.cvm-imgpop { min-width: 0; z-index: 181; }
+
+/* zoom/paper readout under the page */
+.cvm-status { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 120; font: 600 11px var(--pt-font); color: var(--pt-text-faint); pointer-events: none; white-space: nowrap; }
+
+@media print { .cvm-root { display: none; } }

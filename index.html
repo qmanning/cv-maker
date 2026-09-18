@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CV Maker</title>
+  <meta name="robots" content="noindex" />
+  <script>
+    // no-flash theme: apply saved choice before first paint (default dark) — shares Infospector's key
+    try { var t = localStorage.getItem('pt:theme'); document.documentElement.setAttribute('data-pt-theme', t === 'light' ? 'light' : 'dark'); }
+    catch (e) { document.documentElement.setAttribute('data-pt-theme', 'dark'); }
+  </script>
+  <link rel="stylesheet" href="./dist/cv-maker.css" />
+  <script src="./config.js"></script>
+</head>
+<body>
+  <div id="cv-maker"></div>
+  <script type="module" src="./dist/cv-maker.js"></script>
+</body>
+</html>
