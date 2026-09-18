@@ -92,7 +92,8 @@ test("every <a> href is http(s)/mailto and points at the reserved .example TLD o
 });
 
 test("PRIVACY GUARD: the fictional sample contains none of the real author's identifying strings", () => {
-    for (const needle of ["Manning", "qmanning"]   // the author's own details must never ship in the sample or the bundle) {
+    // the author's own details must never ship in the sample
+    for (const needle of ["Manning", "qmanning"]) {
         assert.doesNotMatch(html, new RegExp(needle.replace(/[.]/g, "\\.")), `template unexpectedly contains "${needle}"`);
     }
 });

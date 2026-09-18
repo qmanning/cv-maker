@@ -14,7 +14,8 @@ const cssPath = path.join(distDir, "cv-maker.css");
 const js = fs.readFileSync(jsPath, "utf8");
 const css = fs.readFileSync(cssPath, "utf8");
 
-const PRIVACY_NEEDLES = ["Manning", "qmanning"]   // the author's own details must never ship in the sample or the bundle;
+// the author's own details must never ship in the sample or the bundle
+const PRIVACY_NEEDLES = ["Manning", "qmanning"];
 
 test("dist/cv-maker.js and dist/cv-maker.css exist and are non-trivial in size", () => {
     assert.ok(fs.statSync(jsPath).size > 50_000, "cv-maker.js seems too small to be the real bundle");
