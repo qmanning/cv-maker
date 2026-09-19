@@ -4,12 +4,13 @@
 // placeholder copy; only when the document has no block of that kind does a plain built-in one step in.
 // Pure DOM — no React, no editor — so it is unit-testable.
 
-export type BlockKind = "content" | "experience" | "dual";
+export type BlockKind = "content" | "experience" | "dual" | "divider";
 
 export const BLOCK_KINDS: { kind: BlockKind; label: string; hint: string }[] = [
     { kind: "content", label: "Content block", hint: "a paragraph, like the summary" },
     { kind: "experience", label: "Experience block", hint: "title, dates, flowing bullets" },
     { kind: "dual", label: "Dual list", hint: "two lists side by side" },
+    { kind: "divider", label: "Divider", hint: "a rule between sections" },
 ];
 
 /** the units the editor treats as rows: what pagination keeps together and what the block tools act on */
@@ -29,6 +30,7 @@ const PLACEHOLDER = {
 function prototypeFor(kind: BlockKind, page: Element): HTMLElement | null {
     const named = page.querySelector<HTMLElement>(`[data-cv-kind="${kind}"]`);
     if (named) return named;
+    if (kind === "divider") return null;                     // nothing to learn from the document: a rule is a rule
     const blocks = topBlocks(page);
     const regionsOf = (b: Element) => Array.from(b.querySelectorAll("[data-cv-edit]"));
     if (kind === "experience") return page.querySelector<HTMLElement>("[data-cv-repeat]");
@@ -43,6 +45,9 @@ function prototypeFor(kind: BlockKind, page: Element): HTMLElement | null {
 const BUILT_IN: Record<BlockKind, string> = {
     content: `<div class="cv-summary" data-cv-block data-cv-edit><p></p></div>`,
     experience: `<section class="cv-job" data-cv-block data-cv-repeat="job"><div class="cv-job-title" data-cv-edit><p></p></div><div class="cv-job-meta" data-cv-edit><p></p></div><div class="cv-job-body cv-flow" data-cv-edit><ul><li><p></p></li></ul></div></section>`,
+    // self-styled, so the rule survives in the exported source HTML whatever the template's CSS says about <hr>;
+    // the padding is its click target (a divider has no text to put a caret in — you select it by clicking it)
+    divider: `<div class="cv-divider" data-cv-block style="padding: 5pt 0"><hr style="border: 0; border-top: 1px solid var(--cv-rule, #e5e5e5); margin: 0"></div>`,
     dual: `<section class="cv-cols2" data-cv-block><div><div class="cv-h2" data-cv-edit><p></p></div><div class="cv-skill-body" data-cv-edit><ul><li><p></p></li></ul></div></div><div><div class="cv-h2" data-cv-edit><p></p></div><div class="cv-skill-body" data-cv-edit><ul><li><p></p></li></ul></div></div></section>`,
 };
 
@@ -79,6 +84,9 @@ export function buildBlock(kind: BlockKind, page: Element): HTMLElement {
     block.querySelectorAll("[data-col-break]").forEach((el) => el.removeAttribute("data-col-break"));
     block.removeAttribute("data-cv-keep-next"); block.removeAttribute("data-cv-kind");
     if (!block.hasAttribute("data-cv-block")) block.setAttribute("data-cv-block", "");
+    // inserted rows are marked so the editor can keep their spacing consistent (see normalizeGaps in CvMaker):
+    // a cloned block only brings its own margins, not the breathing room its prototype got from its old neighbours
+    block.setAttribute("data-cv-added", "");
     fill(block, kind);
     return block;
 }

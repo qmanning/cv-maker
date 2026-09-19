@@ -101,3 +101,19 @@ test("a template can name its prototypes with data-cv-kind", () => {
     assert.ok(!block.hasAttribute("data-cv-kind"), "the clone is an ordinary block, not a second prototype");
     assert.doesNotMatch(block.textContent || "", /Old/);
 });
+
+test("a divider is a self-styled rule with a click target, and has nothing to edit", () => {
+    const block = buildBlock("divider", samplePage());
+    assert.ok(block.matches(".cv-divider[data-cv-block]"));
+    assert.equal(block.querySelectorAll("[data-cv-edit]").length, 0);
+    const hr = block.querySelector("hr");
+    assert.ok(hr, "it contains the rule");
+    assert.match(hr.getAttribute("style") || "", /border-top:\s*1px solid/, "styled inline, so it survives in the exported source whatever the template says about <hr>");
+    assert.match(block.getAttribute("style") || "", /padding/, "padding gives the 1px rule something to click");
+});
+
+test("every inserted block is marked data-cv-added so the editor can keep its spacing consistent", () => {
+    const page = samplePage();
+    for (const kind of ["content", "experience", "dual", "divider"]) assert.ok(buildBlock(kind, page).hasAttribute("data-cv-added"), kind);
+    assert.equal(page.querySelectorAll("[data-cv-added]").length, 0, "building a block never marks the document's own blocks");
+});

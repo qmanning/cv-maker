@@ -11,6 +11,7 @@
 // rules the real build uses (see test/unit/_helpers.mjs) without duplicating this logic. Importing this
 // module never triggers a build on its own — only running it directly (`node build.mjs`) does, guarded
 // by the `import.meta.url` check at the bottom.
+import fs from "node:fs";
 import { build } from "esbuild";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -62,7 +63,11 @@ export function buildOptions({ outdir } = {}) {
 }
 
 export async function runBuild(opts) {
-    return build(buildOptions(opts));
+    const options = buildOptions(opts);
+    // chunk names carry a content hash, so every build would otherwise leave the previous build's chunks behind —
+    // and dist/ is committed and shipped. Start from an empty output folder.
+    fs.rmSync(options.outdir, { recursive: true, force: true });
+    return build(options);
 }
 
 const isMain = (() => {

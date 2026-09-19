@@ -149,6 +149,10 @@ async function collect(el: Element, page: Element, flows: Flow[], inCell: boolea
         return push(cols, px(cs.columnGap), regionBlocks(el, page));
     }
     if (el instanceof HTMLImageElement) return push(1, 0, [await imagePara(el)]);
+    if (el instanceof HTMLHRElement) {                      // a divider block: a bottom-ruled empty paragraph
+        const color = hex(cs.borderTopColor) || "DDDDDD", box = el.parentElement ? getComputedStyle(el.parentElement) : cs;
+        return push(1, 0, [new Paragraph({ spacing: { before: tw(px(box.marginTop) + px(box.paddingTop)), after: tw(px(box.marginBottom) + px(box.paddingBottom)), line: 40, lineRule: LineRuleType.EXACT }, border: { bottom: { style: BorderStyle.SINGLE, size: 6, color, space: 0 } } })]);
+    }
     const kids = Array.from(el.children).filter((c) => getComputedStyle(c).display !== "none");
     if (!inCell && cs.display.includes("flex") && !cs.flexDirection.startsWith("column") && kids.length > 1) {
         // side-by-side columns → one borderless table row

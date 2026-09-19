@@ -66,6 +66,31 @@ async function rasterize(html: string, widthPt: number, heightPt: number, libUrl
     } finally { frame.remove(); }
 }
 
+// Inserted rows ([data-cv-added]) always get breathing room: at least MIN_GAP_PT of space to the block above and
+// below, measured on the laid-out page and topped up with inline margins (so it persists in the saved source).
+// Two entries of the same repeating kind (job next to job) keep the template's own rhythm instead.
+const MIN_GAP_PT = 12, DIVIDER_GAP_PT = 7;   // a divider carries 5pt of its own padding: 7 + 5 = the same 12
+function normalizeGaps(page: HTMLElement, pageWPt: number): void {
+    const rect = page.getBoundingClientRect(); if (!rect.width) return;
+    const zoomK = parseFloat(getComputedStyle(page).zoom) || 1, pxPerOwnPt = (rect.width / pageWPt) * zoomK;   // screen px per pt in the page's own units
+    const added = topBlocks(page).filter((b) => b.hasAttribute("data-cv-added"));
+    for (const b of added) { b.style.marginTop = ""; b.style.marginBottom = ""; }
+    const sameRun = (a: Element, b: Element | null) => !!b && a.hasAttribute("data-cv-repeat") && a.getAttribute("data-cv-repeat") === b.getAttribute("data-cv-repeat");
+    for (const b of added) {
+        const min = b.classList.contains("cv-divider") ? DIVIDER_GAP_PT : MIN_GAP_PT;
+        for (const side of ["Top", "Bottom"] as const) {
+            const other = side === "Top" ? b.previousElementSibling : b.nextElementSibling;
+            if (!other || other.classList.contains("cvm-spacer") || sameRun(b, other)) continue;
+            for (let pass = 0; pass < 3; pass++) {             // margins collapse, so top up and re-measure
+                const gap = (side === "Top" ? b.getBoundingClientRect().top - other.getBoundingClientRect().bottom : other.getBoundingClientRect().top - b.getBoundingClientRect().bottom) / pxPerOwnPt;
+                if (gap >= min - 0.25) break;
+                const cur = parseFloat(getComputedStyle(b)[`margin${side}`]) / PT || 0;
+                b.style[`margin${side}`] = (cur + (min - gap)).toFixed(2) + "pt";
+            }
+        }
+    }
+}
+
 /* ---------------- component ---------------- */
 
 // Framework-agnostic on purpose (no router, no server assumptions): the same component runs inside this
@@ -208,13 +233,14 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
             return new Editor({
                 element: { mount: el } as unknown as Element, extensions, content, injectCSS: false,
                 editorProps: { attributes: { spellcheck: String(stateRef.current.settings.spellcheck) } },
-                onFocus: ({ editor }) => { setActive(editor as Editor); setLinkOpen(false); },
+                onFocus: ({ editor }) => { setActive(editor as Editor); setPicked(null); setLinkOpen(false); },
                 onTransaction: () => setTick((t) => t + 1),
                 onUpdate: () => touch(),
             });
         });
         editorsRef.current = editors;
-        setActive(null); schedule();
+        const mounted = host.querySelector<HTMLElement>(".cv-page"); if (mounted) normalizeGaps(mounted, PAPERS[stateRef.current.settings.paper].w);
+        setActive(null); setPicked(null); schedule();
         // a block that was just inserted gets the caret, with its placeholder selected — type to replace it
         if (focusBlock.current != null) {
             const page = host.querySelector(".cv-page"), block = page ? topBlocks(page)[focusBlock.current] : null; focusBlock.current = null;
@@ -312,7 +338,9 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
     }), [loadSourceText, templateUrl]);
 
     /* ---- rows: move / duplicate / delete whichever block holds the caret (a job, the summary, a dual list…) ---- */
-    const activeBlock = active ? (active.view.dom.closest(UNIT) as HTMLElement | null) : null;
+    // a block with no text (a divider) is picked by clicking it; otherwise the row is wherever the caret is
+    const [picked, setPicked] = useState<HTMLElement | null>(null);
+    const activeBlock = active ? (active.view.dom.closest(UNIT) as HTMLElement | null) : picked;
     useEffect(() => { if (!activeBlock) return; activeBlock.classList.add("cvm-hot"); return () => activeBlock.classList.remove("cvm-hot"); }, [activeBlock]);
     const blockOp = useCallback((op: "dup" | "up" | "down" | "del") => {
         const host = hostRef.current, src = stateRef.current.source; if (!host || !activeBlock || !src) return;
@@ -358,6 +386,8 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
     const onHostClick = useCallback((e: React.MouseEvent) => {
         const img = (e.target as HTMLElement).closest("img");
         if (img && hostRef.current?.contains(img)) { const r = img.getBoundingClientRect(); setImgPop({ img, left: r.left, top: r.bottom + 8 }); }
+        const rule = (e.target as HTMLElement).closest<HTMLElement>(".cv-divider");
+        if (rule && hostRef.current?.contains(rule)) { (document.activeElement as HTMLElement | null)?.blur?.(); setActive(null); setPicked(rule); }
     }, []);
     const onImgFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const f = e.target.files?.[0], img = imgPop?.img; e.target.value = ""; if (!f || !img) return;
@@ -386,7 +416,7 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
             const t = e.target as HTMLElement;
             if (!t.closest(".pt-menu-pop, .pt-dim-pop, #pt-bar, .pt-cpick")) { setMenu(null); setImgPop(null); }
             if (!t.closest(".cvm-insert, .cvm-insert-menu")) { setInsertMenu(false); insertHold.current = false; }
-            if (!t.closest(".cvm-paper, .pt-menu-pop, #pt-bar, #pt-ctx, #pt-confirm, .pt-cpick")) { setActive(null); (document.activeElement as HTMLElement | null)?.blur?.(); }
+            if (!t.closest(".cvm-paper, .pt-menu-pop, #pt-bar, #pt-ctx, #pt-confirm, .pt-cpick")) { setActive(null); setPicked(null); (document.activeElement as HTMLElement | null)?.blur?.(); }
         };
         document.addEventListener("mousedown", down); return () => document.removeEventListener("mousedown", down);
     }, []);
@@ -567,7 +597,7 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
                         <div className="pt-menu-pop pt-open cvm-insert-menu" role="menu" style={{ left: insertAt.left + insertAt.width / 2, top: insertAt.y + 22 }} onMouseDown={keep}>
                             {BLOCK_KINDS.map((k) => (
                                 <button key={k.kind} className="pt-menu-item cvm-row" role="menuitem" onClick={() => addBlock(k.kind)}>
-                                    {k.kind === "content" ? <Text /> : k.kind === "experience" ? <BriefcaseBusiness /> : <Columns2 />}{k.label}<span className="cvm-hint">{k.hint}</span>
+                                    {k.kind === "content" ? <Text /> : k.kind === "experience" ? <BriefcaseBusiness /> : k.kind === "dual" ? <Columns2 /> : <Minus />}{k.label}<span className="cvm-hint">{k.hint}</span>
                                 </button>
                             ))}
                         </div>

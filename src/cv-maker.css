@@ -72,6 +72,8 @@ body > .pt-cpick { z-index: 2100; }
 .cvm-host [data-col-break]::before { content: "⇥ column"; position: absolute; top: -6.5pt; left: 0; font: 600 5pt var(--pt-font); letter-spacing: .3pt; text-transform: uppercase; color: var(--pt-guide-sel); pointer-events: none; }
 .cvm-host img { cursor: pointer; }
 .cvm-host img:hover { outline: 1px solid var(--pt-accent); outline-offset: 2px; }
+.cvm-host .cv-divider { cursor: pointer; }
+.cvm-host .cv-divider:hover, .cvm-host .cv-divider.cvm-hot { outline: 1px solid var(--pt-accent); outline-offset: 1pt; border-radius: 1.5pt; }
 .cvm-host [data-cv-repeat].cvm-hot { box-shadow: -3pt 0 0 0 #fff, -4.5pt 0 0 0 var(--pt-accent); }
 
 /* format bar: a glass surface (.pt-menu-pop) that floats in place, just above the box being edited (JS positions it) */
