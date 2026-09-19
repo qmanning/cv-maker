@@ -5,6 +5,10 @@ Pull requests add their entry under **Unreleased**; a release moves it under a v
 
 ## [Unreleased]
 
+### Added
+- **Add a row anywhere.** Hover the gap between two blocks and a **+** appears on a hairline showing where the new block will land. Click it and choose **Content block** (a paragraph, like the summary), **Experience block** (title, dates, bullets that flow across two columns) or **Dual list** (two lists side by side). The new block copies the shape of the matching block already in your document — so it works with any template — arrives with placeholder copy, and takes the caret with that copy selected, ready to type over. Templates can name their prototypes with `data-cv-kind="content|experience|dual"`.
+- The move / duplicate / delete tools now work on **any** block that holds the caret (the summary, a dual list…), not only on jobs.
+
 ## [0.1.0] — 2026-09-18
 
 ### Added

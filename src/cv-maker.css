@@ -94,7 +94,18 @@ body > .pt-cpick { z-index: 2100; }
 .cvm-link input { flex: 1; min-width: 260px; height: 28px; padding: 0 10px; border-radius: 14px; border: 1px solid var(--pt-glass-brd-strong); background: color-mix(in srgb, var(--pt-text) 9%, transparent); color: var(--pt-text); font: 12.5px var(--pt-font); outline: none; }
 .cvm-link input:focus { border-color: var(--pt-accent); }
 
-/* block tools (duplicate / move / delete a repeatable block) + image popover */
+/* the "+" between rows: a hairline where the block will land, and an Infospector round button on it — .pt-rbtn, so its
+   corner follows the Radius dial like every other control (concentric chrome) */
+.cvm-insert-line { position: fixed; height: 0; border-top: 1.5px solid var(--pt-accent); z-index: 117; pointer-events: none; opacity: .9; box-shadow: 0 0 10px color-mix(in srgb, var(--pt-accent) 55%, transparent); animation: cvm-insert-in 160ms cubic-bezier(.22,.61,.36,1); transform-origin: center; }
+.pt-rbtn.cvm-insert { position: fixed; z-index: 119; width: 28px; height: 28px; translate: -50% -50%; background: var(--pt-accent); color: var(--pt-accent-ink, #fff); animation: cvm-insert-pop 220ms var(--pt-spring, ease-out); }
+.pt-rbtn.cvm-insert:hover { transform: none; filter: brightness(1.08); }
+.pt-rbtn.cvm-insert svg { width: 16px; height: 16px; stroke-width: 2.5; transition: rotate 200ms cubic-bezier(.22,.61,.36,1); }
+.pt-rbtn.cvm-insert[aria-expanded="true"] svg { rotate: 45deg; }
+.pt-menu-pop.cvm-insert-menu { z-index: 181; min-width: 300px; translate: -50% 0; }
+@keyframes cvm-insert-in { from { opacity: 0; scale: .6 1; } to { opacity: .9; scale: 1 1; } }
+@keyframes cvm-insert-pop { from { opacity: 0; scale: .4; } to { opacity: 1; scale: 1; } }
+
+/* block tools (duplicate / move / delete the row that holds the caret) + image popover */
 .pt-menu-pop.cvm-blocktools { min-width: 0; padding: var(--glass-pad, 8px); border-radius: calc(var(--cvm-ctl-r) + var(--glass-pad, 8px) + 1px); z-index: 118; }
 .pt-menu-pop.cvm-blocktools.pt-open { display: flex; flex-direction: column; gap: 2px; }
 .pt-menu-pop.cvm-imgpop { min-width: 0; z-index: 181; }

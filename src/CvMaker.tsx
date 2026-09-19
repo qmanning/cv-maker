@@ -13,13 +13,14 @@ import { TextStyle } from "@tiptap/extension-text-style";
 import { Color } from "@tiptap/extension-color";
 import { TextAlign } from "@tiptap/extension-text-align";
 import {
-    AlignCenter, AlignLeft, AlignRight, ArrowDown, ArrowLeft, ArrowUp, Bold, BookOpen, ChevronDown, Columns2, Copy, Download,
+    AlignCenter, AlignLeft, AlignRight, ArrowDown, ArrowLeft, ArrowUp, Bold, BookOpen, BriefcaseBusiness, Plus, Text, ChevronDown, Columns2, Copy, Download,
     Ellipsis, Eraser, FileCode2, FileImage, FileText, FileType2, ImageUp, Italic, Link2, List, Minus, Moon, RotateCcw,
     Save, SpellCheck, Sun, Upload, Trash2, Underline as UnderlineIcon, ALargeSmall, MoveVertical, MoveHorizontal,
 } from "lucide-react";
 import { FontSize } from "@/components/ui/font-size-extension";
 import { FontWeight } from "@/components/ui/font-weight-extension";
 import { BlockLineHeight, ColumnBreak, LetterSpacing } from "./cv-extensions";
+import { BLOCK_KINDS, UNIT, insertBlock, topBlocks, type BlockKind } from "./cv-blocks";
 import { attachColorPicker, toHex, useInfospectorLook } from "./use-infospector-look";
 import { LookMenu } from "./LookMenu";
 import { FOOTER_PT, GAP_PT, MIN_FIT, PAPERS, PT, type PaperId, type Source, fullHtml, pageBoxCss, parseSource, slugify } from "./cv-source";
@@ -214,6 +215,12 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
         });
         editorsRef.current = editors;
         setActive(null); schedule();
+        // a block that was just inserted gets the caret, with its placeholder selected — type to replace it
+        if (focusBlock.current != null) {
+            const page = host.querySelector(".cv-page"), block = page ? topBlocks(page)[focusBlock.current] : null; focusBlock.current = null;
+            const first = block && editors.find((e) => block.contains(e.view.dom));
+            if (first) window.setTimeout(() => { if (!first.isDestroyed) { first.commands.focus(); first.commands.selectAll(); block!.scrollIntoView({ block: "nearest", behavior: "smooth" }); } }, 40);
+        }
         document.fonts?.ready.then(schedule);
         return () => { editors.forEach((e) => e.destroy()); editorsRef.current = []; };
     }, [source, schedule, touch]);
@@ -304,21 +311,48 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
         run: async () => loadSourceText(await fetchSource(templateUrl), "Résumé"),
     }), [loadSourceText, templateUrl]);
 
-    /* ---- repeatable blocks (jobs): duplicate / move / delete ---- */
-    const activeBlock = active ? (active.view.dom.closest("[data-cv-repeat]") as HTMLElement | null) : null;
+    /* ---- rows: move / duplicate / delete whichever block holds the caret (a job, the summary, a dual list…) ---- */
+    const activeBlock = active ? (active.view.dom.closest(UNIT) as HTMLElement | null) : null;
     useEffect(() => { if (!activeBlock) return; activeBlock.classList.add("cvm-hot"); return () => activeBlock.classList.remove("cvm-hot"); }, [activeBlock]);
     const blockOp = useCallback((op: "dup" | "up" | "down" | "del") => {
         const host = hostRef.current, src = stateRef.current.source; if (!host || !activeBlock || !src) return;
-        const idx = Array.from(host.querySelectorAll("[data-cv-repeat]")).indexOf(activeBlock);
+        const idx = Array.from(host.querySelectorAll(UNIT)).indexOf(activeBlock);
         const tmp = document.createElement("div"); tmp.innerHTML = serialize();
-        const el = tmp.querySelectorAll("[data-cv-repeat]")[idx]; if (!el) return;
-        const same = (n: Element | null) => (n && n.getAttribute("data-cv-repeat") === el.getAttribute("data-cv-repeat") ? n : null);
+        const el = tmp.querySelectorAll(UNIT)[idx]; if (!el) return;
+        const row = (n: Element | null) => (n && n.matches(UNIT) ? n : null);
         if (op === "dup") el.after(el.cloneNode(true));
         if (op === "del") el.remove();
-        if (op === "up") { const prev = same(el.previousElementSibling); if (!prev) return; prev.before(el); }
-        if (op === "down") { const next = same(el.nextElementSibling); if (!next) return; next.after(el); }
+        if (op === "up") { const prev = row(el.previousElementSibling); if (!prev) return; prev.before(el); }
+        if (op === "down") { const next = row(el.nextElementSibling); if (!next) return; next.after(el); }
         setSource({ css: src.css, html: tmp.innerHTML }); setDirty(true);
     }, [activeBlock, serialize]);
+
+    /* ---- the "+" between rows: hover a gap, pick a kind, a new block lands there ---- */
+    const [insertAt, setInsertAt] = useState<{ after: number; y: number; left: number; width: number } | null>(null);
+    const [insertMenu, setInsertMenu] = useState(false);
+    const focusBlock = useRef<number | null>(null), insertHold = useRef(false);
+    const onCanvasMove = useCallback((e: React.MouseEvent) => {
+        if (insertMenu || e.buttons) return;                                     // menu open, or a drag-select in progress
+        const page = hostRef.current?.querySelector(".cv-page"); if (!page) return;
+        const pr = page.getBoundingClientRect(), blocks = topBlocks(page);
+        let hit: { after: number; y: number } | null = null;
+        if (e.clientX >= pr.left - 24 && e.clientX <= pr.right + 24) {
+            for (let i = 0; i < blocks.length; i++) {
+                const bottom = blocks[i].getBoundingClientRect().bottom, nextTop = blocks[i + 1]?.getBoundingClientRect().top ?? bottom + 24;
+                const y = bottom + Math.max(2, Math.min(nextTop - bottom, 16)) / 2;   // mid-gap (a page break's long gap counts as a short one)
+                if (Math.abs(e.clientY - y) <= 9) { hit = { after: i, y }; break; }
+            }
+        }
+        setInsertAt((cur) => (hit ? (cur && cur.after === hit.after && Math.abs(cur.y - hit.y) < 1 ? cur : { ...hit, left: pr.left, width: pr.width }) : insertHold.current ? cur : null));
+    }, [insertMenu]);
+    const addBlock = useCallback((kind: BlockKind) => {
+        const src = stateRef.current.source, at = insertAt; if (!src || !at) return;
+        const tmp = document.createElement("div"); tmp.innerHTML = serialize();
+        const page = tmp.querySelector(".cv-page"); if (!page) return;
+        focusBlock.current = insertBlock(page, at.after, kind);
+        setInsertMenu(false); setInsertAt(null); insertHold.current = false;
+        setSource({ css: src.css, html: tmp.innerHTML }); setDirty(true);
+    }, [insertAt, serialize]);
 
     /* ---- images: click any <img> in the document to swap it ---- */
     const onHostClick = useCallback((e: React.MouseEvent) => {
@@ -351,6 +385,7 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
         const down = (e: MouseEvent) => {
             const t = e.target as HTMLElement;
             if (!t.closest(".pt-menu-pop, .pt-dim-pop, #pt-bar, .pt-cpick")) { setMenu(null); setImgPop(null); }
+            if (!t.closest(".cvm-insert, .cvm-insert-menu")) { setInsertMenu(false); insertHold.current = false; }
             if (!t.closest(".cvm-paper, .pt-menu-pop, #pt-bar, #pt-ctx, #pt-confirm, .pt-cpick")) { setActive(null); (document.activeElement as HTMLElement | null)?.blur?.(); }
         };
         document.addEventListener("mousedown", down); return () => document.removeEventListener("mousedown", down);
@@ -358,7 +393,7 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
     const [, setLayoutTick] = useState(0);
     useEffect(() => {
         const wrap = wrapRef.current; if (!wrap) return;
-        const bump = () => { setLayoutTick((t) => t + 1); setImgPop(null); };
+        const bump = () => { setLayoutTick((t) => t + 1); setImgPop(null); setInsertAt(null); setInsertMenu(false); };
         wrap.addEventListener("scroll", bump, { passive: true }); window.addEventListener("resize", bump);
         return () => { wrap.removeEventListener("scroll", bump); window.removeEventListener("resize", bump); };
     }, [look.ready]);
@@ -521,6 +556,24 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
                     <button className="cvm-fbtn" data-tip="Delete this entry" onClick={() => setConfirm({ msg: "Delete this entry?", ok: "Delete", run: () => blockOp("del") })}><Trash2 /></button>
                 </div>
             )}
+            {insertAt && !busy && (
+                <>
+                    <div className="cvm-insert-line" style={{ left: insertAt.left, width: insertAt.width, top: insertAt.y }} />
+                    <button className="pt-rbtn cvm-insert" aria-label="Add a block here" aria-haspopup="menu" aria-expanded={insertMenu} data-tip={insertMenu ? undefined : "Add a block here"}
+                        style={{ left: insertAt.left + insertAt.width / 2, top: insertAt.y }} onMouseDown={keep}
+                        onMouseEnter={() => { insertHold.current = true; }} onMouseLeave={() => { insertHold.current = insertMenu; }}
+                        onClick={() => { setInsertMenu((o) => !o); insertHold.current = true; }}><Plus /></button>
+                    {insertMenu && (
+                        <div className="pt-menu-pop pt-open cvm-insert-menu" role="menu" style={{ left: insertAt.left + insertAt.width / 2, top: insertAt.y + 22 }} onMouseDown={keep}>
+                            {BLOCK_KINDS.map((k) => (
+                                <button key={k.kind} className="pt-menu-item cvm-row" role="menuitem" onClick={() => addBlock(k.kind)}>
+                                    {k.kind === "content" ? <Text /> : k.kind === "experience" ? <BriefcaseBusiness /> : <Columns2 />}{k.label}<span className="cvm-hint">{k.hint}</span>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </>
+            )}
             {imgPop && (
                 <div className="pt-menu-pop pt-open cvm-imgpop" style={{ left: imgPop.left, top: imgPop.top }}>
                     <button className="pt-menu-item cvm-row" onClick={() => imgFileRef.current?.click()}><ImageUp />Change image…</button>
@@ -535,7 +588,7 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
             }} />}
 
             {/* canvas — Infospector's #pt-stagewrap + background patterns */}
-            <main id="pt-stagewrap" ref={wrapRef} className={`cvm-wrap pt-bg-${look.bg.pattern}`}
+            <main id="pt-stagewrap" ref={wrapRef} className={`cvm-wrap pt-bg-${look.bg.pattern}`} onMouseMove={onCanvasMove} onMouseLeave={() => { if (!insertHold.current && !insertMenu) setInsertAt(null); }}
                 onContextMenu={(e) => { if (!(e.target as HTMLElement).closest(".cvm-paper")) { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY }); } }}>
                 <div className="cvm-paper" ref={paperRef} style={{ ["--cvm-page-w" as string]: paper.w + "pt", zoom }}>
                     <div className="cvm-sheets">

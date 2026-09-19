@@ -8,7 +8,8 @@ CV Maker is an edit-in-place résumé editor that runs entirely in the browser. 
 - **A format bar that follows you.** It appears just above the box you're editing (or below, if there's no room) with bold, italic, underline, font size in pt, weight, line height, letter spacing, a glass color picker, links, bullets, a horizontal rule, alignment, and clear formatting.
 - **Job entries that flow.** A `.cv-flow` region's copy flows across two columns from one input, with an optional "start the next column here" break — so you type one job description and it lands where the design wants it.
 - **Independent side-by-side columns** for skills or anything else that isn't one flowing story.
-- **Duplicate, move, and delete repeatable entries** — click into any `[data-cv-repeat]` block (a job, say) and a small tool pill appears beside it: move up, move down, duplicate, delete.
+- **Add a row anywhere.** Hover between two blocks, click the **+**, and drop in a Content block, an Experience block, or a Dual list — cloned from your document's own blocks, so it matches any template.
+- **Move, duplicate, and delete any block** — click into it and a small tool pill appears beside it.
 - **Swap any image** — click it, choose a file, and it's embedded straight into the document as a data URI. No uploads, no broken links later.
 - **US Letter and A4**, switchable any time.
 - **Fit to one page** scales the whole design down as a single unit (never below 80%) so every line still breaks exactly where it was designed to.
