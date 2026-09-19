@@ -9,6 +9,7 @@ Pull requests add their entry under **Unreleased**; a release moves it under a v
 - **Add a row anywhere.** Hover the gap between two blocks and a **+** appears on a hairline showing where the new block will land. Click it and choose **Content block** (a paragraph, like the summary), **Experience block** (title, dates, bullets that flow across two columns), **Dual list** (two lists side by side) or **Divider** (a rule between sections — click it to select it, then move or delete it). The new block copies the shape of the matching block already in your document — so it works with any template — arrives with placeholder copy, and takes the caret with that copy selected, ready to type over. Templates can name their prototypes with `data-cv-kind="content|experience|dual"`.
 - Inserted blocks always get **consistent breathing room**: the editor keeps at least 12pt between a new block and its neighbours (re-checked whenever rows move), so a list dropped above a paragraph never ends up butted against it. Two jobs in a row keep the template's own rhythm.
 - The move / duplicate / delete tools now work on **any** block that holds the caret (the summary, a dual list…), not only on jobs.
+- The **⋯** menu now ends with a credit: **CV Maker by Q Manning**, linking to qmanning.com/labs/cv-maker. (The credit lives in the tool only — never in an exported résumé, which is yours.)
 
 ### Changed
 - CV Maker's glass now defaults to **Blur 44px** and **Backing 56%** (Infospector's own defaults are 8px / 35%): the chrome floats over a white sheet of small type, so it needs the heavier glass to stay legible. The defaults only apply while those dials are untouched — a look you've set, in either tool, still wins.
@@ -53,3 +54,7 @@ Pull requests add their entry under **Unreleased**; a release moves it under a v
 
 [Unreleased]: https://github.com/qmanning/cv-maker/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/qmanning/cv-maker/releases/tag/v0.1.0
+
+---
+
+Made by [Q Manning](https://qmanning.com) · [Source on GitHub](https://github.com/qmanning/cv-maker) · [See it live in the Labs](https://qmanning.com/labs/cv-maker)

@@ -576,6 +576,11 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
                     <button className="pt-menu-item cvm-row cvm-narrow-only" onClick={() => patch({ spellcheck: !settings.spellcheck })}><SpellCheck />Spellcheck<span className="cvm-hint">{settings.spellcheck ? "on" : "off"}</span></button>
                     <button className="pt-menu-item cvm-row cvm-narrow-only" onClick={() => look.setTheme(look.theme === "light" ? "dark" : "light")}>{look.theme === "light" ? <Sun /> : <Moon />}Theme<span className="cvm-hint">{look.theme}</span></button>
                     <button className="pt-menu-item cvm-row" onClick={(e) => { setMenu(null); setCtx({ x: e.clientX - 240, y: e.clientY }); }}><Sun />Background · colors · appearance…</button>
+                    <div className="pt-menu-div" />
+                    {/* credit: the tool says who made it and where it lives — never the exported résumé, which is the user's */}
+                    <a className="pt-menu-item cvm-row cvm-credit" href="https://qmanning.com/labs/cv-maker" target="_blank" rel="noopener" onClick={() => setMenu(null)}>
+                        <span>CV Maker <span className="cvm-hint" style={{ marginLeft: 4 }}>by Q Manning</span></span><span className="cvm-hint">qmanning.com ↗</span>
+                    </a>
                 </div>
             )}
             {activeBlock && blockRect && paperRect && (

@@ -170,3 +170,7 @@ autosaves one document per browser.
 | PNG export fails with a script-load error | `vendor/html-to-image.js` is missing — re-copy the folder |
 | Export server answers `501` | `puppeteer` isn't installed next to `server.mjs` — run `npm i puppeteer` there |
 | Export server request blocked by CORS | The server only accepts `localhost` / `127.0.0.1` / `::1` origins — don't point `exportServer` at a non-localhost URL |
+
+---
+
+Made by [Q Manning](https://qmanning.com) · [Source on GitHub](https://github.com/qmanning/cv-maker) · [See it live in the Labs](https://qmanning.com/labs/cv-maker)

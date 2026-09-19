@@ -44,15 +44,21 @@ test("dist files contain no absolute filesystem paths from this machine", () => 
 
 test("dist files contain none of the privacy-guard strings", () => {
     for (const [name, text] of [["cv-maker.js", js], ["cv-maker.css", css]]) {
+        // the tool credits its author in the ⋯ menu ("CV Maker by Q Manning" → qmanning.com/labs/cv-maker) — that is
+        // intended. What must never ship is anything ELSE about him, so the credit is removed before the check: any
+        // other mention (a résumé line, an email, a social handle) still fails.
+        const withoutCredit = text.replaceAll("https://qmanning.com/labs/cv-maker", "").replaceAll("by Q Manning", "").replace(/qmanning\.com (?:\u2197|\\u2197)/g, "");
         for (const needle of PRIVACY_NEEDLES) {
-            assert.doesNotMatch(text, new RegExp(needle.replace(/[.]/g, "\\.")), `${name} unexpectedly contains "${needle}"`);
+            assert.doesNotMatch(withoutCredit, new RegExp(needle.replace(/[.]/g, "\\."), "i"), `${name} contains "${needle}" outside the intended credit`);
         }
     }
 });
 
-test("index.html references only relative URLs (works at any URL depth)", () => {
+test("index.html loads only relative URLs (works at any URL depth)", () => {
     const html = fs.readFileSync(path.join(repoRoot, "index.html"), "utf8");
-    const urlAttrs = [...html.matchAll(/(?:href|src)="([^"]+)"/g)].map((m) => m[1]);
+    // asset references only — <link rel="author"> points at the author's site on purpose and loads nothing
+    const assets = html.replace(/<link[^>]+rel="author"[^>]*>/g, "").replace(/<!--[\s\S]*?-->/g, "");
+    const urlAttrs = [...assets.matchAll(/(?:href|src)="([^"]+)"/g)].map((m) => m[1]);
     assert.ok(urlAttrs.length > 0, "expected at least one href/src in index.html");
     for (const url of urlAttrs) {
         assert.ok(!url.startsWith("/"), `index.html url "${url}" starts with a leading "/" — breaks at non-root depths`);

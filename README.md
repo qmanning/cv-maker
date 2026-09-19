@@ -86,6 +86,8 @@ layout — columns, header, rules. The editor never rewrites your CSS; it only m
 
 ## Exports
 
+![An export in progress: the sheet dims and a scan line sweeps it until the file is ready](docs/screenshots/export.png)
+
 | Format | What you get | Needs a server? |
 | --- | --- | --- |
 | PDF | Real, selectable text and live links — ATS-readable | No — falls back to the browser's print dialog ("Save as PDF") |

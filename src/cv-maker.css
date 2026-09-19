@@ -33,6 +33,7 @@ body > .pt-cpick { z-index: 2100; }
 .cvm-dirty { width: 7px; height: 7px; border-radius: 50%; background: var(--pt-open); flex: none; }
 .pt-menu-item.cvm-row { display: flex; align-items: center; gap: 9px; }
 .pt-menu-item.cvm-row .cvm-hint { margin-left: auto; color: var(--pt-text-faint); font-size: 11.5px; }
+.pt-menu-item.cvm-credit { text-decoration: none; justify-content: space-between; box-sizing: border-box; }
 .pt-menu-item.cvm-active { background: var(--pt-accent-soft); }
 
 /* the canvas: Infospector's #pt-stagewrap, but it scrolls (a page is taller than a window) */
