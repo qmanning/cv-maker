@@ -13,7 +13,7 @@ import { renderExport, validExportBody, EXPORT_SCHEME } from "./export.mjs";
 import { setupFiles } from "./files.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(here, "..");                       // the prebuilt folder
+const ROOT = app.isPackaged ? path.join(here, "web") : path.resolve(here, "..");   // the prebuilt folder (electron-builder copies it to web/)
 const ORIGIN = "app://cv-maker";
 const SERVED = [/^\/index\.html$/, /^\/(dist|vendor|templates)\/[^\0]+$/];
 const MAX_BODY = 25 * 1024 * 1024;

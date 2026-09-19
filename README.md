@@ -127,16 +127,35 @@ and it renders your document with JavaScript disabled and all network requests b
 serves the folder on its own `app://` origin and answers the editor's existing export-server option
 itself, so **PDF and PNG are one click — no `server.mjs`, no puppeteer, no print dialog.**
 
+**Download** an installer from [Releases](https://github.com/qmanning/cv-maker/releases) — macOS
+(`…-mac-arm64.dmg` for Apple Silicon, `…-mac-x64.dmg` for Intel) or Windows — **or run it from source:**
+
 ```bash
 cd electron
 npm install
 npm start
 ```
 
+### First launch (the builds are unsigned)
+
+CV Maker is free and I don't pay Apple or Microsoft for a signing certificate, so your computer will
+ask you to vouch for the app once. If you'd rather not, use the [web version](https://qmanning.com/labs/cv-maker/demo)
+or run it from source (above) — same editor, and neither shows a warning.
+
+- **macOS** — drag *CV Maker* to Applications and open it. macOS says it *"could not verify CV Maker is
+  free of malware"*: click **Done**, open **System Settings → Privacy & Security**, scroll to
+  *"CV Maker was blocked…"*, click **Open Anyway**, and confirm. Only the first time. (If it says the app
+  *"is damaged"* instead, run `xattr -cr "/Applications/CV Maker.app"` in Terminal and open it again.)
+- **Windows** — on *"Windows protected your PC"*, click **More info → Run anyway**.
+
+Build the installers yourself with `npm run dist` (macOS) or `npm run dist:win`; pushing a `v*` tag
+makes GitHub build both and attach them to a draft release. Unsigned also means no auto-update:
+grab the next version from Releases.
+
 Exports render in a throwaway window with JavaScript off and every network request refused, the same
 posture as `server.mjs`. `npm run smoke` launches the app hidden, exports a PDF and a PNG through the
 real UI, and — if puppeteer is resolvable (or `CVM_PUPPETEER_FROM=/path/with/node_modules`) — compares
-the PDF with puppeteer's, text run by text run. It isn't packaged, signed, or auto-updating yet.
+the PDF with puppeteer's, text run by text run. It isn't signed or auto-updating yet.
 
 **Your résumé is a real file.** In the desktop app the document is one Source HTML file on disk —
 **File → Open / Open Recent**, drop a file on the window, **Save** (⌘S) and **Save As** (⇧⌘S), an

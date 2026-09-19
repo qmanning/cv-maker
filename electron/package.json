@@ -11,10 +11,88 @@
     "main": "main.mjs",
     "scripts": {
         "start": "electron .",
-        "smoke": "node smoke.mjs"
+        "smoke": "node smoke.mjs",
+        "icon": "electron build/make-icon.mjs",
+        "dist": "electron-builder --mac",
+        "dist:win": "electron-builder --win"
     },
     "devDependencies": {
         "electron": "^44.4.3",
+        "electron-builder": "^26.15.3",
         "pdfjs-dist": "^6.3.289"
+    },
+    "build": {
+        "appId": "com.qmanning.cvmaker",
+        "productName": "CV Maker",
+        "copyright": "MIT © 2026 Q Manning",
+        "directories": {
+            "output": "out",
+            "buildResources": "build"
+        },
+        "files": [
+            "main.mjs",
+            "export.mjs",
+            "files.mjs",
+            "preload.cjs",
+            "package.json",
+            {
+                "from": "..",
+                "to": "web",
+                "filter": [
+                    "index.html",
+                    "dist/**",
+                    "vendor/**",
+                    "templates/**",
+                    "LICENSE"
+                ]
+            }
+        ],
+        "fileAssociations": [
+            {
+                "ext": [
+                    "html",
+                    "htm"
+                ],
+                "name": "Résumé (HTML)",
+                "role": "Editor",
+                "rank": "Alternate"
+            }
+        ],
+        "mac": {
+            "category": "public.app-category.productivity",
+            "target": [
+                {
+                    "target": "dmg",
+                    "arch": [
+                        "arm64",
+                        "x64"
+                    ]
+                }
+            ],
+            "identity": "-",
+            "hardenedRuntime": false,
+            "gatekeeperAssess": false,
+            "artifactName": "CV-Maker-${version}-mac-${arch}.${ext}"
+        },
+        "dmg": {
+            "title": "CV Maker ${version}"
+        },
+        "win": {
+            "target": [
+                {
+                    "target": "nsis",
+                    "arch": [
+                        "x64",
+                        "arm64"
+                    ]
+                }
+            ],
+            "artifactName": "CV-Maker-${version}-win-${arch}.${ext}"
+        },
+        "nsis": {
+            "oneClick": false,
+            "allowToChangeInstallationDirectory": true
+        },
+        "publish": null
     }
 }

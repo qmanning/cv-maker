@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- CV Maker app icon — the Labs tile's motif: a sheet on the dotted canvas, the caret mid-edit. macOS grid: 824 body, 100 margin. -->
+  <defs>
+    <pattern id="g" width="40" height="40" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="2" fill="rgba(255,255,255,.13)"/></pattern>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1a1e28"/><stop offset="1" stop-color="#0c0e13"/></linearGradient>
+    <clipPath id="body"><rect x="100" y="100" width="824" height="824" rx="186"/></clipPath>
+    <filter id="sh" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#000" flood-opacity=".45"/></filter>
+  </defs>
+  <g clip-path="url(#body)">
+    <rect x="100" y="100" width="824" height="824" fill="url(#bg)"/>
+    <rect x="100" y="100" width="824" height="824" fill="url(#g)"/>
+    <g filter="url(#sh)">
+      <rect x="262" y="196" width="500" height="648" rx="22" fill="#fff"/>
+    </g>
+    <circle cx="332" cy="272" r="30" fill="#3666f8"/>
+    <rect x="382" y="250" width="210" height="22" rx="11" fill="#111"/>
+    <rect x="382" y="284" width="140" height="14" rx="7" fill="#b9bcc4"/>
+    <rect x="302" y="334" width="420" height="3" fill="#e7e8ec"/>
+    <rect x="302" y="372" width="420" height="14" rx="7" fill="#d9dbe1"/>
+    <rect x="302" y="400" width="340" height="14" rx="7" fill="#d9dbe1"/>
+    <rect x="302" y="458" width="150" height="20" rx="10" fill="#111"/>
+    <rect x="302" y="500" width="250" height="18" rx="9" fill="#111" opacity=".85"/>
+    <rect x="566" y="490" width="8" height="38" rx="4" fill="#3666f8"/>
+    <rect x="302" y="548" width="196" height="12" rx="6" fill="#c9ccd3"/>
+    <rect x="302" y="574" width="186" height="12" rx="6" fill="#c9ccd3"/>
+    <rect x="302" y="600" width="170" height="12" rx="6" fill="#c9ccd3"/>
+    <rect x="526" y="548" width="196" height="12" rx="6" fill="#c9ccd3"/>
+    <rect x="526" y="574" width="160" height="12" rx="6" fill="#c9ccd3"/>
+    <rect x="302" y="662" width="150" height="20" rx="10" fill="#111"/>
+    <rect x="302" y="704" width="196" height="12" rx="6" fill="#c9ccd3"/>
+    <rect x="302" y="730" width="176" height="12" rx="6" fill="#c9ccd3"/>
+    <rect x="526" y="704" width="196" height="12" rx="6" fill="#c9ccd3"/>
+    <rect x="526" y="730" width="150" height="12" rx="6" fill="#c9ccd3"/>
+  </g>
+  <rect x="100.5" y="100.5" width="823" height="823" rx="185.5" fill="none" stroke="rgba(255,255,255,.10)"/>
+</svg>
