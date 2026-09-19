@@ -10,6 +10,9 @@ Pull requests add their entry under **Unreleased**; a release moves it under a v
 - Inserted blocks always get **consistent breathing room**: the editor keeps at least 12pt between a new block and its neighbours (re-checked whenever rows move), so a list dropped above a paragraph never ends up butted against it. Two jobs in a row keep the template's own rhythm.
 - The move / duplicate / delete tools now work on **any** block that holds the caret (the summary, a dual list…), not only on jobs.
 
+### Changed
+- CV Maker's glass now defaults to **Blur 44px** and **Backing 56%** (Infospector's own defaults are 8px / 35%): the chrome floats over a white sheet of small type, so it needs the heavier glass to stay legible. The defaults only apply while those dials are untouched — a look you've set, in either tool, still wins.
+
 ## [0.1.0] — 2026-09-18
 
 ### Added

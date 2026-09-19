@@ -30,7 +30,10 @@ export type ColorFmt = "hex" | "rgb" | "hsl" | "hsb";
 
 const BG_BASE: BgState = { pattern: "dots", opacity: 50, patternColor: null, groundColor: null, patternTheme: null, groundTheme: null, accent: null };
 const GLASS_BASE: GlassState = { blur: null, sat: null, light: null, dark: null, tint: null, color: null, colorTheme: null, backing: null, shine: null, shade: null, lightAngle: null, radius: null, pad: null };
-const GLASS_DEFAULTS = { blur: 8, sat: 150, tint: 14, color: "#bbbbbc", backing: 35, shine: 0, shade: 0, lightAngle: 145, radius: 40, pad: 8 };
+// CV Maker's defaults differ from Infospector's in two dials: its chrome floats over a white sheet of small type, so it
+// needs a heavier blur and backing to stay legible (Infospector: blur 8, backing 35 over a dark canvas). They apply only
+// while a dial is untouched — a look the user has set (in either tool: the saved look is shared) always wins.
+const GLASS_DEFAULTS = { blur: 44, sat: 150, tint: 14, color: "#bbbbbc", backing: 56, shine: 0, shade: 0, lightAngle: 145, radius: 40, pad: 8 };
 const ROOT_PROPS = ["--pt-pattern-opacity", "--pt-pattern", "--pt-ground", "--pt-ground-2", "--pt-accent", "--pt-accent-ink", "--glass-blur", "--saturation", "--glass-reflex-light", "--glass-reflex-dark", "--glass-tint", "--glass-tint-2", "--c-glass", "--glass-backing-color", "--glass-backing", "--glass-shine", "--glass-shade", "--glass-light-angle", "--glass-radius", "--glass-pad", "--pt-text", "--pt-text-dim", "--pt-text-faint"];
 
 function read<T>(key: string, base: T): T {
@@ -106,7 +109,7 @@ export function useInfospectorLook(hostCssUrl: string) {
         set("--pt-accent-ink", lib.contrast("#ffffff", accent) >= 3 ? "#ffffff" : "#111111");
 
         const g = glass;
-        set("--glass-blur", g.blur == null ? null : g.blur + "px");
+        set("--glass-blur", (g.blur ?? GLASS_DEFAULTS.blur) + "px");
         set("--saturation", g.sat == null ? null : g.sat + "%");
         set("--glass-reflex-light", g.light); set("--glass-reflex-dark", g.dark);
         set("--glass-tint", g.tint == null ? null : g.tint + "%");
@@ -130,7 +133,7 @@ export function useInfospectorLook(hostCssUrl: string) {
         const c = cs(), num = (p: string, d: number) => { const n = parseFloat(c.getPropertyValue(p)); return Number.isFinite(n) ? n : d; };
         setEffective({
             pattern: c.getPropertyValue("--pt-pattern").trim(), ground, accent, tint,
-            blur: g.blur ?? num("--glass-blur", GLASS_DEFAULTS.blur), sat: g.sat ?? num("--saturation", GLASS_DEFAULTS.sat),
+            blur: g.blur ?? GLASS_DEFAULTS.blur, sat: g.sat ?? num("--saturation", GLASS_DEFAULTS.sat),
             light: g.light ?? num("--glass-reflex-light", 0.3), dark: g.dark ?? num("--glass-reflex-dark", 2),
             tintPct, backing,
             shine: g.shine ?? GLASS_DEFAULTS.shine, shade: g.shade ?? GLASS_DEFAULTS.shade, lightAngle: g.lightAngle ?? GLASS_DEFAULTS.lightAngle,
