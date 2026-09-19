@@ -36,4 +36,5 @@ export const pageBoxCss = (wPt: number, scale = 1) => `
 export const fullHtml = (name: string, css: string, body: string, extraCss = "") =>
     `<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8" />\n<title>${name.replace(/[<&]/g, "")}</title>\n<style>\n${css}\n</style>${extraCss ? `\n<style>${extraCss}</style>` : ""}\n</head>\n<body>\n${body}\n</body>\n</html>\n`;
 
-export const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "resume";
+// accents fold to their base letter first ("Résumé" → "resume", not "r-sum")
+export const slugify = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "resume";

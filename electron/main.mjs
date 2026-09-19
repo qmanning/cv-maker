@@ -10,6 +10,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { renderExport, validExportBody, EXPORT_SCHEME } from "./export.mjs";
+import { setupFiles } from "./files.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(here, "..");                       // the prebuilt folder
@@ -17,6 +18,12 @@ const ORIGIN = "app://cv-maker";
 const SERVED = [/^\/index\.html$/, /^\/(dist|vendor|templates)\/[^\0]+$/];
 const MAX_BODY = 25 * 1024 * 1024;
 const SMOKE_DIR = process.env.CVM_SMOKE_DIR || "";           // set by smoke.mjs: drive one PDF + one PNG export, keep the evidence, quit
+
+if (SMOKE_DIR) app.setPath("userData", path.join(SMOKE_DIR, "userData"));   // a clean profile: no leftovers in, none out
+app.setName("CV Maker");
+let files = null;
+const openWhenReady = [];                                    // macOS can deliver open-file (double-clicked document, Dock drop) before we're ready
+app.on("open-file", (e, file) => { e.preventDefault(); if (files) files.openPath(file); else openWhenReady.push(file); });
 
 const CSP = [
     "default-src 'self'",
@@ -77,8 +84,9 @@ function createWindow() {
     const win = new BrowserWindow({
         width: 1320, height: 960, minWidth: 720, minHeight: 520,
         show: !SMOKE_DIR, backgroundColor: "#111214", title: "CV Maker",
-        webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, spellcheck: true, backgroundThrottling: !SMOKE_DIR },
+        webPreferences: { preload: path.join(here, "preload.cjs"), contextIsolation: true, nodeIntegration: false, sandbox: true, spellcheck: true, backgroundThrottling: !SMOKE_DIR },
     });
+    files.attach(win);
     // the editor never leaves its origin: real links open in the user's browser, everything else is refused
     const external = (u) => { if (/^https?:\/\//i.test(u)) shell.openExternal(u); };
     win.webContents.setWindowOpenHandler(({ url }) => { external(url); return { action: "deny" }; });
@@ -86,6 +94,15 @@ function createWindow() {
     win.webContents.session.setPermissionRequestHandler((_wc, _perm, cb) => cb(false));
     win.loadURL(ORIGIN + "/index.html");
     return win;
+}
+
+/* ---- smoke, second launch: the app comes back with the same file open, showing what's on disk, nothing unsaved ---- */
+async function smokeRelaunch(win) {
+    const js = (code) => win.webContents.executeJavaScript(code, true);
+    const t = Date.now(); let shown = false;
+    while (Date.now() - t < 30000 && !shown) { shown = await js(`!!document.querySelector(".cv-page")?.textContent.includes("Edited By Another Program")`); await new Promise((r) => setTimeout(r, 150)); }
+    await new Promise((r) => setTimeout(r, 900));
+    return { relaunch: { reopenedLastFile: shown, title: win.getTitle(), clean: !files.state().dirty } };
 }
 
 /* ---- smoke mode: click Export → PDF, then Export → PNG, like a person would ---- */
@@ -108,17 +125,33 @@ async function smoke(win) {
         await until(label + " download", () => saved.some((s) => s.file.endsWith("." + ext)));
     }
     fs.writeFileSync(path.join(SMOKE_DIR, "editor.png"), (await win.webContents.capturePage()).toPNG());
+
+    /* real files: type → dirty → Save (the File menu's command) → the file is on disk → something else edits it → the sheet follows */
+    const savedFile = path.join(SMOKE_DIR, "saved.html"), fileSteps = {};
+    await js(`(() => { const el = document.querySelector(".cv-page [data-cv-edit]"); el.focus(); document.execCommand("selectAll"); document.execCommand("insertText", false, "Typed In Smoke"); })()`);
+    await until("the edited flag", () => files.state().dirty);
+    fileSteps.dirtyAfterTyping = true;
+    win.webContents.send("files:command", "save");
+    await until("the save to land", () => fs.existsSync(savedFile) && !files.state().dirty);
+    const onDisk = fs.readFileSync(savedFile, "utf8");
+    fileSteps.savedHasEdit = onDisk.includes("Typed In Smoke"); fileSteps.savedIsFullHtml = /^<!doctype html>/i.test(onDisk) && !/<script/i.test(onDisk);
+    fileSteps.title = win.getTitle();
+    fs.writeFileSync(savedFile, onDisk.replace("Typed In Smoke", "Edited By Another Program"));
+    await until("the sheet to follow the file", () => js(`document.querySelector(".cv-page").textContent.includes("Edited By Another Program")`));
+    fileSteps.followedExternalEdit = true; fileSteps.cleanAfterReload = !files.state().dirty;
     const info = await js(`({ pages: document.querySelectorAll(".cvm-pageno").length, origin: location.origin, stored: !!localStorage })`);
-    return { saved, problems, info, electron: process.versions.electron, chrome: process.versions.chrome };
+    return { saved, problems, info, fileSteps, electron: process.versions.electron, chrome: process.versions.chrome };
 }
 
 app.whenReady().then(async () => {
     protocol.handle("app", handleApp);
+    files = setupFiles({ templatePath: path.join(ROOT, "templates", "sample-resume.html"), smokeDir: SMOKE_DIR });
     const win = createWindow();
+    win.webContents.once("did-finish-load", () => openWhenReady.splice(0).forEach((f) => files.openPath(f)));
     if (SMOKE_DIR) {
         let result;
-        try { result = { ok: true, ...(await smoke(win)) }; } catch (e) { result = { ok: false, error: String(e?.message || e) }; }
-        fs.writeFileSync(path.join(SMOKE_DIR, "result.json"), JSON.stringify(result, null, 2));
+        try { result = { ok: true, ...(await (process.env.CVM_SMOKE_RELAUNCH ? smokeRelaunch(win) : smoke(win))) }; } catch (e) { result = { ok: false, error: String(e?.message || e) }; }
+        fs.writeFileSync(path.join(SMOKE_DIR, process.env.CVM_SMOKE_RELAUNCH ? "relaunch.json" : "result.json"), JSON.stringify(result, null, 2));
         app.exit(result.ok ? 0 : 1);
         return;
     }

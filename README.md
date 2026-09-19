@@ -136,8 +136,14 @@ npm start
 Exports render in a throwaway window with JavaScript off and every network request refused, the same
 posture as `server.mjs`. `npm run smoke` launches the app hidden, exports a PDF and a PNG through the
 real UI, and — if puppeteer is resolvable (or `CVM_PUPPETEER_FROM=/path/with/node_modules`) — compares
-the PDF with puppeteer's, text run by text run. It isn't packaged, signed, or auto-updating yet, and
-your document still lives in the app's own browser storage; opening and saving real files is next.
+the PDF with puppeteer's, text run by text run. It isn't packaged, signed, or auto-updating yet.
+
+**Your résumé is a real file.** In the desktop app the document is one Source HTML file on disk —
+**File → Open / Open Recent**, drop a file on the window, **Save** (⌘S) and **Save As** (⇧⌘S), an
+edited dot in the title bar, and a prompt before closing with unsaved work. The app watches the open
+file, so when something else edits it — your AI assistant, another editor — the sheet reloads by
+itself (and asks first if you have unsaved edits of your own). That means the workflow you'd use in a
+project works here too: point your assistant at the `.html` file and watch the page change.
 
 ## Configuration
 

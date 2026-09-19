@@ -3,7 +3,7 @@
 // the page the script is loaded from (so this folder can live at any path — "/", "/labs/cv-maker/",
 // wherever), and mounts CvMaker into #cv-maker.
 import { createRoot } from "react-dom/client";
-import CvMaker from "./CvMaker";
+import CvMaker, { type CvFiles } from "./CvMaker";
 import "./cv-maker.css";
 
 type Config = { home?: string; exportServer?: string; backHref?: string };
@@ -11,6 +11,8 @@ type Config = { home?: string; exportServer?: string; backHref?: string };
 declare global {
     interface Window {
         CV_MAKER?: Config;
+        /** set by a desktop shell's preload (electron/preload.cjs): real Open / Save instead of browser storage */
+        cvMakerFiles?: CvFiles;
     }
 }
 
@@ -26,6 +28,7 @@ if (el) {
             backHref={cfg.backHref || undefined}
             glassCssUrl={resolve("./vendor/infospector/host.css")}
             rasterizerUrl={resolve("./vendor/html-to-image.js")}
+            files={window.cvMakerFiles}
         />,
     );
 }

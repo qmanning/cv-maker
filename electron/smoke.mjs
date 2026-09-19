@@ -23,6 +23,13 @@ console.log(JSON.stringify(result, null, 2));
 if (run.status !== 0 || !result.ok) fail("the app did not complete both exports");
 if (result.problems.length) fail("console errors / CSP violations in the editor window");
 for (const s of result.saved) if (s.state !== "completed") fail(`download ${s.file}: ${s.state}`);
+for (const [step, ok] of Object.entries(result.fileSteps)) if (step !== "title" && ok !== true) fail("real files: " + step);
+if (!/^saved\.html/.test(result.fileSteps.title)) fail(`window title is “${result.fileSteps.title}”, expected it to name the file`);
+
+spawnSync(require("electron"), [here], { env: { ...process.env, CVM_SMOKE_DIR: out, CVM_SMOKE_RELAUNCH: "1" }, stdio: "inherit", timeout: 60000 });
+const again = JSON.parse(fs.readFileSync(path.join(out, "relaunch.json"), "utf8")).relaunch || {};
+console.log("relaunch: " + JSON.stringify(again));
+if (!again.reopenedLastFile || !again.clean || !/^saved\.html/.test(again.title || "")) fail("relaunch: the app did not come back with the saved file open and clean");
 
 const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
 async function describe(file) {
