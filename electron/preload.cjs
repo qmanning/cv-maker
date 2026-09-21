@@ -29,7 +29,12 @@ contextBridge.exposeInMainWorld("cvMakerAssistant", {
 
 // an AI app outside Itera (through the shell's MCP server) drives the editor: the shell calls, the editor's handlers answer
 let remoteHandlers = null;
-contextBridge.exposeInMainWorld("cvMakerRemote", { serve: (handlers) => { remoteHandlers = handlers; return () => { if (remoteHandlers === handlers) remoteHandlers = null; }; } });
+contextBridge.exposeInMainWorld("cvMakerRemote", {
+    serve: (handlers) => { remoteHandlers = handlers; return () => { if (remoteHandlers === handlers) remoteHandlers = null; }; },
+    status: () => ipcRenderer.invoke("remote:status"),            // { apps: ["Claude Desktop", …], live: n } — for the pill under the page
+    onStatus: subscribe("remote:status-changed"),
+    configure: () => ipcRenderer.send("assistant:configure"),
+});
 ipcRenderer.on("remote:call", async (_e, { id, method, args }) => {
     try {
         if (!remoteHandlers || typeof remoteHandlers[method] !== "function") throw new Error("The editor isn't ready yet.");

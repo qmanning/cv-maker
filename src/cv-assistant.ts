@@ -39,9 +39,16 @@ export interface CvRemoteHandlers {
     /** what the export pipeline needs to render this document (PDF / PNG happen in the shell) */
     exportPayload(): { html: string; widthPt: number; heightPt: number; name: string };
 }
+/** which outside AI apps know about this editor, and whether one is attached at this moment */
+export interface CvRemoteStatus { apps: string[]; live: number }
 export interface CvRemote {
     /** the editor hands the shell its handlers; returns a function that withdraws them */
     serve(handlers: CvRemoteHandlers): () => void;
+    /** optional: lets the editor say "Claude Desktop connected" instead of inviting the person to connect again */
+    status?(): Promise<CvRemoteStatus>;
+    onStatus?(handler: (status: CvRemoteStatus) => void): () => void;
+    /** open the shell's Connect window */
+    configure?(): void;
 }
 
 const KINDS: BlockKind[] = ["content", "experience", "dual", "divider"];

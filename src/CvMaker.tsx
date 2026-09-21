@@ -16,7 +16,7 @@ import {
     AlignCenter, AlignLeft, AlignRight, ArrowDown, ArrowLeft, ArrowUp, Bold, BookOpen, BriefcaseBusiness, Plus, Text, ChevronDown, Columns2, Copy, Download,
     Ellipsis, Eraser, FileCode2, FileImage, FileText, FileType2, ImageUp, Italic, Link2, List, Minus, Moon, RotateCcw,
     Save, SpellCheck, Sun, Upload, Trash2, Underline as UnderlineIcon, ALargeSmall, MoveVertical, MoveHorizontal,
-    Sparkles, SendHorizontal, Undo2, Check, Settings2,
+    Sparkles, SendHorizontal, Undo2, Check, Settings2, X,
 } from "lucide-react";
 import { FontSize } from "@/components/ui/font-size-extension";
 import { FontWeight } from "@/components/ui/font-weight-extension";
@@ -24,7 +24,7 @@ import { BlockLineHeight, ColumnBreak, LetterSpacing } from "./cv-extensions";
 import { BLOCK_KINDS, UNIT, insertBlock, topBlocks, type BlockKind } from "./cv-blocks";
 import { attachColorPicker, toHex, useInfospectorLook } from "./use-infospector-look";
 import { LookMenu } from "./LookMenu";
-import { applyOps, describeDocument, type CvAssistant, type CvRemote, type CvRemoteHandlers } from "./cv-assistant";
+import { applyOps, describeDocument, type CvAssistant, type CvRemote, type CvRemoteHandlers, type CvRemoteStatus } from "./cv-assistant";
 import { FOOTER_PT, GAP_PT, MIN_FIT, PAPERS, PT, type PaperId, type Source, fullHtml, pageBoxCss, parseSource, slugify, stepZoom } from "./cv-source";
 
 const LOCAL_KEY = "cvm:doc", START_SIZE_KEY = "cvm:startsize", HOME_KEY = "cvm:home";
@@ -477,6 +477,18 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
         undo: () => { const last = remoteUndo.current.pop(); if (!last) return false; setSource(last); setDirty(true); touch(); setAiReply(null); say("Undone"); return true; },
         exportPayload: () => ({ ...exportHtml(), name: slugify(stateRef.current.name) }),
     };
+    // the pill under the page: it knows whether an outside AI app is connected, and it can be sent away for good —
+    // connecting is never required, and the shell's AI menu is always there
+    const [remoteStatus, setRemoteStatus] = useState<CvRemoteStatus | null>(null);
+    const [pillHidden, setPillHidden] = useState(() => stored("cvm:ai-pill") === "hidden");
+    useEffect(() => {
+        if (!remote?.status) return;
+        remote.status().then(setRemoteStatus).catch(() => setRemoteStatus(null));
+        return remote.onStatus?.(setRemoteStatus);
+    }, [remote]);
+    const hidePill = useCallback(() => { setPillHidden(true); store("cvm:ai-pill", "hidden"); say("Hidden. It's still under the AI menu."); }, [say]);
+    const openConnect = useCallback(() => (remote?.configure ?? assistant?.configure)?.(), [assistant, remote]);
+
     useEffect(() => remote?.serve({
         describe: () => remoteRef.current!.describe(),
         apply: (ops, message, by) => remoteRef.current!.apply(ops, message, by),
@@ -799,7 +811,7 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
                     </div>
                 </div>
             )}
-            {assistant && (
+            {(assistant || remote) && (
                 <div className="cvm-ask-wrap">
                     {aiReply && (
                         <div className="cvm-ask-reply" role="status">
@@ -820,16 +832,28 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
                     )}
 {aiStatus?.ready ? (
                     <form className={"cvm-ask" + (aiBusy ? " cvm-ask-busy" : "")} onSubmit={(e) => { e.preventDefault(); runAssistant(ask); }}>
-                            <button type="button" className="pt-rbtn" aria-label="AI settings" data-tip={aiStatus?.ready ? `Your AI: ${aiStatus.label} · change…` : "Connect your AI"} onClick={() => assistant.configure()}>{aiStatus?.ready ? <Sparkles /> : <Settings2 />}</button>
+                            <button type="button" className="pt-rbtn" aria-label="AI settings" data-tip={aiStatus?.ready ? `Your AI: ${aiStatus.label} · change…` : "Connect your AI"} onClick={openConnect}>{aiStatus?.ready ? <Sparkles /> : <Settings2 />}</button>
                             <textarea ref={askRef} rows={1} value={aiBusy || ask} readOnly={!!aiBusy} aria-label="Ask your AI to change this résumé"
                                 placeholder={aiStatus?.ready ? "Ask your AI to change this résumé…  ⌘K" : "Connect your own AI to edit by asking — your key stays on this computer"}
-                                onFocus={() => { setAskFocus(true); if (aiStatus && !aiStatus.ready) { askRef.current?.blur(); assistant.configure(); } }} onBlur={() => setAskFocus(false)}
+                                onFocus={() => { setAskFocus(true); if (aiStatus && !aiStatus.ready) { askRef.current?.blur(); openConnect(); } }} onBlur={() => setAskFocus(false)}
                                 onChange={(e) => setAsk(e.target.value)}
                                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); runAssistant(ask); } if (e.key === "Escape") askRef.current?.blur(); }} />
                             <button type="submit" className="pt-rbtn cvm-ask-send" aria-label="Send" disabled={!!aiBusy || !ask.trim()}><SendHorizontal /></button>
                         </form>
                     ) : (
-                        <button type="button" className="cvm-ask-connect" onClick={() => assistant.configure()}><Sparkles /><b>Connect your AI</b><span>Claude Desktop and others · no API key needed</span></button>
+                        pillHidden ? null : (
+                            <div className={"cvm-ask-connect" + (remoteStatus?.live ? " cvm-live" : "")}>
+                                {remoteStatus && (remoteStatus.live > 0 || remoteStatus.apps.length > 0) ? (
+                                    <button type="button" className="cvm-ask-connect-main" onClick={openConnect} data-tip="Connections…">
+                                        <i className="cvm-dot" /><b>{remoteStatus.live > 0 ? `${remoteStatus.apps[0] || "Your AI app"} is connected right now` : `${remoteStatus.apps.join(" and ")} connected`}</b>
+                                        <span>{remoteStatus.live > 0 ? "changes it makes appear here, with Undo" : "ask it to change this résumé"}</span>
+                                    </button>
+                                ) : (
+                                    <button type="button" className="cvm-ask-connect-main" onClick={openConnect}><Sparkles /><b>Connect your AI</b><span>Claude Desktop, ChatGPT and others · no API key needed</span></button>
+                                )}
+                                <button type="button" className="cvm-ask-connect-x" aria-label="Hide this" data-tip="Hide this — it stays under the AI menu" onClick={hidePill}><X /></button>
+                            </div>
+                        )
                     )}
                 </div>
             )}

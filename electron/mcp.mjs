@@ -131,9 +131,16 @@ export function setupMcp({ editorWindow, currentFile, socketPath = "" }) {
         return codexState();
     }
 
+    // what the editor's pill shows: which apps have been told about Itera, and how many are attached right now
+    const editorStatus = () => ({ apps: [claudeState().connected && claudeState().current ? "Claude Desktop" : "", codexState().connected && codexState().current ? "ChatGPT / Codex" : ""].filter(Boolean), live: clients });
+    const tellEditor = () => { const w = editorWindow(); if (w && !w.isDestroyed()) w.webContents.send("remote:status-changed", editorStatus()); };
+    ipcMain.handle("remote:status", (e) => (e.sender === editorWindow()?.webContents ? editorStatus() : { apps: [], live: 0 }));
+    listeners.add(tellEditor);
+    const andTell = (fn) => (...args) => { const out = fn(...args); changed(); return out; };
+
     return {
-        codexState, connectCodex, disconnectCodex,
-        socket: SOCKET, entry, claudeState, connectClaude, disconnectClaude,
+        codexState, connectCodex: andTell(connectCodex), disconnectCodex: andTell(disconnectCodex),
+        socket: SOCKET, entry, claudeState, connectClaude: andTell(connectClaude), disconnectClaude: andTell(disconnectClaude), editorStatus,
         state: () => ({ needsMove: temporaryHome() ? needsMove : "", claude: claudeState(), codex: codexState(), codexCommand: `codex mcp add ${SERVER_NAME} --env ELECTRON_RUN_AS_NODE=1 -- ${JSON.stringify(entry().command)} ${JSON.stringify(entry().args[0])}`, clients, lastSeen, snippet: JSON.stringify({ mcpServers: { [SERVER_NAME]: entry() } }, null, 2), claudeCode: `claude mcp add ${SERVER_NAME} --env ELECTRON_RUN_AS_NODE=1 -- ${JSON.stringify(entry().command)} ${JSON.stringify(entry().args[0])}` }),
         onChange: (fn) => { listeners.add(fn); return () => listeners.delete(fn); },
         revealClaudeConfig: () => shell.showItemInFolder(claudeConfigPath()),
