@@ -69,7 +69,7 @@ export function setupMcp({ editorWindow, currentFile, socketPath = "" }) {
     // macOS runs a quarantined app that hasn't been moved by the person from a random, temporary, read-only path
     // ("App Translocation"), and a disk image goes away when ejected — neither is a path to hand to another app
     const temporaryHome = () => app.isPackaged && (/\/AppTranslocation\//.test(process.execPath) || process.execPath.startsWith("/Volumes/"));
-    const needsMove = "Move CV Maker into your Applications folder and open it from there first. Right now it is running from the disk image, so your AI app would lose track of it after a restart.";
+    const needsMove = "Install CV Maker in your Applications folder first. Right now it is running from the disk image, so your AI app would lose track of it after a restart.";
     const entry = () => ({ command: process.execPath, args: [serverScript], env: { ELECTRON_RUN_AS_NODE: "1" } });
 
     const claudeConfigPath = () => process.env.CVM_CLAUDE_CONFIG ? process.env.CVM_CLAUDE_CONFIG : process.platform === "darwin" ? path.join(os.homedir(), "Library", "Application Support", "Claude", "claude_desktop_config.json")

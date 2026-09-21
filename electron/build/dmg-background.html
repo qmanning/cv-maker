@@ -1,6 +1,7 @@
 <!doctype html>
 <!-- The installer window's background (660×480). Finder draws the icons and their labels on top:
-     CV Maker (170,165) → Applications (490,165), and the Settings shortcut at (545,372).
+     CV Maker (330,165), and the Settings shortcut at (540,352). There is deliberately no Applications alias: double-clicking
+     one navigates THIS window away, and the steps below vanish exactly when macOS shows its warning.
      Finder's labels are black in Light mode and white in Dark, so the canvas is a mid tone both can sit on. -->
 <html><head><meta charset="utf-8"><style>
   html, body { margin: 0; width: 660px; height: 480px; overflow: hidden; font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; }
@@ -18,15 +19,14 @@
   .well { position: absolute; right: 22px; top: 16px; width: 140px; height: 138px; border-radius: 12px; background: rgba(255,255,255,.10); box-shadow: inset 0 0 0 1px rgba(255,255,255,.14); }
 </style></head><body>
   <div class="dots"></div>
-  <div class="hint">1. Drag CV Maker into Applications</div>
-  <svg class="arrow" viewBox="0 0 120 34"><path d="M4 17h96" stroke="#fff" stroke-opacity=".85" stroke-width="4" stroke-linecap="round" fill="none"/><path d="M88 5l14 12-14 12" stroke="#fff" stroke-opacity=".85" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+  <div class="hint">Double-click CV Maker to begin</div>
   <div class="card">
-    <h2>Keep this window open until CV Maker has started.</h2>
-    <p class="sub">CV Maker is free, so it isn't signed with a paid Apple certificate. macOS needs your OK, once.</p>
+    <h2>Start it from here. It installs itself.</h2>
+    <p class="sub">CV Maker is free and unsigned, so macOS needs your OK once.</p>
     <ol>
-      <li><b>Drag CV Maker into Applications</b>, then open it <b>from there</b>.</li>
-      <li>macOS blocks it once. Click <b>Done</b> (not Move to Trash).</li>
-      <li>Come back here and open the shortcut&nbsp;→ then scroll down and click <b>Open Anyway</b>.</li>
+      <li><b>Double-click CV Maker</b>, right here in this window.</li>
+      <li>macOS blocks it once. Click <b>Done</b>, open the shortcut&nbsp;→ scroll down, click <b>Open Anyway</b>.</li>
+      <li>CV Maker opens and offers to <b>install itself</b>. Say yes.</li>
     </ol>
     <div class="well"></div>
   </div>

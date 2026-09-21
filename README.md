@@ -142,10 +142,14 @@ CV Maker is free and I don't pay Apple or Microsoft for a signing certificate, s
 ask you to vouch for the app once. If you'd rather not, use the [web version](https://qmanning.com/labs/cv-maker/demo)
 or run it from source (above) — same editor, and neither shows a warning.
 
-- **macOS** — drag *CV Maker* into Applications **first**, then open it **from Applications** (not from the disk image — from there macOS runs it at a temporary path, and your AI app would lose track of it; if you do, CV Maker offers to move itself). macOS says *"Apple could not verify
-  “CV Maker” is free of malware that may harm your Mac or compromise your privacy."* Click **Done** (not *Move to Trash*; the dialog offers nothing else), open **System Settings → Privacy & Security**, scroll to
-  *"CV Maker was blocked…"*, click **Open Anyway**, and confirm. Only the first time. Keep the installer window open while you do this: it shows these steps, with an **Open Privacy & Security** shortcut that jumps to the right Settings page. (If it says the app
-  *"is damaged"* instead, run `xattr -cr "/Applications/CV Maker.app"` in Terminal and open it again.)
+- **macOS** — open the disk image and **double-click CV Maker right there** (don't drag it anywhere; the window
+  with the steps needs to stay in front of you). macOS says *"Apple could not verify “CV Maker” is free of
+  malware that may harm your Mac or compromise your privacy."* Click **Done** (not *Move to Trash*; the dialog
+  offers nothing else), then double-click **Open Privacy & Security** in that same window — or open **System
+  Settings → Privacy & Security** yourself — scroll to the bottom, click **Open Anyway**, and confirm. CV Maker
+  starts and offers to **install itself in Applications**: say yes. It copies itself there, reopens from
+  Applications, and macOS doesn't ask again; eject the disk image. (If macOS says the app *"is damaged"*
+  instead, run `xattr -cr` on the app in Terminal and open it again.)
 - **Windows** — on *"Windows protected your PC"*, click **More info → Run anyway**.
 
 Build the installers yourself with `npm run dist` (macOS) or `npm run dist:win`; pushing a `v*` tag

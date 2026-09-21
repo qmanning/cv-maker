@@ -8,6 +8,7 @@
 import { app, BrowserWindow, dialog, protocol, net, shell } from "electron";
 import fs from "node:fs";
 import path from "node:path";
+import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { renderExport, validExportBody, EXPORT_SCHEME } from "./export.mjs";
 import { setupFiles } from "./files.mjs";
@@ -111,15 +112,37 @@ function createWindow() {
 
 /* ---- macOS: run from Applications, not from the disk image. From the image the app gets a random temporary path
    (App Translocation), which breaks anything that remembers where CV Maker lives — above all the MCP connection. ---- */
+function installedCopy() {
+    const bundle = path.resolve(process.execPath, "..", "..", "..");   // …/CV Maker.app/Contents/MacOS/CV Maker
+    const home = process.env.CVM_INSTALL_DIR || "/Applications";       // (the env override is for tests)
+    let dir = home; try { fs.accessSync(dir, fs.constants.W_OK); } catch { dir = path.join(app.getPath("home"), "Applications"); }
+    return { bundle, dest: path.join(dir, path.basename(bundle)) };
+}
+const runningFromInstall = () => { const { bundle, dest } = installedCopy(); return bundle === dest || (!process.env.CVM_INSTALL_DIR && app.isInApplicationsFolder()); };
+/** copy this app into Applications, clear the "downloaded" flag on the COPY (the person already approved this very app a
+ *  moment ago, so macOS shouldn't interrogate them twice), open the copy, and quit. Same idea as the LetsMove library. */
 function moveToApplications() {
-    if (process.platform !== "darwin" || !app.isPackaged || app.isInApplicationsFolder()) return false;
-    try { return app.moveToApplicationsFolder({ conflictHandler: (kind) => kind === "exists" ? dialog.showMessageBoxSync({ type: "question", buttons: ["Cancel", "Replace"], defaultId: 1, cancelId: 0, message: "There is already a CV Maker in your Applications folder.", detail: "Replace it with this one?" }) === 1 : true }); }
-    catch (e) { dialog.showErrorBox("Couldn't move CV Maker", String(e?.message || e) + "\n\nDrag CV Maker into Applications yourself, then open it from there."); return false; }
+    if (process.platform !== "darwin" || !app.isPackaged || runningFromInstall()) return false;
+    const { bundle, dest } = installedCopy();
+    try {
+        if (fs.existsSync(dest)) {
+            const replace = process.env.CVM_INSTALL_DIR ? 1 : dialog.showMessageBoxSync({ type: "question", buttons: ["Cancel", "Replace"], defaultId: 1, cancelId: 0, message: "There is already a CV Maker in your Applications folder.", detail: "Replace it with this one?" });
+            if (replace !== 1) return false;
+            fs.rmSync(dest, { recursive: true, force: true });
+        }
+        fs.mkdirSync(path.dirname(dest), { recursive: true });
+        const run = (cmd, args) => { const r = spawnSync(cmd, args, { encoding: "utf8" }); if (r.status !== 0) throw new Error((r.stderr || r.error?.message || cmd + " failed").trim()); };
+        run("/usr/bin/ditto", [bundle, dest]);
+        spawnSync("/usr/bin/xattr", ["-dr", "com.apple.quarantine", dest]);   // absent is fine
+        if (!process.env.CVM_INSTALL_NO_RELAUNCH) spawn("/usr/bin/open", ["-n", dest], { detached: true, stdio: "ignore" }).unref();
+        setTimeout(() => app.exit(0), 300);
+        return true;
+    } catch (e) { dialog.showErrorBox("Couldn't install CV Maker", String(e?.message || e) + "\n\nDrag CV Maker into your Applications folder yourself, then open it from there."); return false; }
 }
 function offerMoveToApplications(parent) {
-    if (process.platform !== "darwin" || !app.isPackaged || SMOKE_DIR || app.isInApplicationsFolder()) return;
-    const choice = dialog.showMessageBoxSync(parent, { type: "question", buttons: ["Move to Applications", "Not Now"], defaultId: 0, cancelId: 1, message: "Move CV Maker to your Applications folder?", detail: "It is running from the disk image. Moving it lets your AI app (Claude, ChatGPT) find CV Maker every time, and you can eject the image afterwards. CV Maker will reopen from Applications." });
-    if (choice === 0) moveToApplications();
+    if (process.platform !== "darwin" || !app.isPackaged || SMOKE_DIR || runningFromInstall()) return false;
+    const choice = process.env.CVM_INSTALL_AUTO ? 0 : dialog.showMessageBoxSync(parent, { type: "question", buttons: ["Install in Applications", "Not Now"], defaultId: 0, cancelId: 1, message: "Install CV Maker in your Applications folder?", detail: "You're running it from the disk image. CV Maker will copy itself to Applications and reopen from there. After that you can eject the disk image, and macOS won't ask about it again." });
+    return choice === 0 ? moveToApplications() : false;
 }
 
 /* ---- the welcome sheet: shown once on first run, and from Help ▸ Welcome to CV Maker ---- */
@@ -304,7 +327,7 @@ app.whenReady().then(async () => {
         app.exit(result.ok ? 0 : 1);
         return;
     }
-    win.webContents.once("did-finish-load", () => { offerMoveToApplications(win); welcomeOnFirstRun(win); });
+    win.webContents.once("did-finish-load", () => { if (!offerMoveToApplications(win)) welcomeOnFirstRun(win); });   // installing quits; the welcome waits for the installed copy
     app.on("activate", () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
 
