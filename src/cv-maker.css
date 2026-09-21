@@ -25,6 +25,24 @@ body > .pt-cpick { z-index: 2100; }
 .cvm-bar .pt-omni { flex: 1 1 0; min-width: 72px; }
 .cvm-bar .pt-omni input { text-overflow: ellipsis; padding-right: 36px; }
 .cvm-bar .pt-omni .cvm-import { display: grid; }
+
+/* recent-documents typeahead (desktop): the results drop UNDER the bar — Infospector positions its own copy
+   with JS (position: fixed), but ours is nested in the omni, so anchor it there instead */
+.cvm-bar .pt-omni-results { position: absolute; top: calc(100% + 8px); left: 0; right: 0; width: auto; }
+.cvm-omni-item .pt-oi-title { flex: 1 1 auto; margin-right: auto; }
+.cvm-omni-pin { flex: none; width: 24px; height: 24px; margin-left: 6px; display: grid; place-items: center; border: none;
+  border-radius: 50%; background: transparent; color: var(--pt-text-faint); cursor: pointer; opacity: 0; transition: opacity .12s; }
+.cvm-omni-item:hover .cvm-omni-pin, .cvm-omni-item.pt-active .cvm-omni-pin, .cvm-omni-pin.pt-active { opacity: 1; }
+.cvm-omni-pin:hover { background: var(--pt-glass); color: var(--pt-text); }
+.cvm-omni-pin.pt-active { color: var(--pt-accent); }
+.cvm-omni-pin svg { width: 15px; height: 15px; }
+
+/* the Itera mark, far left — a quick-menu trigger in the brand accent that animates on hover */
+.cvm-bar .cvm-brand { flex: none; color: var(--pt-accent); }
+.cvm-brand-glyph { transition: transform .25s cubic-bezier(.2, .7, .2, 1); transform-origin: 50% 55%; }
+.cvm-bar .cvm-brand:hover .cvm-brand-glyph { transform: rotate(-8deg) scale(1.12); }
+.cvm-bar .cvm-brand:active .cvm-brand-glyph { transform: rotate(-8deg) scale(1.02); }
+@media (prefers-reduced-motion: reduce) { .cvm-brand-glyph { transition: none; } }
 .cvm-narrow-only { display: none !important; }
 @media (max-width: 520px) { .cvm-bar .cvm-secondary { display: none; } .pt-menu-item.cvm-narrow-only { display: flex !important; } #pt-bar.cvm-bar { gap: 4px; } }
 @media (max-width: 620px) { .cvm-bar .cvm-label, .cvm-bar .pt-dim-scale { display: none; } .cvm-bar { gap: 5px; } }

@@ -13,10 +13,12 @@ const hash = (text) => crypto.createHash("sha1").update(text).digest("hex");
 
 export function setupFiles({ templatePath, smokeDir = "", onWelcome = () => {}, onAssistant = () => {}, updates = null }) {
     const statePath = () => path.join(app.getPath("userData"), "files.json");
-    let win = null, current = "", dirty = false, known = "", watcher = null, watchTimer = null, closeAfterSave = false, recent = [];
-    try { const s = JSON.parse(fs.readFileSync(statePath(), "utf8")); recent = (s.recent || []).filter((p) => typeof p === "string"); if (s.current && fs.existsSync(s.current)) current = s.current; } catch { /* first run */ }
+    let win = null, current = "", dirty = false, known = "", watcher = null, watchTimer = null, closeAfterSave = false, recent = [], pinned = "";
+    try { const s = JSON.parse(fs.readFileSync(statePath(), "utf8")); recent = (s.recent || []).filter((p) => typeof p === "string"); if (typeof s.pinned === "string") pinned = s.pinned; if (s.current && fs.existsSync(s.current)) current = s.current; } catch { /* first run */ }
+    // a pinned "master" is the default document whenever nothing else is already open
+    if (!current && pinned && fs.existsSync(pinned)) current = pinned;
 
-    const persist = () => { try { fs.writeFileSync(statePath(), JSON.stringify({ current, recent }, null, 2)); } catch { /* not worth a dialog */ } };
+    const persist = () => { try { fs.writeFileSync(statePath(), JSON.stringify({ current, recent, pinned }, null, 2)); } catch { /* not worth a dialog */ } };
     const title = () => {
         if (!win || win.isDestroyed()) return;
         win.setTitle((current ? path.basename(current) : "Untitled") + (dirty && process.platform !== "darwin" ? " •" : "") + " — Itera");
@@ -24,6 +26,11 @@ export function setupFiles({ templatePath, smokeDir = "", onWelcome = () => {}, 
     };
     const send = (channel, payload) => { if (win && !win.isDestroyed()) win.webContents.send(channel, payload); };
     const ask = (options) => (smokeDir ? 0 : dialog.showMessageBoxSync(win, { type: "question", noLink: true, ...options }));
+    // the omni bar's typeahead: existing files only, the pinned master at the top, recency preserved otherwise
+    const recentList = () => recent.filter((p) => fs.existsSync(p))
+        .map((p) => ({ path: p, name: path.basename(p).replace(/\.html?$/i, ""), pinned: p === pinned }))
+        .sort((a, b) => (a.pinned === b.pinned ? 0 : a.pinned ? -1 : 1));
+    const emitRecent = () => send("files:recent-changed", recentList());
 
     function watch() {
         watcher?.close(); watcher = null;
@@ -43,7 +50,7 @@ export function setupFiles({ templatePath, smokeDir = "", onWelcome = () => {}, 
     function setCurrent(file, text) {
         current = file; known = text == null ? "" : hash(text);
         if (file) { recent = [file, ...recent.filter((p) => p !== file)].slice(0, 10); app.addRecentDocument(file); }
-        persist(); watch(); title(); buildMenu();
+        persist(); watch(); title(); buildMenu(); emitRecent();
     }
     const okToReplace = (verb) => !dirty || ask({ message: "You have unsaved changes.", detail: `${verb} anyway and lose them?`, buttons: ["Cancel", verb], defaultId: 0, cancelId: 0 }) === 1;
 
@@ -93,6 +100,17 @@ export function setupFiles({ templatePath, smokeDir = "", onWelcome = () => {}, 
         dirty = !!flag; title();
         if (!dirty && closeAfterSave) { closeAfterSave = false; win?.close(); }
     });
+    ipcMain.handle("files:recent", () => recentList());
+    ipcMain.on("files:openPath", (_e, file) => { if (typeof file === "string" && file) openPath(file); });
+    ipcMain.on("files:pin", (_e, msg) => {
+        const p = msg && msg.path, on = !!(msg && msg.pinned);
+        if (typeof p !== "string" || !p) return;
+        pinned = on ? p : (pinned === p ? "" : pinned);   // one master at a time; unpin only clears its own
+        persist(); buildMenu(); emitRecent();
+    });
+    // the brand menu's quick actions
+    ipcMain.on("shell:check-updates", () => updates?.check());
+    ipcMain.on("shell:open-external", (_e, url) => { if (typeof url === "string" && /^https?:\/\//i.test(url)) shell.openExternal(url); });
 
     function buildMenu() {
         const mac = process.platform === "darwin";

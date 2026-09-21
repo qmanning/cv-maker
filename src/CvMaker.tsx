@@ -16,7 +16,7 @@ import {
     AlignCenter, AlignLeft, AlignRight, ArrowDown, ArrowLeft, ArrowUp, Bold, BookOpen, BriefcaseBusiness, Plus, Text, ChevronDown, Columns2, Copy, Download,
     Ellipsis, Eraser, FileCode2, FileImage, FileText, FileType2, ImageUp, Italic, Link2, List, Minus, Moon, RotateCcw,
     Save, SpellCheck, Sun, Upload, Trash2, Underline as UnderlineIcon, ALargeSmall, MoveVertical, MoveHorizontal,
-    Sparkles, SendHorizontal, Undo2, Check, Settings2, X,
+    Sparkles, SendHorizontal, Undo2, Check, Settings2, X, Star, RefreshCw, ExternalLink,
 } from "lucide-react";
 import { FontSize } from "@/components/ui/font-size-extension";
 import { FontWeight } from "@/components/ui/font-weight-extension";
@@ -37,6 +37,9 @@ const ZOOMS = [1, 1.25, 1.5, 2];
 interface Settings { paper: PaperId; paginate: boolean; spellcheck: boolean; zoom: number | "width" | "height" | "browser" | null; fit: boolean }
 interface SavedDoc extends Source { name: string; settings: Settings; savedAt: string; unsaved?: boolean }
 
+/** one entry in the shell's recent-documents list, for the omni bar's typeahead */
+export interface RecentDoc { path: string; name: string; pinned?: boolean }
+
 /** A desktop shell's file system, when there is one: the document is then a real Source HTML file on disk.
  *  Without it (every web build) the document lives in this browser — autosave + Import / Export → Source HTML. */
 export interface CvFiles {
@@ -53,6 +56,26 @@ export interface CvFiles {
     onCommand(handler: (command: "save" | "saveAs") => void): () => void;
     /** unsaved edits? — the shell's title bar and close guard */
     setDirty(dirty: boolean): void;
+    /** the last documents opened, newest first (a pinned "master" sorts to the top) — the omni typeahead */
+    recent?(): Promise<RecentDoc[]>;
+    /** open a specific recent file by path — the chosen file arrives back through onOpen */
+    openPath?(path: string): void;
+    /** pin (or unpin) a file as the master, so it heads the list and is the default document */
+    pin?(path: string, pinned: boolean): void;
+    /** the recent list changed (an open, a save, a pin) — refresh the typeahead */
+    onRecent?(handler: (list: RecentDoc[]) => void): () => void;
+    /** shell chrome the brand menu drives: check for updates, open a URL outside the app */
+    checkUpdates?(): void;
+    openExternal?(url: string): void;
+}
+
+/** the Itera mark (public/itera/brand/itera-glyph.svg), inline so it takes currentColor and can animate */
+function IteraGlyph(props: { className?: string }) {
+    return (
+        <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" className={props.className} aria-hidden="true">
+            <path d="M6 6V5C5.44772 5 5 5.44772 5 6L6 6ZM14.6667 14.6667V15.6667C15.219 15.6667 15.6667 15.219 15.6667 14.6667H14.6667ZM6 14.6667H5C5 14.9319 5.10536 15.1862 5.29289 15.3738C5.48043 15.5613 5.73478 15.6667 6 15.6667V14.6667ZM10.3333 10.3333V9.33333C9.78105 9.33333 9.33333 9.78105 9.33333 10.3333H10.3333ZM19 19V20C19.5523 20 20 19.5523 20 19H19ZM19 10.3333H20C20 9.78105 19.5523 9.33333 19 9.33333V10.3333ZM10.3333 15.5333H9.33333V15.5333H10.3333ZM13.8 19V20V20V19ZM11.2 12.0667V11.0667H10.2V12.0667H11.2ZM12.9333 12.0667H13.9333V11.0667H12.9333V12.0667ZM12.9333 13.8V14.8H13.9333V13.8H12.9333ZM11.2 13.8H10.2V14.8H11.2V13.8ZM12.0667 11.2V10.2H11.0667V11.2H12.0667ZM13.8 11.2H14.8V10.2H13.8V11.2ZM13.8 12.9333V13.9333H14.8V12.9333H13.8ZM12.0667 12.9333H11.0667V13.9333H12.0667V12.9333ZM11.2 11.2V10.2H10.2V11.2H11.2ZM12.9333 11.2H13.9333V10.2H12.9333V11.2ZM12.9333 12.9333V13.9333H13.9333V12.9333H12.9333ZM11.2 12.9333H10.2V13.9333H11.2V12.9333ZM12.0667 12.0667V11.0667H11.0667V12.0667H12.0667ZM13.8 12.0667H14.8V11.0667H13.8V12.0667ZM13.8 13.8V14.8H14.8V13.8H13.8ZM12.0667 13.8H11.0667V14.8H12.0667V13.8ZM6 6V7H11.2V6V5H6V6ZM14.6667 9.46667H13.6667V14.6667H14.6667H15.6667V9.46667H14.6667ZM14.6667 14.6667V13.6667H6V14.6667V15.6667H14.6667V14.6667ZM6 14.6667H7V6L6 6L5 6V14.6667H6ZM11.2 6V7C12.5623 7 13.6667 8.10436 13.6667 9.46667H14.6667H15.6667C15.6667 6.9998 13.6669 5 11.2 5V6ZM10.3333 10.3333H9.33333L9.33333 15.5333H10.3333H11.3333L11.3333 10.3333H10.3333ZM13.8 19V20H19V19V18H13.8V19ZM19 19H20V10.3333H19H18V19H19ZM19 10.3333V9.33333L10.3333 9.33333V10.3333V11.3333L19 11.3333V10.3333ZM10.3333 15.5333H9.33333C9.33333 18.0002 11.3331 20 13.8 20V19V18C12.4377 18 11.3333 16.8956 11.3333 15.5333H10.3333ZM11.2 12.0667V13.0667H12.9333V12.0667V11.0667H11.2V12.0667ZM12.9333 12.0667H11.9333V13.8H12.9333H13.9333V12.0667H12.9333ZM12.9333 13.8V12.8H11.2V13.8V14.8H12.9333V13.8ZM11.2 13.8H12.2V12.0667H11.2H10.2V13.8H11.2ZM12.0667 11.2V12.2H13.8V11.2V10.2H12.0667V11.2ZM13.8 11.2H12.8V12.9333H13.8H14.8V11.2H13.8ZM13.8 12.9333V11.9333H12.0667V12.9333V13.9333H13.8V12.9333ZM12.0667 12.9333H13.0667V11.2H12.0667H11.0667V12.9333H12.0667ZM11.2 11.2V12.2H12.9333V11.2V10.2H11.2V11.2ZM12.9333 11.2H11.9333V12.9333H12.9333H13.9333V11.2H12.9333ZM12.9333 12.9333V11.9333H11.2V12.9333V13.9333H12.9333V12.9333ZM11.2 12.9333H12.2V11.2H11.2H10.2V12.9333H11.2ZM12.0667 12.0667V13.0667H13.8V12.0667V11.0667H12.0667V12.0667ZM13.8 12.0667H12.8V13.8H13.8H14.8V12.0667H13.8ZM13.8 13.8V12.8H12.0667V13.8V14.8H13.8V13.8ZM12.0667 13.8H13.0667V12.0667H12.0667H11.0667V13.8H12.0667Z" />
+        </svg>
+    );
 }
 const DEFAULT_SETTINGS: Settings = { paper: "letter", paginate: true, spellcheck: true, zoom: null, fit: true };
 
@@ -145,7 +168,7 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
     const [active, setActive] = useState<Editor | null>(null);
     const [, setTick] = useState(0);
     const [dirty, setDirty] = useState(false);
-    const [menu, setMenu] = useState<{ id: "size" | "export" | "more"; left?: number; right?: number; top: number } | null>(null);
+    const [menu, setMenu] = useState<{ id: "size" | "export" | "more" | "brand"; left?: number; right?: number; top: number } | null>(null);
     const [ctx, setCtx] = useState<{ x: number; y: number } | null>(null);
     const [imgPop, setImgPop] = useState<{ img: HTMLImageElement; left: number; top: number } | null>(null);
     const [linkOpen, setLinkOpen] = useState(false);
@@ -156,11 +179,19 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
     const [fits, setFits] = useState({ width: 1.25, height: 0.7 });
     const [startSize, setStartSize] = useState(() => stored(START_SIZE_KEY) || "last");   // "last" | a paper id
     const [home, setHome] = useState(() => stored(HOME_KEY));                          // start-up source file; "" = the bundled one
+    // desktop only: the open file's identity (basename, no extension) drives the export filename and the omni bar's label
+    const [fileName, setFileName] = useState("");
+    // desktop only: the recent-documents typeahead that lives in the omni bar
+    const hasRecents = !!files?.recent;
+    const [recents, setRecents] = useState<RecentDoc[]>([]);
+    const [omniOpen, setOmniOpen] = useState(false);
+    const [omniQuery, setOmniQuery] = useState("");
+    const [omniIdx, setOmniIdx] = useState(0);
 
     const wrapRef = useRef<HTMLElement>(null), hostRef = useRef<HTMLDivElement>(null), paperRef = useRef<HTMLDivElement>(null);
     const editorsRef = useRef<Editor[]>([]), tipRef = useRef<HTMLDivElement>(null);
-    const fileRef = useRef<HTMLInputElement>(null), imgFileRef = useRef<HTMLInputElement>(null);
-    const stateRef = useRef({ name, settings, source, scale, pages }); stateRef.current = { name, settings, source, scale, pages };
+    const fileRef = useRef<HTMLInputElement>(null), imgFileRef = useRef<HTMLInputElement>(null), omniRef = useRef<HTMLDivElement>(null);
+    const stateRef = useRef({ name, fileName, settings, source, scale, pages }); stateRef.current = { name, fileName, settings, source, scale, pages };
     const rafRef = useRef(0), saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined), toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
     const paper = PAPERS[settings.paper];
@@ -243,7 +274,7 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
             if (dead) return;
             if (onDisk) {
                 const parsed = parseSource(onDisk.text);
-                setName(parsed.name || onDisk.name); setSettings({ ...DEFAULT_SETTINGS, ...(local?.settings || {}), ...paperPatch }); setSource({ css: parsed.css, html: parsed.html }); return;
+                setName(parsed.name || onDisk.name); setFileName(onDisk.name.replace(/\.html?$/i, "")); setSettings({ ...DEFAULT_SETTINGS, ...(local?.settings || {}), ...paperPatch }); setSource({ css: parsed.css, html: parsed.html }); return;
             }
             if (files && local?.html && local.unsaved) { setDirty(true); say("Restored edits that were never saved to a file"); }
             if (local?.html) { setName(local.name || "Résumé"); setSettings({ ...DEFAULT_SETTINGS, ...(local.settings || {}), ...paperPatch }); setSource({ css: local.css, html: local.html }); return; }
@@ -314,10 +345,12 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
         if (files) {
             // a real file: the Source HTML goes to disk; this browser keeps a copy only as a safety net
             try {
-                const file = await files.save(fullHtml(n, src.css, doc.html), { as, suggested: slugify(n) + ".html" });
+                const file = await files.save(fullHtml(n, src.css, doc.html), { as, suggested: slugify(stateRef.current.fileName || n) + ".html" });
                 if (!file) return;
                 clearTimeout(saveTimer.current);
                 try { localStorage.setItem(LOCAL_KEY, JSON.stringify({ ...doc, savedAt: new Date().toISOString(), unsaved: false })); } catch { /* ignore */ }
+                setFileName(file.replace(/\.html?$/i, ""));   // the saved file is now this document's identity
+                void files.recent?.().then(setRecents).catch(() => {});
                 setDirty(false); say(`Saved — ${file}`);
             } catch (e) { say(e instanceof Error ? e.message : "Could not save the file"); }
             return;
@@ -365,7 +398,7 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
 
     const runExport = useCallback(async (kind: "pdf" | "png" | "docx" | "html") => {
         setMenu(null); paginate();
-        const file = slugify(stateRef.current.name), began = Date.now();
+        const file = slugify(stateRef.current.fileName || stateRef.current.name), began = Date.now();
         try {
             setBusy(kind.toUpperCase());
             if (kind === "html") return download(new Blob([fullHtml(stateRef.current.name, stateRef.current.source?.css || "", serialize())], { type: "text/html" }), file + ".html");
@@ -391,6 +424,7 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
     const loadSourceText = useCallback((text: string, fallbackName: string, opened?: { note?: string }) => {
         const parsed = parseSource(text);
         setName(parsed.name || fallbackName); setSource({ css: parsed.css, html: parsed.html }); setDirty(!opened);
+        setFileName(opened ? fallbackName : "");   // a real file gives the document its identity; a reset/import leaves it to the printed name
         if (opened) {   // it IS the file on disk: nothing unsaved, and the safety-net copy must not outvote it on the next start
             clearTimeout(saveTimer.current);
             try { localStorage.setItem(LOCAL_KEY, JSON.stringify({ name: parsed.name || fallbackName, css: parsed.css, html: parsed.html, settings: stateRef.current.settings, savedAt: new Date().toISOString(), unsaved: false })); } catch { /* ignore */ }
@@ -403,6 +437,40 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
         msg: "Replace the document with the original source file? Your edits to this document will be lost.", ok: "Replace",
         run: async () => loadSourceText(await fetchSource(templateUrl), "Résumé"),
     }), [loadSourceText, templateUrl]);
+
+    /* ---- omni bar: a recent-documents typeahead (desktop shells only) ---- */
+    // keep the list fresh: load once, then follow the shell (an open, a save, a pin all re-emit it)
+    useEffect(() => {
+        if (!files?.recent) return;
+        let dead = false;
+        void files.recent().then((l) => { if (!dead) setRecents(l); }).catch(() => {});
+        const off = files.onRecent?.((l) => setRecents(l));
+        return () => { dead = true; off?.(); };
+    }, [files]);
+    // click away closes the dropdown
+    useEffect(() => {
+        if (!omniOpen) return;
+        const away = (e: PointerEvent) => { if (!omniRef.current?.contains(e.target as Node)) setOmniOpen(false); };
+        window.addEventListener("pointerdown", away);
+        return () => window.removeEventListener("pointerdown", away);
+    }, [omniOpen]);
+    const omniList = useMemo(() => {
+        const q = omniQuery.trim().toLowerCase();
+        return (q ? recents.filter((r) => r.name.toLowerCase().includes(q)) : recents).slice(0, 10);
+    }, [recents, omniQuery]);
+    const chooseRecent = useCallback((path: string) => { setOmniOpen(false); setOmniQuery(""); files?.openPath?.(path); }, [files]);
+    const togglePin = useCallback((r: RecentDoc) => { files?.pin?.(r.path, !r.pinned); void files?.recent?.().then(setRecents).catch(() => {}); }, [files]);
+    const omniKey = (e: React.KeyboardEvent) => {
+        if (e.key === "ArrowDown") { e.preventDefault(); setOmniIdx((i) => Math.min(i + 1, omniList.length - 1)); }
+        else if (e.key === "ArrowUp") { e.preventDefault(); setOmniIdx((i) => Math.max(i - 1, 0)); }
+        else if (e.key === "Enter") { e.preventDefault(); const r = omniList[omniIdx] || omniList[0]; if (r) chooseRecent(r.path); }
+        else if (e.key === "Escape") { setOmniOpen(false); (e.target as HTMLInputElement).blur(); }
+    };
+
+    /* ---- brand menu (the Itera mark, far left): quick shell actions ---- */
+    const BRAND_HOME = "https://qmanning.com/labs/itera";
+    const visitHomepage = () => { setMenu(null); if (files?.openExternal) files.openExternal(BRAND_HOME); else window.open(BRAND_HOME, "_blank", "noopener"); };
+    const checkUpdates = () => { setMenu(null); files?.checkUpdates?.(); };
 
     /* ---- ask your AI (desktop shells only): words in → operations out → applied as ONE undoable step ---- */
     const [ask, setAsk] = useState(""), [askFocus, setAskFocus] = useState(false);
@@ -478,7 +546,7 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
             return { applied: out.applied, skipped: out.skipped, pagesBefore, pagesAfter, fitScale: Math.round(stateRef.current.scale * 100) / 100 };
         },
         undo: () => { const last = remoteUndo.current.pop(); if (!last) return false; setSource(last); setDirty(true); touch(); setAiReply(null); say("Undone"); return true; },
-        exportPayload: () => ({ ...exportHtml(), name: slugify(stateRef.current.name) }),
+        exportPayload: () => ({ ...exportHtml(), name: slugify(stateRef.current.fileName || stateRef.current.name) }),
     };
     // the pill under the page: it knows whether an outside AI app is connected, and it can be sent away for good —
     // connecting is never required, and the shell's AI menu is always there
@@ -590,7 +658,7 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
         return () => { wrap.removeEventListener("scroll", bump); window.removeEventListener("resize", bump); };
     }, [look.ready]);
 
-    const openMenu = (id: "size" | "export" | "more", e: React.MouseEvent, align: "left" | "right") => {
+    const openMenu = (id: "size" | "export" | "more" | "brand", e: React.MouseEvent, align: "left" | "right") => {
         const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
         setMenu((m) => (m?.id === id ? null : { id, top: r.bottom + 8, ...(align === "left" ? { left: r.left } : { right: window.innerWidth - r.right }) }));
     };
@@ -653,16 +721,40 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
             {/* main bar — Infospector's #pt-bar */}
             <div id="pt-bar" className="cvm-bar">
                 {backHref && <button className="pt-rbtn" aria-label="Back" data-tip="Back" onClick={() => { window.location.href = backHref; }}><ArrowLeft /></button>}
+                <button className="pt-rbtn cvm-brand" aria-label="Itera menu" aria-haspopup="menu" data-tip="Itera" onClick={(e) => openMenu("brand", e, "left")}><IteraGlyph className="cvm-brand-glyph" /></button>
                 <div className="pt-dim">
                     <div className="pt-dim-trigger">
                         <button className="pt-dim-val" aria-haspopup="true" data-tip="Paper size and zoom" onClick={(e) => openMenu("size", e, "left")}>{paper.label}<span className="pt-dim-scale" style={{ color: "var(--pt-text-faint)" }}>· {Math.round(zoom * 100)}%</span></button>
                         <button className="pt-chev" aria-label="Choose a size" onClick={(e) => openMenu("size", e, "left")}>▾</button>
                     </div>
                 </div>
-                <div className="pt-omni">
+                <div ref={omniRef} className={"pt-omni" + (hasRecents ? " cvm-omni-recent" : "") + ((hasRecents ? (omniOpen ? omniQuery : fileName) : name) ? " pt-has-value" : "")}>
                     <span className="pt-omni-icon"><FileText /></span>
-                    <input type="text" value={name} spellCheck={false} aria-label="Document name" placeholder="Document name" onChange={(e) => { setName(e.target.value); setDirty(true); }} />
+                    {hasRecents ? (
+                        <input type="text" spellCheck={false} aria-label="Open a recent document" placeholder={fileName || "Untitled — search recent documents"}
+                            value={omniOpen ? omniQuery : fileName}
+                            onFocus={() => { setOmniOpen(true); setOmniQuery(""); setOmniIdx(0); void files?.recent?.().then(setRecents).catch(() => {}); }}
+                            onChange={(e) => { setOmniOpen(true); setOmniQuery(e.target.value); setOmniIdx(0); }}
+                            onKeyDown={omniKey} />
+                    ) : (
+                        <input type="text" value={name} spellCheck={false} aria-label="Document name" placeholder="Document name" onChange={(e) => { setName(e.target.value); setDirty(true); }} />
+                    )}
                     <button className="pt-omni-clear cvm-import" aria-label={files ? "Open a résumé file" : "Import a source HTML file"} data-tip={files ? "Open a résumé file · ⌘O" : "Import a source HTML file"} onClick={() => (files ? files.open() : fileRef.current?.click())}><Upload /></button>
+                    {hasRecents && omniOpen && (
+                        <div className="pt-omni-results pt-open" role="listbox">
+                            {omniList.length === 0 ? (
+                                <div className="pt-omni-empty">{recents.length ? "No document matches." : "No recent documents yet — open or save one."}</div>
+                            ) : omniList.map((r, i) => (
+                                <div key={r.path} role="option" aria-selected={i === omniIdx} className={"pt-omni-item cvm-omni-item" + (i === omniIdx ? " pt-active" : "")}
+                                    onMouseEnter={() => setOmniIdx(i)} onMouseDown={(e) => { e.preventDefault(); chooseRecent(r.path); }}>
+                                    <span className="pt-oi-title">{r.name}</span>
+                                    {r.pinned && <span className="pt-oi-badge">Master</span>}
+                                    <button className={"cvm-omni-pin" + (r.pinned ? " pt-active" : "")} aria-label={r.pinned ? "Unpin master" : "Pin as master"} data-tip={r.pinned ? "Unpin master" : "Pin as master"}
+                                        onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); togglePin(r); }}><Star /></button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
                 <button className="pt-rbtn" {...pill(settings.paginate)} aria-label="Pagination" data-tip={settings.paginate ? "Pagination on · pages + page numbers" : "Pagination off · one continuous page"} onClick={() => patch({ paginate: !settings.paginate })}><BookOpen /></button>
                 <button className="pt-rbtn cvm-secondary" {...pill(settings.spellcheck)} aria-label="Spellcheck" data-tip={settings.spellcheck ? "Spellcheck on" : "Spellcheck off"} onClick={() => patch({ spellcheck: !settings.spellcheck })}><SpellCheck /></button>
@@ -743,6 +835,13 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
                     <a className="pt-menu-item cvm-row cvm-credit" href="https://qmanning.com/labs/itera" target="_blank" rel="noopener" onClick={() => setMenu(null)}>
                         <span>Itera <span className="cvm-hint" style={{ marginLeft: 4 }}>by Q Manning</span></span><span className="cvm-hint">qmanning.com ↗</span>
                     </a>
+                </div>
+            )}
+            {menu?.id === "brand" && (
+                <div className="pt-menu-pop pt-open cvm-brand-menu" role="menu" style={{ left: menu.left, top: menu.top, minWidth: 220 }}>
+                    <div className="pt-ctx-title">Itera</div>
+                    {files?.checkUpdates && <button className="pt-menu-item cvm-row" onClick={checkUpdates}><RefreshCw />Check for Updates…</button>}
+                    <button className="pt-menu-item cvm-row" onClick={visitHomepage}><ExternalLink />Visit Homepage<span className="cvm-hint">qmanning.com ↗</span></button>
                 </div>
             )}
             {activeBlock && blockRect && paperRect && (

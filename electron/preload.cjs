@@ -16,6 +16,14 @@ contextBridge.exposeInMainWorld("cvMakerFiles", {
     onOpen: subscribe("files:opened"),
     onCommand: subscribe("files:command"),
     setDirty: (dirty) => ipcRenderer.send("files:dirty", !!dirty),
+    // recent-documents typeahead (the omni bar)
+    recent: () => ipcRenderer.invoke("files:recent"),
+    openPath: (p) => ipcRenderer.send("files:openPath", String(p)),
+    pin: (p, on) => ipcRenderer.send("files:pin", { path: String(p), pinned: !!on }),
+    onRecent: subscribe("files:recent-changed"),
+    // the brand menu's quick actions
+    checkUpdates: () => ipcRenderer.send("shell:check-updates"),
+    openExternal: (url) => ipcRenderer.send("shell:open-external", String(url)),
 });
 
 // "ask your AI": words and the document go to the shell, operations come back. The key never comes near this page.
