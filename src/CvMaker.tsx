@@ -16,7 +16,7 @@ import {
     AlignCenter, AlignLeft, AlignRight, ArrowDown, ArrowLeft, ArrowUp, Bold, BookOpen, BriefcaseBusiness, Plus, Text, Columns2, Copy, Download,
     Eraser, FileCode2, FileImage, FileText, FileType2, ImageUp, Italic, Link2, List, Minus, Moon, RotateCcw,
     Save, SpellCheck, Sun, Upload, Trash2, Underline as UnderlineIcon, ALargeSmall, MoveVertical, MoveHorizontal,
-    Sparkles, SendHorizontal, Undo2, Check, Settings2, X, Star, RefreshCw, FileUser, ChevronLeft, Files, ScanSearch, CircleCheck, CircleDashed,
+    Sparkles, SendHorizontal, Undo2, Check, Settings2, X, Star, RefreshCw, FileUser, ChevronLeft, Files, GripVertical, ScanSearch, CircleCheck, CircleDashed,
 } from "lucide-react";
 import { FontSize } from "@/components/ui/font-size-extension";
 import { FontWeight } from "@/components/ui/font-weight-extension";
@@ -336,6 +336,8 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
         editorsRef.current = editors;
         const mounted = host.querySelector<HTMLElement>(".cv-page"); if (mounted) normalizeGaps(mounted, PAPERS[stateRef.current.settings.paper].w);
         setActive(null); setPicked(null); schedule();
+        // an object that was just moved / pasted / duplicated stays selected (its element is new: the page was re-mounted)
+        if (pickAfter.current != null) { const el = host.querySelectorAll<HTMLElement>(UNIT)[pickAfter.current]; pickAfter.current = null; if (el) window.setTimeout(() => setPicked(el), 0); }
         // a block that was just inserted gets the caret, with its placeholder selected — type to replace it
         if (focusBlock.current != null) {
             const page = host.querySelector(".cv-page"), block = page ? topBlocks(page)[focusBlock.current] : null; focusBlock.current = null;
@@ -493,6 +495,7 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
         const resume = slots.current.resume;
         const source = kind === "letter" && resume ? { css: letterCss(resume.source.css, slot.source.css), html: mirrorHeader(slot.source.html, resume.source.html) } : slot.source;
         slots.current[kind] = { ...slot, source };
+        hist.current = [];   // structural undo belongs to the document that was on the sheet
         remoteUndo.current = slot.undo; setAiReply(null); setActive(null); setPicked(null); setImgPop(null); setOmniOpen(false); setOmniQuery("");
         setTab(kind); setName(slot.name); setFileName(slot.fileName); setSource(source); setDirty(slot.dirty);
     }, []);
@@ -829,18 +832,105 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
     const [picked, setPicked] = useState<HTMLElement | null>(null);
     const activeBlock = active ? (active.view.dom.closest(UNIT) as HTMLElement | null) : picked;
     useEffect(() => { if (!activeBlock) return; activeBlock.classList.add("cvm-hot"); return () => activeBlock.classList.remove("cvm-hot"); }, [activeBlock]);
-    const blockOp = useCallback((op: "dup" | "up" | "down" | "del") => {
-        const host = hostRef.current, src = stateRef.current.source; if (!host || !activeBlock || !src) return;
-        const idx = Array.from(host.querySelectorAll(UNIT)).indexOf(activeBlock);
-        const tmp = document.createElement("div"); tmp.innerHTML = serialize();
-        const el = tmp.querySelectorAll(UNIT)[idx]; if (!el) return;
-        const row = (n: Element | null) => (n && n.matches(UNIT) ? n : null);
-        if (op === "dup") el.after(el.cloneNode(true));
-        if (op === "del") el.remove();
-        if (op === "up") { const prev = row(el.previousElementSibling); if (!prev) return; prev.before(el); }
-        if (op === "down") { const next = row(el.nextElementSibling); if (!next) return; next.after(el); }
-        setSource({ css: src.css, html: tmp.innerHTML }); setDirty(true);
-    }, [activeBlock, serialize]);
+    // OBJECTS. Text is edited in place; a block is also an object you can select (Esc from its text, ⌥-click, or click its
+    // margin), and then copy / cut / paste / duplicate / delete / move or drag — Infospector's blue box marks it. Every
+    // structural change goes through restructure(): it works on a detached copy and leaves one undo step (⌘Z while an object is selected).
+    const hist = useRef<Source[]>([]), clip = useRef(""), pickAfter = useRef<number | null>(null);
+    const fixedUnit = (el: Element | null) => !!el?.hasAttribute("data-cv-mirror");   // a letter's header belongs to the résumé
+    const restructure = useCallback((fn: (units: HTMLElement[], root: HTMLElement) => HTMLElement | null | void) => {
+        const src = stateRef.current.source; if (!src) return;
+        const before: Source = { css: src.css, html: serialize() };
+        const root = document.createElement("div"); root.innerHTML = before.html;
+        const keep = fn(Array.from(root.querySelectorAll<HTMLElement>(UNIT)), root);
+        if (keep === null) return;
+        hist.current.push(before); trimUndo(hist.current);
+        pickAfter.current = keep ? Array.from(root.querySelectorAll(UNIT)).indexOf(keep) : null;
+        setSource({ css: src.css, html: root.innerHTML }); setDirty(true);
+    }, [serialize]);
+    const unitIndex = (el: Element) => Array.from(hostRef.current?.querySelectorAll(UNIT) || []).indexOf(el);
+    const pickObject = useCallback((el: HTMLElement | null) => { (document.activeElement as HTMLElement | null)?.blur?.(); window.getSelection()?.removeAllRanges(); setActive(null); setPicked(el); }, []);
+    const blockOp = useCallback((op: "dup" | "up" | "down" | "del" | "copy" | "cut" | "paste") => {
+        const idx = activeBlock ? unitIndex(activeBlock) : -1;
+        if (op !== "paste" && (idx < 0 || fixedUnit(activeBlock))) return;
+        if (op === "copy" || op === "cut") {
+            const root = document.createElement("div"); root.innerHTML = serialize();
+            const el = root.querySelectorAll<HTMLElement>(UNIT)[idx]; if (!el) return;
+            clip.current = el.outerHTML; void navigator.clipboard?.writeText(el.innerText || el.textContent || "").catch(() => {});
+            say(op === "copy" ? "Copied · ⌘V pastes it after the selected block" : "Cut");
+            if (op === "copy") return;
+        }
+        if (op === "paste" && !clip.current) return;
+        restructure((units, root) => {
+            const el = units[idx], row = (n: Element | null) => (n instanceof HTMLElement && n.matches(UNIT) && !fixedUnit(n) ? n : null);
+            if (op === "paste") {
+                const box = document.createElement("div"); box.innerHTML = clip.current; const fresh = box.firstElementChild as HTMLElement | null; if (!fresh) return null;
+                // after the selected object when it sits where this kind of object lives; otherwise at the end of the page
+                const page = root.querySelector(".cv-page"); if (el) el.after(fresh); else if (page) page.append(fresh); else return null;
+                return fresh;
+            }
+            if (!el) return null;
+            if (op === "dup") { const copy = el.cloneNode(true) as HTMLElement; el.after(copy); return copy; }
+            if (op === "del" || op === "cut") { const next = row(el.nextElementSibling) || row(el.previousElementSibling); el.remove(); return next || undefined; }
+            if (op === "up") { const prev = row(el.previousElementSibling); if (!prev) return null; prev.before(el); return el; }
+            if (op === "down") { const next = row(el.nextElementSibling); if (!next) return null; next.after(el); return el; }
+        });
+    }, [activeBlock, serialize, restructure, say]);
+    const undoStructure = useCallback(() => { const last = hist.current.pop(); if (!last) return say("Nothing to undo"); setSource(last); setDirty(true); say("Undone"); }, [say]);
+
+    // the selection box follows its object (scrolling, zoom, re-layout) for as long as one is selected
+    const [selRect, setSelRect] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
+    useEffect(() => {
+        if (!picked || active) { setSelRect(null); return; }
+        let raf = 0, last = "";
+        const tick = () => {
+            if (!picked.isConnected) { setPicked(null); return; }
+            const r = picked.getBoundingClientRect(), key = [r.left, r.top, r.width, r.height].map((n) => n.toFixed(1)).join();
+            if (key !== last) { last = key; setSelRect({ left: r.left, top: r.top, width: r.width, height: r.height }); }
+            raf = requestAnimationFrame(tick);
+        };
+        tick(); return () => cancelAnimationFrame(raf);
+    }, [picked, active]);
+
+    // keys: Esc lifts you from a block's text to the block; with a block selected — ⌘C ⌘X ⌘V ⌘D ⌫ ↑ ↓ ⌘Z, ⏎ back into its text
+    useEffect(() => {
+        const key = (e: KeyboardEvent) => {
+            const t = e.target as HTMLElement | null, mod = e.metaKey || e.ctrlKey;
+            if (e.key === "Escape" && active && !menu && !linkOpen) { const unit = active.view.dom.closest<HTMLElement>(UNIT); if (unit) { e.preventDefault(); pickObject(unit); } return; }
+            if (!picked || active || t?.closest("input, textarea, select, [contenteditable=true]")) return;
+            const k = e.key.toLowerCase(), run = (op: Parameters<typeof blockOp>[0]) => { e.preventDefault(); blockOp(op); };
+            if (e.key === "Escape") { e.preventDefault(); setPicked(null); }
+            else if (mod && k === "c") run("copy"); else if (mod && k === "x") run("cut"); else if (mod && k === "v") run("paste"); else if (mod && k === "d") run("dup");
+            else if (mod && k === "z" && !e.shiftKey) { e.preventDefault(); undoStructure(); }
+            else if (e.key === "Backspace" || e.key === "Delete") { run("del"); say("Deleted · ⌘Z brings it back"); }
+            else if (e.key === "ArrowUp") run("up"); else if (e.key === "ArrowDown") run("down");
+            else if (e.key === "Enter") { const ed = editorsRef.current.find((x) => picked.contains(x.view.dom)); if (ed) { e.preventDefault(); ed.commands.focus("end"); } }
+        };
+        window.addEventListener("keydown", key, true); return () => window.removeEventListener("keydown", key, true);
+    }, [active, picked, menu, linkOpen, blockOp, pickObject, undoStructure, say]);
+
+    // drag a selected object by its tab (or the grip in the side pill): a line shows where it will land among its siblings
+    const [dropLine, setDropLine] = useState<{ left: number; width: number; y: number } | null>(null);
+    const startDrag = useCallback((e: React.PointerEvent, el: HTMLElement | null) => {
+        if (!el || fixedUnit(el) || e.button !== 0) return;
+        e.preventDefault(); pickObject(el);
+        const sibs = Array.from(el.parentElement?.children || []).filter((c): c is HTMLElement => c instanceof HTMLElement && c.matches(UNIT) && !fixedUnit(c));
+        let slot = -1, moved = false; const y0 = e.clientY;
+        const move = (ev: PointerEvent) => {
+            if (!moved && Math.abs(ev.clientY - y0) < 4) return; moved = true;
+            const rects = sibs.map((x) => x.getBoundingClientRect());
+            slot = rects.findIndex((r) => ev.clientY < r.top + r.height / 2); if (slot < 0) slot = sibs.length;
+            const ref = rects[Math.min(slot, rects.length - 1)], y = slot < rects.length ? ref.top - 3 : ref.bottom + 3;
+            setDropLine({ left: ref.left, width: ref.width, y }); document.body.style.cursor = "grabbing";
+        };
+        const up = () => {
+            window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); document.body.style.cursor = ""; setDropLine(null);
+            const from = sibs.indexOf(el); if (!moved || slot < 0 || slot === from || slot === from + 1) return;
+            const me = unitIndex(el), before = slot < sibs.length ? unitIndex(sibs[slot]) : -1, lastSib = unitIndex(sibs[sibs.length - 1]);
+            restructure((units) => { const node = units[me]; if (!node) return null; if (before >= 0) units[before].before(node); else units[lastSib].after(node); return node; });
+        };
+        window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
+    }, [pickObject, restructure]);
+    const unitLabel = (el: HTMLElement) => (fixedUnit(el) ? "Header · from the résumé" : el.getAttribute("data-cv-repeat") === "job" ? "Experience entry" : el.tagName === "HEADER" ? "Header" : el.querySelector("hr, .cv-divider") || el.matches("hr, .cv-divider") ? "Divider" : "Block");
 
     /* ---- the "+" between rows: hover a gap, pick a kind, a new block lands there ---- */
     const [insertAt, setInsertAt] = useState<{ after: number; y: number; left: number; width: number } | null>(null);
@@ -880,11 +970,13 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
             setConfirm({ msg: `Open this link in your browser?\n${href.length > 90 ? href.slice(0, 88) + "…" : href}`, ok: "Open", run: () => { if (files?.openExternal) files.openExternal(href); else window.open(href, "_blank", "noopener"); } });
             return;
         }
+        const target = e.target as HTMLElement, unit = target.closest<HTMLElement>(UNIT);
+        if (unit && hostRef.current?.contains(unit) && (e.altKey || !target.closest("[data-cv-edit], img, a"))) { e.preventDefault(); pickObject(unit); return; }
         const img = (e.target as HTMLElement).closest("img");
         if (img && hostRef.current?.contains(img)) { const r = img.getBoundingClientRect(); setImgPop({ img, left: r.left, top: r.bottom + 8 }); }
         const rule = (e.target as HTMLElement).closest<HTMLElement>(".cv-divider");
         if (rule && hostRef.current?.contains(rule)) { (document.activeElement as HTMLElement | null)?.blur?.(); setActive(null); setPicked(rule); }
-    }, [files, say]);
+    }, [files, say, pickObject]);
     const onImgFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const f = e.target.files?.[0], img = imgPop?.img; e.target.value = ""; if (!f || !img) return;
         const reader = new FileReader();
@@ -1164,8 +1256,16 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
                     </div>
                 );
             })()}
+            {picked && !active && selRect && (
+                <div className={"cvm-selbox" + (fixedUnit(picked) ? " cvm-fixed" : "")} style={{ left: selRect.left, top: selRect.top, width: selRect.width, height: selRect.height }} aria-hidden="true">
+                    <div className="cvm-seltab" onPointerDown={(e) => startDrag(e, picked)} data-tip={fixedUnit(picked) ? undefined : "Drag to move · ⌘C ⌘V ⌘D ⌫ ↑ ↓"}>{!fixedUnit(picked) && <GripVertical />}{unitLabel(picked)}</div>
+                    {["nw", "n", "ne", "e", "se", "s", "sw", "w"].map((h) => <i key={h} className={"cvm-h cvm-h-" + h} />)}
+                </div>
+            )}
+            {dropLine && <div className="cvm-insert-line cvm-drop-line" style={{ left: dropLine.left, width: dropLine.width, top: dropLine.y }} />}
             {activeBlock && blockRect && paperRect && (
                 <div className="pt-menu-pop pt-open cvm-blocktools" style={{ left: Math.max(8, paperRect.left - 52), top: Math.max(124, Math.min(window.innerHeight - 170, blockRect.top)) }} onMouseDown={keep}>
+                    <button className="cvm-fbtn cvm-grip" data-tip="Drag to move · click to select" onPointerDown={(e) => startDrag(e, activeBlock)}><GripVertical /></button>
                     <button className="cvm-fbtn" data-tip="Move up" onClick={() => blockOp("up")}><ArrowUp /></button>
                     <button className="cvm-fbtn" data-tip="Move down" onClick={() => blockOp("down")}><ArrowDown /></button>
                     <button className="cvm-fbtn" data-tip="Duplicate this entry" onClick={() => blockOp("dup")}><Copy /></button>
@@ -1213,7 +1313,11 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
                             : <div className="cvm-sheet" style={{ top: 0, bottom: 0 }} />}
                         {overflowMarks.map((y, i) => <div key={y} className="cvm-overflow" style={{ top: y + "pt" }}><span>page {i + 1} ends</span></div>)}
                     </div>
-                    <div className="cvm-host" ref={hostRef} onClick={onHostClick} />
+                    <div className="cvm-host" ref={hostRef} onClick={onHostClick}
+                        onMouseDownCapture={(e) => {   // ⌥-press selects the OBJECT under the pointer: caught before the text editor can take the press (and the caret) for itself
+                            const unit = e.altKey && e.button === 0 ? (e.target as HTMLElement).closest<HTMLElement>(UNIT) : null;
+                            if (unit && hostRef.current?.contains(unit)) { e.preventDefault(); e.stopPropagation(); pickObject(unit); }
+                        }} />
                     {/* export in progress: each sheet dims and Infospector's scan line sweeps it until the file is ready */}
                     <div className={"cvm-scans" + (busy ? " cvm-scanning" : "")} aria-hidden="true">
                         {settings.paginate

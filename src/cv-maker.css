@@ -215,3 +215,19 @@ body > .pt-cpick { z-index: 2100; }
 .cvm-kw-clear { flex: none; height: 30px; padding: 0 10px; border-radius: var(--cvm-ctl-r); border: 1px solid var(--pt-glass-brd); background: transparent; color: var(--pt-text-dim); font: 12px var(--pt-font); cursor: pointer; }
 .cvm-kw-clear:hover { color: var(--pt-text); }
 /* (the ::highlight(cvm-kw) rule is injected by CvMaker at runtime: CSS compilers don't all parse ::highlight() yet) */
+
+/* a selected OBJECT (a block, not its text): Infospector's selection language — accent box, square white-ringed handles, a name tab */
+.cvm-selbox { position: fixed; z-index: 150; pointer-events: none; box-sizing: border-box; border: 1.5px solid var(--pt-accent); border-radius: 1px;
+  box-shadow: 0 0 0 1px color-mix(in srgb, #fff 55%, transparent); }
+.cvm-selbox.cvm-fixed { border-style: dashed; }
+.cvm-h { position: absolute; width: 9px; height: 9px; box-sizing: border-box; background: var(--pt-accent); border: 1.5px solid #fff; border-radius: 2px; box-shadow: 0 1px 3px rgba(0, 0, 0, .35); }
+.cvm-fixed .cvm-h { display: none; }
+.cvm-h-nw { left: -5px; top: -5px; } .cvm-h-n { left: calc(50% - 4.5px); top: -5px; } .cvm-h-ne { right: -5px; top: -5px; }
+.cvm-h-e { right: -5px; top: calc(50% - 4.5px); } .cvm-h-se { right: -5px; bottom: -5px; } .cvm-h-s { left: calc(50% - 4.5px); bottom: -5px; }
+.cvm-h-sw { left: -5px; bottom: -5px; } .cvm-h-w { left: -5px; top: calc(50% - 4.5px); }
+.cvm-seltab { position: absolute; left: -1.5px; bottom: calc(100% + 1px); display: flex; align-items: center; gap: 3px; height: 19px; padding: 0 7px 0 3px; pointer-events: auto; cursor: grab;
+  background: var(--pt-accent); color: #fff; font: 600 10.5px/1 var(--pt-font); border-radius: 4px 4px 0 0; white-space: nowrap; user-select: none; touch-action: none; }
+.cvm-fixed .cvm-seltab { cursor: default; padding-left: 7px; }
+.cvm-seltab svg { width: 12px; height: 12px; opacity: .85; }
+.cvm-grip { cursor: grab; touch-action: none; }
+.cvm-drop-line { position: fixed; z-index: 151; height: 3px; border-radius: 2px; background: var(--pt-accent); pointer-events: none; }
