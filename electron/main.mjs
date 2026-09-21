@@ -66,6 +66,15 @@ async function handleApp(req) {
     if (url.host !== "cv-maker") return new Response("", { status: 404 });
     if (url.pathname === "/__export") return req.method === "POST" ? handleExport(req) : json(405, { error: "POST only" });
     if (req.method !== "GET" && req.method !== "HEAD") return new Response("", { status: 405 });
+    if (url.pathname.startsWith("/__welcome/")) {   // the sheet's two buttons are plain links to here: act, close it, navigate nowhere
+        const sheet = welcome; welcome = null;
+        setImmediate(() => { if (sheet && !sheet.isDestroyed()) sheet.close(); if (url.pathname === "/__welcome/open") files.openDialog(); });
+        return new Response(null, { status: 204 });
+    }
+    if (url.pathname === "/welcome.html") {   // the first-run sheet; ⌘ reads Ctrl off the Mac
+        const html = fs.readFileSync(path.join(here, "welcome.html"), "utf8").replaceAll("⌘", process.platform === "darwin" ? "⌘" : "Ctrl+");
+        return new Response(html, { headers: { "content-type": "text/html; charset=utf-8", "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'" } });
+    }
     if (url.pathname === "/config.js") {
         return new Response(`window.CV_MAKER = { exportServer: ${JSON.stringify(ORIGIN + "/__export")} };\n`, { headers: { "content-type": "text/javascript; charset=utf-8" } });
     }
@@ -94,6 +103,30 @@ function createWindow() {
     win.webContents.session.setPermissionRequestHandler((_wc, _perm, cb) => cb(false));
     win.loadURL(ORIGIN + "/index.html");
     return win;
+}
+
+/* ---- the welcome sheet: shown once on first run, and from Help ▸ Welcome to CV Maker ---- */
+let welcome = null;
+function showWelcome(parent) {
+    if (!parent || parent.isDestroyed()) return;
+    if (welcome && !welcome.isDestroyed()) return welcome.focus();
+    welcome = new BrowserWindow({
+        parent, modal: true, show: false, width: 600, height: 620, useContentSize: true, resizable: false, minimizable: false, maximizable: false, fullscreenable: false,
+        backgroundColor: "#14161c", title: "Welcome to CV Maker",
+        webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, javascript: false },
+    });
+    welcome.setMenuBarVisibility(false);
+    welcome.webContents.on("will-navigate", (e, url) => { if (!url.startsWith(ORIGIN + "/__welcome/")) { e.preventDefault(); if (/^https?:\/\//i.test(url)) shell.openExternal(url); } });
+    welcome.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:\/\//i.test(url)) shell.openExternal(url); return { action: "deny" }; });
+    welcome.once("ready-to-show", () => { if (!SMOKE_DIR) welcome?.show(); });
+    welcome.on("closed", () => { welcome = null; });
+    welcome.loadURL(ORIGIN + "/welcome.html");
+}
+function welcomeOnFirstRun(parent) {
+    const flag = path.join(app.getPath("userData"), "welcomed");
+    if (fs.existsSync(flag)) return;
+    try { fs.writeFileSync(flag, new Date().toISOString()); } catch { /* it will just show again */ }
+    showWelcome(parent);
 }
 
 /* ---- smoke, second launch: the app comes back with the same file open, showing what's on disk, nothing unsaved ---- */
@@ -139,13 +172,22 @@ async function smoke(win) {
     fs.writeFileSync(savedFile, onDisk.replace("Typed In Smoke", "Edited By Another Program"));
     await until("the sheet to follow the file", () => js(`document.querySelector(".cv-page").textContent.includes("Edited By Another Program")`));
     fileSteps.followedExternalEdit = true; fileSteps.cleanAfterReload = !files.state().dirty;
+    /* the welcome sheet: it loads, and its primary button dismisses it */
+    showWelcome(win);
+    const sheet = welcome;
+    await until("the welcome sheet", () => !!sheet && !sheet.webContents.isLoading() && sheet.webContents.getTitle() === "Welcome to CV Maker");
+    fileSteps.welcomeLoaded = true;
+    sheet.webContents.loadURL(ORIGIN + "/__welcome/start").catch(() => {});   // what the primary button links to (a hidden window takes no clicks)
+    await until("the welcome sheet to close", () => sheet.isDestroyed(), 8000);
+    fileSteps.welcomeDismissed = true;
+
     const info = await js(`({ pages: document.querySelectorAll(".cvm-pageno").length, origin: location.origin, stored: !!localStorage })`);
     return { saved, problems, info, fileSteps, electron: process.versions.electron, chrome: process.versions.chrome };
 }
 
 app.whenReady().then(async () => {
     protocol.handle("app", handleApp);
-    files = setupFiles({ templatePath: path.join(ROOT, "templates", "sample-resume.html"), smokeDir: SMOKE_DIR });
+    files = setupFiles({ templatePath: path.join(ROOT, "templates", "sample-resume.html"), smokeDir: SMOKE_DIR, onWelcome: () => showWelcome(BrowserWindow.getAllWindows().find((w) => w !== welcome)) });
     const win = createWindow();
     win.webContents.once("did-finish-load", () => openWhenReady.splice(0).forEach((f) => files.openPath(f)));
     if (SMOKE_DIR) {
@@ -155,6 +197,7 @@ app.whenReady().then(async () => {
         app.exit(result.ok ? 0 : 1);
         return;
     }
+    win.webContents.once("did-finish-load", () => welcomeOnFirstRun(win));
     app.on("activate", () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
 

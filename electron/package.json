@@ -34,6 +34,7 @@
             "export.mjs",
             "files.mjs",
             "preload.cjs",
+            "welcome.html",
             "package.json",
             {
                 "from": "..",
@@ -75,7 +76,32 @@
             "artifactName": "CV-Maker-${version}-mac-${arch}.${ext}"
         },
         "dmg": {
-            "title": "CV Maker ${version}"
+            "title": "CV Maker ${version}",
+            "background": "build/background.png",
+            "iconSize": 92,
+            "iconTextSize": 12,
+            "window": {
+                "width": 660,
+                "height": 480
+            },
+            "contents": [
+                {
+                    "x": 170,
+                    "y": 165
+                },
+                {
+                    "x": 490,
+                    "y": 165,
+                    "type": "link",
+                    "path": "/Applications"
+                },
+                {
+                    "x": 540,
+                    "y": 352,
+                    "type": "file",
+                    "path": "build/Open Privacy & Security.inetloc"
+                }
+            ]
         },
         "win": {
             "target": [

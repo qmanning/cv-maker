@@ -1,0 +1,49 @@
+<!doctype html>
+<!-- electron/welcome.html — the desktop app's first-run sheet (also Help ▸ Welcome to CV Maker).
+     No scripts: the two buttons are links the shell intercepts (app://cv-maker/__welcome/…). -->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Welcome to CV Maker</title>
+<style>
+  :root { color-scheme: dark; --ink: #f2f3f6; --dim: rgba(242,243,246,.66); --line: rgba(255,255,255,.10); --blue: #3666f8; }
+  html, body { margin: 0; height: 100%; }
+  body { background: #14161c; color: var(--ink); font: 13.5px/1.45 -apple-system, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; display: flex; flex-direction: column; user-select: none; cursor: default; }
+  header { padding: 26px 30px 0; }
+  h1 { margin: 0; font-size: 21px; font-weight: 700; letter-spacing: -.2px; }
+  header p { margin: 6px 0 0; color: var(--dim); }
+  ol { list-style: none; margin: 18px 0 0; padding: 0 30px; counter-reset: n; flex: 1; }
+  li { counter-increment: n; position: relative; padding: 11px 0 11px 40px; border-top: 1px solid var(--line); }
+  li:first-child { border-top: 0; }
+  li::before { content: counter(n); position: absolute; left: 0; top: 12px; width: 24px; height: 24px; border-radius: 50%; background: rgba(54,102,248,.18); color: #9db4ff; font-weight: 700; font-size: 12px; line-height: 24px; text-align: center; }
+  li b { display: block; font-weight: 650; }
+  li span { color: var(--dim); }
+  kbd { font: inherit; font-size: 12px; padding: 1px 5px; border-radius: 5px; background: rgba(255,255,255,.09); box-shadow: inset 0 0 0 1px var(--line); color: var(--ink); }
+  footer { display: flex; align-items: center; gap: 10px; padding: 16px 30px 22px; border-top: 1px solid var(--line); }
+  footer .more { margin-right: auto; white-space: nowrap; color: var(--dim); text-decoration: none; font-size: 12.5px; }
+  footer .more:hover { color: var(--ink); }
+  .btn { display: inline-block; white-space: nowrap; padding: 8px 16px; border-radius: 10px; text-decoration: none; font-weight: 600; color: var(--ink); background: rgba(255,255,255,.08); box-shadow: inset 0 0 0 1px var(--line); }
+  .btn:hover { background: rgba(255,255,255,.13); }
+  .btn.primary { background: var(--blue); box-shadow: none; color: #fff; }
+  .btn.primary:hover { filter: brightness(1.08); }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Welcome to CV Maker</h1>
+    <p>The page you're looking at <em>is</em> the résumé. There are no forms. It opens with a made-up person, Mara Quill, so you can see how it works.</p>
+  </header>
+  <ol>
+    <li><b>Click any text and type.</b><span>Select words and a format bar appears right there: bold, size, color, links, bullets.</span></li>
+    <li><b>Add, move or remove sections.</b><span>Hover the gap between two blocks and click <kbd>+</kbd>. With the caret in a block, the arrows and trash beside it move, duplicate or delete it. Click the picture to change it.</span></li>
+    <li><b>It keeps itself to one page.</b><span>“Fit to one page” gently scales the sheet as you write; the paper size and zoom are in the toolbar at the top.</span></li>
+    <li><b>Save it as a file. It's yours.</b><span><kbd>⌘S</kbd> saves a plain <kbd>.html</kbd> file wherever you like. Open it here any time. Your AI assistant can edit that file too, and this page updates as it does.</span></li>
+    <li><b>Export when you're ready.</b><span>The Export button (top right) makes a PDF with real, selectable text, a Word document, or a PNG.</span></li>
+  </ol>
+  <footer>
+    <a class="more" href="https://github.com/qmanning/cv-maker#make-your-own-template">Make your own template ↗</a>
+    <a class="btn" href="app://cv-maker/__welcome/open">Open a résumé file…</a>
+    <a class="btn primary" href="app://cv-maker/__welcome/start">Start with the sample</a>
+  </footer>
+</body>
+</html>

@@ -142,9 +142,9 @@ CV Maker is free and I don't pay Apple or Microsoft for a signing certificate, s
 ask you to vouch for the app once. If you'd rather not, use the [web version](https://qmanning.com/labs/cv-maker/demo)
 or run it from source (above) — same editor, and neither shows a warning.
 
-- **macOS** — drag *CV Maker* to Applications and open it. macOS says it *"could not verify CV Maker is
-  free of malware"*: click **Done**, open **System Settings → Privacy & Security**, scroll to
-  *"CV Maker was blocked…"*, click **Open Anyway**, and confirm. Only the first time. (If it says the app
+- **macOS** — drag *CV Maker* to Applications and open it. macOS says *"Apple could not verify
+  “CV Maker” is free of malware that may harm your Mac or compromise your privacy."* Click **Done**, open **System Settings → Privacy & Security**, scroll to
+  *"CV Maker was blocked…"*, click **Open Anyway**, and confirm. Only the first time. The installer window shows these steps too, with an **Open Privacy & Security** shortcut that jumps to the right Settings page. (If it says the app
   *"is damaged"* instead, run `xattr -cr "/Applications/CV Maker.app"` in Terminal and open it again.)
 - **Windows** — on *"Windows protected your PC"*, click **More info → Run anyway**.
 

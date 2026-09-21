@@ -11,7 +11,7 @@ const MAX_FILE = 25 * 1024 * 1024;
 const FILTERS = [{ name: "Résumé (HTML)", extensions: ["html", "htm"] }];
 const hash = (text) => crypto.createHash("sha1").update(text).digest("hex");
 
-export function setupFiles({ templatePath, smokeDir = "" }) {
+export function setupFiles({ templatePath, smokeDir = "", onWelcome = () => {} }) {
     const statePath = () => path.join(app.getPath("userData"), "files.json");
     let win = null, current = "", dirty = false, known = "", watcher = null, watchTimer = null, closeAfterSave = false, recent = [];
     try { const s = JSON.parse(fs.readFileSync(statePath(), "utf8")); recent = (s.recent || []).filter((p) => typeof p === "string"); if (s.current && fs.existsSync(s.current)) current = s.current; } catch { /* first run */ }
@@ -23,7 +23,7 @@ export function setupFiles({ templatePath, smokeDir = "" }) {
         win.setRepresentedFilename(current || ""); win.setDocumentEdited(dirty);   // macOS: the proxy icon and the dot in the close button
     };
     const send = (channel, payload) => { if (win && !win.isDestroyed()) win.webContents.send(channel, payload); };
-    const ask = (options) => (smokeDir ? { response: 0 } : dialog.showMessageBoxSync(win, { type: "question", noLink: true, ...options }));
+    const ask = (options) => (smokeDir ? 0 : dialog.showMessageBoxSync(win, { type: "question", noLink: true, ...options }));
 
     function watch() {
         watcher?.close(); watcher = null;
@@ -113,7 +113,7 @@ export function setupFiles({ templatePath, smokeDir = "" }) {
             { role: "editMenu" },
             { label: "View", submenu: [{ role: "togglefullscreen" }, ...(app.isPackaged ? [] : [{ type: "separator" }, { role: "reload" }, { role: "toggleDevTools" }])] },
             { role: "windowMenu" },
-            { role: "help", submenu: [{ label: "CV Maker on the Web", click: () => shell.openExternal("https://qmanning.com/labs/cv-maker") }, { label: "Source on GitHub", click: () => shell.openExternal("https://github.com/qmanning/cv-maker") }] },
+            { role: "help", submenu: [{ label: "Welcome to CV Maker", click: () => onWelcome() }, { type: "separator" }, { label: "CV Maker on the Web", click: () => shell.openExternal("https://qmanning.com/labs/cv-maker") }, { label: "Source on GitHub", click: () => shell.openExternal("https://github.com/qmanning/cv-maker") }] },
         ]));
     }
 
@@ -130,7 +130,7 @@ export function setupFiles({ templatePath, smokeDir = "" }) {
             });
             win.on("closed", () => { watcher?.close(); watcher = null; if (win === window) win = null; });
         },
-        openPath,
+        openPath, openDialog,
         state: () => ({ current, dirty }),
     };
 }
