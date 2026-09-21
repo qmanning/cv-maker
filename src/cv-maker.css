@@ -30,6 +30,7 @@ body > .pt-cpick { z-index: 2100; }
    with JS (position: fixed), but ours is nested in the omni, so anchor it there instead */
 .cvm-bar .pt-omni-results { position: absolute; top: calc(100% + 8px); left: 0; right: 0; width: auto; }
 .cvm-omni-item .pt-oi-title { flex: 1 1 auto; margin-right: auto; }
+.cvm-omni-item > svg { flex: none; width: 15px; height: 15px; color: var(--pt-text-dim); }   /* the "Save as …" row's icon */
 .cvm-omni-pin { flex: none; width: 24px; height: 24px; margin-left: 6px; display: grid; place-items: center; border: none;
   border-radius: 50%; background: transparent; color: var(--pt-text-faint); cursor: pointer; opacity: 0; transition: opacity .12s; }
 .cvm-omni-item:hover .cvm-omni-pin, .cvm-omni-item.pt-active .cvm-omni-pin, .cvm-omni-pin.pt-active { opacity: 1; }

@@ -24,6 +24,10 @@ HTML for a region: only p, ul, ol, li, strong, em, u, a (href) and br. A region 
 
 This is someone's real résumé. Work only from facts in the document or given by the person; never invent employers, titles, dates, numbers, degrees or skills. If you need information you do not have, ask the person instead of editing.
 
+Documents: the résumé is a file. list_documents shows the recent ones (one may be marked master: the person's base résumé) and which is open. To tailor a résumé for a job, open_document the master, then save_document with save_as (e.g. "Acme — Product Designer") BEFORE editing, so the master is never changed; exports are named after the open file. open_document refuses while there are unsaved changes: save_document first, or ask the person. Never save over a document the person did not ask you to change.
+
+Page and images: get_page_setup / set_page_setup read and change paper size, fit-to-one-page, pagination and zoom. list_images / replace_image swap a picture (a photo, a logo) for an image file on this computer. export_resume writes a PDF, PNG, Word (docx) or Source HTML file to Downloads.
+
 edit_resume reports pages_before and pages_after. If your edit pushed the résumé onto another page, tighten what you just wrote (same facts, fewer words) and call edit_resume again, unless the person asked for more pages. After editing, tell the person briefly what you changed. Ids are re-issued by every get_resume, so call it again before a second round of edits.`;
 
 const OP = {
@@ -41,7 +45,14 @@ const TOOLS = [
     { name: "get_resume", description: "Read the résumé that is open in Itera: its blocks and editable regions (with ids), the file name, how many pages it fills, and whether the editor is already shrinking it to fit. Call this before editing.", inputSchema: { type: "object", additionalProperties: false, properties: {} }, annotations: { readOnlyHint: true, title: "Read the open résumé" } },
     { name: "edit_resume", description: "Change the open résumé. Operations are applied in order as ONE step the person can undo; ids refer to the document as get_resume last returned it, even after earlier operations in the same call. Returns how many were applied, any that were skipped and why, and pages_before / pages_after.", inputSchema: { type: "object", additionalProperties: false, required: ["summary", "ops"], properties: { summary: { type: "string", description: "One short sentence shown to the person inside Itera, e.g. \"Tightened the Halcyon bullets.\"" }, ops: { type: "array", minItems: 1, items: OP } } }, annotations: { title: "Edit the open résumé", destructiveHint: false } },
     { name: "undo_last_edit", description: "Take back the most recent edit_resume.", inputSchema: { type: "object", additionalProperties: false, properties: {} }, annotations: { title: "Undo the last edit" } },
-    { name: "export_resume", description: "Export the open résumé to the person's Downloads folder as a PDF (real, selectable text) or a PNG. Returns the file path.", inputSchema: { type: "object", additionalProperties: false, required: ["format"], properties: { format: { type: "string", enum: ["pdf", "png"] } } }, annotations: { title: "Export the résumé" } },
+    { name: "export_resume", description: "Export the open résumé to the person's Downloads folder: pdf (real, selectable text), png, docx (Word, ATS-friendly) or html (the re-loadable Source HTML). The file is named after the open document. Returns the file path.", inputSchema: { type: "object", additionalProperties: false, required: ["format"], properties: { format: { type: "string", enum: ["pdf", "png", "docx", "html"] } } }, annotations: { title: "Export the résumé" } },
+    { name: "list_documents", description: "The person's recent résumé files in Itera (name, path, and which one is pinned as the master), which one is open now, and whether it has unsaved changes.", inputSchema: { type: "object", additionalProperties: false, properties: {} }, annotations: { readOnlyHint: true, title: "List recent résumés" } },
+    { name: "open_document", description: "Open a résumé in Itera — what the person does with the Import/Open button. Pass a name from list_documents (e.g. the master) or an absolute path to an .html résumé. Refuses if the open résumé has unsaved changes. Call get_resume afterwards: ids are new.", inputSchema: { type: "object", additionalProperties: false, required: ["document"], properties: { document: { type: "string", description: "A document name from list_documents, or an absolute file path." } } }, annotations: { title: "Open a résumé" } },
+    { name: "save_document", description: "Save the open résumé to its file. With save_as, save a COPY under that name instead (next to the current file; it becomes the open document and names future exports) — use this to branch a tailored résumé off the master, or to rename. Never overwrites a different existing file.", inputSchema: { type: "object", additionalProperties: false, properties: { save_as: { type: "string", description: "A new document name, without a folder or extension, e.g. \"Acme — Product Designer\"." } } }, annotations: { title: "Save the résumé" } },
+    { name: "get_page_setup", description: "Paper size, fit-to-one-page, pagination and zoom of the open résumé, plus how many pages it fills and the fit scale in effect.", inputSchema: { type: "object", additionalProperties: false, properties: {} }, annotations: { readOnlyHint: true, title: "Read the page setup" } },
+    { name: "set_page_setup", description: "Change any of: paper (\"letter\" or \"a4\"), fit_to_one_page (scale the design down, never below 80%, to land on one sheet), paginate (pages + page numbers vs one continuous page), zoom (\"width\", \"height\", or a number: 1.25 = 125%; view only). Returns the resulting setup including pages.", inputSchema: { type: "object", additionalProperties: false, properties: { paper: { type: "string", enum: ["letter", "a4"] }, fit_to_one_page: { type: "boolean" }, paginate: { type: "boolean" }, zoom: { anyOf: [{ type: "string", enum: ["width", "height"] }, { type: "number", minimum: 0.25, maximum: 4 }] } } }, annotations: { title: "Change the page setup" } },
+    { name: "list_images", description: "Every image in the open résumé (photo, logo, …) with its id (i0, i1, …), alt text and pixel size.", inputSchema: { type: "object", additionalProperties: false, properties: {} }, annotations: { readOnlyHint: true, title: "List the résumé's images" } },
+    { name: "replace_image", description: "Replace one image with an image file on this computer (png, jpg, gif, webp, svg; up to 8 MB). It is embedded in the résumé file. One undoable step (undo_last_edit).", inputSchema: { type: "object", additionalProperties: false, required: ["image", "path"], properties: { image: { type: "string", description: "An id from list_images, e.g. i0." }, path: { type: "string", description: "Absolute path to the new image file." }, alt: { type: "string", description: "New alt text (optional)." } } }, annotations: { title: "Replace an image" } },
 ];
 
 /* ---- the app, over the local socket: one JSON line out, one JSON line back ---- */
@@ -87,6 +98,13 @@ async function callTool(name, args) {
     }
     if (name === "undo_last_edit") return text(await app("undo"));
     if (name === "export_resume") return text(await app("export", { format: args?.format }));
+    if (name === "list_documents") return text(await app("documents"));
+    if (name === "open_document") return text({ ...(await app("open", { document: args?.document })), note: "Call get_resume now: this is a different document and the ids are new." });
+    if (name === "save_document") return text(await app("save", { save_as: args?.save_as }));
+    if (name === "get_page_setup") return text(await app("page_get"));
+    if (name === "set_page_setup") return text(await app("page_set", args || {}));
+    if (name === "list_images") return text(await app("images"));
+    if (name === "replace_image") return text(await app("image_set", { image: args?.image, path: args?.path, alt: args?.alt }));
     return text(`Unknown tool: ${name}`, true);
 }
 
@@ -96,7 +114,7 @@ readline.createInterface({ input: process.stdin }).on("line", async (line) => {
     const reply = (result) => send({ jsonrpc: "2.0", id: msg.id, result });
     try {
         if (msg.method === "initialize") { const n = String(msg.params?.clientInfo?.title || msg.params?.clientInfo?.name || ""); if (n) client = /claude/i.test(n) ? (/code/i.test(n) ? "Claude Code" : "Claude") : n.slice(0, 40); }
-        if (msg.method === "initialize") return reply({ protocolVersion: VERSIONS.includes(msg.params?.protocolVersion) ? msg.params.protocolVersion : VERSIONS[0], capabilities: { tools: {} }, serverInfo: { name: "itera", title: "Itera", version: "0.1.0" }, instructions: INSTRUCTIONS });
+        if (msg.method === "initialize") return reply({ protocolVersion: VERSIONS.includes(msg.params?.protocolVersion) ? msg.params.protocolVersion : VERSIONS[0], capabilities: { tools: {} }, serverInfo: { name: "itera", title: "Itera", version: "0.2.0" }, instructions: INSTRUCTIONS });
         if (msg.method === "ping") return reply({});
         if (msg.method === "tools/list") return reply({ tools: TOOLS });
         if (msg.method === "tools/call") { try { return reply(await callTool(msg.params?.name, msg.params?.arguments || {})); } catch (e) { return reply(text(String(e?.message || e), true)); } }

@@ -15,7 +15,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const SERVER_NAME = "itera";
 const LEGACY_NAMES = ["cv-maker"];   // what this app called itself until September 2026 — cleaned up whenever we write a config
 
-export function setupMcp({ editorWindow, currentFile, socketPath = "" }) {
+export function setupMcp({ editorWindow, currentFile, files = () => null, socketPath = "" }) {
     const SOCKET = socketPath || (process.platform === "win32" ? `\\\\.\\pipe\\itera-mcp-${os.userInfo().username}` : path.join(app.getPath("userData"), "mcp.sock"));
     let seq = 0, clients = 0, lastSeen = 0; const pending = new Map(), listeners = new Set();
     const changed = () => listeners.forEach((fn) => fn());
@@ -39,13 +39,48 @@ export function setupMcp({ editorWindow, currentFile, socketPath = "" }) {
         }
         if (method === "undo") return { undone: await editor("undo") };
         if (method === "export") {
-            const format = params?.format === "png" ? "png" : "pdf";
-            const payload = await editor("exportPayload");
-            const { buffer } = await renderExport({ ...payload, format, scale: 2 });
-            let file = path.join(app.getPath("downloads"), `${payload.name}.${format}`);
-            for (let n = 2; fs.existsSync(file); n++) file = path.join(app.getPath("downloads"), `${payload.name}-${n}.${format}`);
+            const format = ["png", "docx", "html"].includes(params?.format) ? params.format : "pdf";
+            let base, buffer;
+            if (format === "docx" || format === "html") {   // the editor renders these itself
+                const out = await editor("exportFile", [format]);
+                base = String(out.name).replace(/\.[a-z]+$/i, ""); buffer = out.base64 ? Buffer.from(out.data, "base64") : Buffer.from(String(out.data), "utf8");
+            } else {
+                const payload = await editor("exportPayload");
+                base = payload.name; ({ buffer } = await renderExport({ ...payload, format, scale: 2 }));
+            }
+            let file = path.join(app.getPath("downloads"), `${base}.${format}`);
+            for (let n = 2; fs.existsSync(file); n++) file = path.join(app.getPath("downloads"), `${base}-${n}.${format}`);
             fs.writeFileSync(file, buffer);
             return { saved: file };
+        }
+        const shellFiles = () => { const f = files(); if (!f) throw new Error("Itera is still starting. Try again in a moment."); return f; };
+        if (method === "documents") {
+            const f = shellFiles(), st = f.state();
+            return { open: st.current ? path.basename(st.current) : null, open_path: st.current || null, unsaved_changes: !!st.dirty, documents: f.recentList().map((r) => ({ name: r.name, path: r.path, master: !!r.pinned })) };
+        }
+        if (method === "open") {
+            const out = shellFiles().openRemote(params?.document);
+            if (!out.already_open) await new Promise((r) => setTimeout(r, 900));   // let the editor mount it before the next get_resume
+            return out;
+        }
+        if (method === "save") {
+            const f = shellFiles(), { html } = await editor("sourceHtml");
+            const out = f.writeDocument(html, { saveAs: typeof params?.save_as === "string" ? params.save_as : "" });
+            await editor("markSaved", [out.file]);
+            return { saved: out.path, file: out.file };
+        }
+        const pageOut = (p) => ({ paper: p.paper, paper_label: p.paperLabel, papers: p.papers, fit_to_one_page: p.fit, paginate: p.paginate, zoom: p.zoom, zoom_percent: p.zoomPercent, pages: p.pages, fit_scale: p.fitScale });
+        if (method === "page_get") return pageOut(await editor("getPage"));
+        if (method === "page_set") return pageOut(await editor("setPage", [{ paper: params?.paper, fit: params?.fit_to_one_page, paginate: params?.paginate, zoom: params?.zoom }]));
+        if (method === "images") return { images: await editor("listImages") };
+        if (method === "image_set") {
+            const file = String(params?.path || ""), ext = path.extname(file).slice(1).toLowerCase();
+            const mime = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", svg: "image/svg+xml" }[ext];
+            if (!path.isAbsolute(file) || !mime) throw new Error("path must be an absolute path to a .png, .jpg, .gif, .webp or .svg file on this computer.");
+            let stat; try { stat = fs.statSync(file); } catch { throw new Error(`There is no file at ${file}.`); }
+            if (stat.size > 8 * 1024 * 1024) throw new Error("That image is over 8 MB — it gets embedded in the résumé file, so use a smaller one.");
+            const out = await editor("setImage", [String(params?.image || ""), `data:${mime};base64,${fs.readFileSync(file).toString("base64")}`, typeof params?.alt === "string" ? params.alt : null, clientName]);
+            return { replaced: out.replaced, pages_before: out.pagesBefore, pages_after: out.pagesAfter };
         }
         throw new Error("unknown method " + method);
     }

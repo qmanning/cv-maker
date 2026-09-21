@@ -38,7 +38,23 @@ export interface CvRemoteHandlers {
     undo(): boolean;
     /** what the export pipeline needs to render this document (PDF / PNG happen in the shell) */
     exportPayload(): { html: string; widthPt: number; heightPt: number; name: string };
+    /** the formats the editor renders itself: Word and the re-loadable Source HTML (docx travels as base64) */
+    exportFile(kind: "docx" | "html"): Promise<{ name: string; data: string; base64: boolean }>;
+    /** the toolbar's size menu, as data: paper, fit-to-one-page, pagination, zoom — and what they currently produce */
+    getPage(): RemotePage;
+    /** change any of them; resolves once the page has re-laid itself out */
+    setPage(patch: { paper?: string; fit?: boolean; paginate?: boolean; zoom?: number | "width" | "height" }): Promise<RemotePage>;
+    /** every <img> in the document, in order (i0, i1, …) */
+    listImages(): RemoteImage[];
+    /** swap one image for a data: URI (the shell read the file) — one undoable step, like an edit */
+    setImage(id: string, dataUri: string, alt: string | null, by: string): Promise<{ replaced: boolean; pagesBefore: number; pagesAfter: number }>;
+    /** the full Source HTML to write to disk, and the name a new file should get — the shell does the writing */
+    sourceHtml(): { html: string; suggested: string };
+    /** the shell wrote the file: it is now this document's identity and nothing is unsaved */
+    markSaved(file: string): void;
 }
+export interface RemotePage { paper: string; paperLabel: string; papers: string[]; fit: boolean; paginate: boolean; zoom: number | "width" | "height"; zoomPercent: number; pages: number; fitScale: number }
+export interface RemoteImage { id: string; alt: string; width: number; height: number; kilobytes: number; embedded: boolean }
 /** which outside AI apps know about this editor, and whether one is attached at this moment */
 export interface CvRemoteStatus { apps: string[]; live: number }
 export interface CvRemote {

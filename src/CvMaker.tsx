@@ -24,7 +24,7 @@ import { BlockLineHeight, ColumnBreak, LetterSpacing } from "./cv-extensions";
 import { BLOCK_KINDS, UNIT, insertBlock, topBlocks, type BlockKind } from "./cv-blocks";
 import { attachColorPicker, toHex, useInfospectorLook } from "./use-infospector-look";
 import { LookMenu } from "./LookMenu";
-import { applyOps, describeDocument, type CvAssistant, type CvRemote, type CvRemoteHandlers, type CvRemoteStatus } from "./cv-assistant";
+import { applyOps, describeDocument, type CvAssistant, type CvRemote, type CvRemoteHandlers, type CvRemoteStatus, type RemotePage } from "./cv-assistant";
 import { FOOTER_PT, GAP_PT, MIN_FIT, PAPERS, PT, type PaperId, type Source, fullHtml, pageBoxCss, parseSource, slugify, stepZoom } from "./cv-source";
 
 const LOCAL_KEY = "cvm:doc", START_SIZE_KEY = "cvm:startsize", HOME_KEY = "cvm:home";
@@ -62,8 +62,13 @@ export interface CvFiles {
     openPath?(path: string): void;
     /** pin (or unpin) a file as the master, so it heads the list and is the default document */
     pin?(path: string, pinned: boolean): void;
+    /** save a copy under a new name, beside the open file (else in Documents) — no dialog; rejects if that name is taken.
+     *  Resolves to the new file's name, which becomes the open document. */
+    saveAs?(html: string, name: string): Promise<string>;
     /** the recent list changed (an open, a save, a pin) — refresh the typeahead */
     onRecent?(handler: (list: RecentDoc[]) => void): () => void;
+    /** the shell's own Save panel for an export finished (saved or cancelled) — the scan runs until then */
+    onDownload?(handler: (state: string) => void): () => void;
     /** shell chrome the brand menu drives: check for updates, open a URL outside the app */
     checkUpdates?(): void;
     openExternal?(url: string): void;
@@ -192,6 +197,7 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
     const editorsRef = useRef<Editor[]>([]), tipRef = useRef<HTMLDivElement>(null);
     const fileRef = useRef<HTMLInputElement>(null), imgFileRef = useRef<HTMLInputElement>(null), omniRef = useRef<HTMLDivElement>(null);
     const stateRef = useRef({ name, fileName, settings, source, scale, pages }); stateRef.current = { name, fileName, settings, source, scale, pages };
+    const shellSaving = useRef(false), shellSavingTimer = useRef(0);
     const rafRef = useRef(0), saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined), toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
     const paper = PAPERS[settings.paper];
@@ -399,26 +405,34 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
     const runExport = useCallback(async (kind: "pdf" | "png" | "docx" | "html") => {
         setMenu(null); paginate();
         const file = slugify(stateRef.current.fileName || stateRef.current.name), began = Date.now();
+        // in a desktop shell the file isn't "exported" until its Save panel is done — and that panel can be slow to appear
+        const dl = (blob: Blob, filename: string) => { if (files?.onDownload) shellSaving.current = true; download(blob, filename); };
         try {
             setBusy(kind.toUpperCase());
-            if (kind === "html") return download(new Blob([fullHtml(stateRef.current.name, stateRef.current.source?.css || "", serialize())], { type: "text/html" }), file + ".html");
+            if (kind === "html") return dl(new Blob([fullHtml(stateRef.current.name, stateRef.current.source?.css || "", serialize())], { type: "text/html" }), file + ".html");
             if (kind === "docx") {
                 const { exportDocx } = await import("./export-docx");
                 const page = hostRef.current!.querySelector<HTMLElement>(".cv-page")!, p = PAPERS[stateRef.current.settings.paper];
-                return download(await exportDocx(page, { pageWPt: p.w, pageHPt: p.h, paginate: stateRef.current.settings.paginate, name: stateRef.current.name }), file + ".docx");
+                return dl(await exportDocx(page, { pageWPt: p.w, pageHPt: p.h, paginate: stateRef.current.settings.paginate, name: stateRef.current.name }), file + ".docx");
             }
             const payload = exportHtml();
             // headless Chrome when there's an export server; otherwise (none configured, unreachable, or it declines)
             // the browser does it itself: print dialog for PDF (still real text + links), html-to-image for PNG
             let r: Response | null = null;
             if (exportUrl) { try { r = await fetch(exportUrl, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...payload, format: kind, scale: 2 }) }); } catch { r = null; } }
-            if (r?.ok) return download(await r.blob(), `${file}.${kind}`);
+            if (r?.ok) return dl(await r.blob(), `${file}.${kind}`);
             if (r && ![404, 405, 501].includes(r.status)) throw new Error((await r.json().catch(() => ({}))).error || "Export failed");
             if (kind === "pdf") { say("Choose “Save as PDF” in the print dialog"); return printFallback(payload.html); }
-            download(await rasterize(payload.html, payload.widthPt, payload.heightPt, rasterizerUrl), `${file}.png`);
+            dl(await rasterize(payload.html, payload.widthPt, payload.heightPt, rasterizerUrl), `${file}.png`);
         } catch (e) { say(e instanceof Error ? e.message : "Export failed"); }
-        finally { window.setTimeout(() => setBusy(""), Math.max(0, 900 - (Date.now() - began))); }   // the scan stays up at least one sweep
-    }, [exportHtml, exportUrl, paginate, printFallback, rasterizerUrl, say, serialize]);
+        finally {
+            // the scan stays up at least one sweep — and, in a shell, until its Save panel has come and gone (a minute at most)
+            if (shellSaving.current) { window.clearTimeout(shellSavingTimer.current); shellSavingTimer.current = window.setTimeout(() => { shellSaving.current = false; setBusy(""); }, 60000); }
+            else window.setTimeout(() => setBusy(""), Math.max(0, 900 - (Date.now() - began)));
+        }
+    }, [exportHtml, exportUrl, paginate, printFallback, rasterizerUrl, say, serialize, files]);
+    useEffect(() => files?.onDownload?.(() => { if (!shellSaving.current) return; shellSaving.current = false; window.clearTimeout(shellSavingTimer.current); setBusy(""); }), [files]);
+
 
     /* ---- source file: load / reset ---- */
     const loadSourceText = useCallback((text: string, fallbackName: string, opened?: { note?: string }) => {
@@ -460,10 +474,28 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
     }, [recents, omniQuery]);
     const chooseRecent = useCallback((path: string) => { setOmniOpen(false); setOmniQuery(""); files?.openPath?.(path); }, [files]);
     const togglePin = useCallback((r: RecentDoc) => { files?.pin?.(r.path, !r.pinned); void files?.recent?.().then(setRecents).catch(() => {}); }, [files]);
+    // type a name no document has and the list offers to save this one under it — that is how a document is renamed / branched
+    const omniNewName = useMemo(() => {
+        const q = omniQuery.trim(); if (!q || !files?.saveAs) return "";
+        const taken = (n: string) => n.toLowerCase() === q.toLowerCase();
+        return taken(fileName) || recents.some((r) => taken(r.name)) ? "" : q;
+    }, [omniQuery, files, fileName, recents]);
+    const saveAsName = useCallback(async (raw: string) => {
+        const wanted = raw.trim(), { name: n, source: src } = stateRef.current;
+        if (!wanted || !src || !files?.saveAs) return;
+        setOmniOpen(false); setOmniQuery("");
+        try { remoteRef.current?.markSaved(await files.saveAs(fullHtml(n, src.css, serialize()), wanted)); }
+        catch (e) { say(e instanceof Error ? e.message : "Could not save the file"); }
+    }, [files, serialize, say]);
+    const omniRows = omniList.length + (omniNewName ? 1 : 0);
     const omniKey = (e: React.KeyboardEvent) => {
-        if (e.key === "ArrowDown") { e.preventDefault(); setOmniIdx((i) => Math.min(i + 1, omniList.length - 1)); }
+        if (e.key === "ArrowDown") { e.preventDefault(); setOmniIdx((i) => Math.min(i + 1, omniRows - 1)); }
         else if (e.key === "ArrowUp") { e.preventDefault(); setOmniIdx((i) => Math.max(i - 1, 0)); }
-        else if (e.key === "Enter") { e.preventDefault(); const r = omniList[omniIdx] || omniList[0]; if (r) chooseRecent(r.path); }
+        else if (e.key === "Enter") {
+            e.preventDefault(); (e.target as HTMLInputElement).blur();
+            const r = omniList[omniIdx];
+            if (r) chooseRecent(r.path); else if (omniNewName) void saveAsName(omniNewName); else if (omniList[0]) chooseRecent(omniList[0].path);
+        }
         else if (e.key === "Escape") { setOmniOpen(false); (e.target as HTMLInputElement).blur(); }
     };
 
@@ -529,6 +561,15 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
         const { settings: st, name: n, scale: sc, pages: pg } = stateRef.current;
         return describeDocument(serialize(), { name: n, paper: PAPERS[st.paper].name, pages: st.paginate ? pg : 1, fitScale: Math.round(sc * 100) / 100 });
     }, [serialize]);
+    const settle = () => new Promise<void>((r) => window.setTimeout(r, 700));   // remount + paginate, so the caller learns what the change did
+    const pageNow = (): RemotePage => {
+        const { settings: st, pages: pg, scale: sc } = stateRef.current;
+        return {
+            paper: st.paper, paperLabel: `${PAPERS[st.paper].name} (${PAPERS[st.paper].label})`, papers: Object.keys(PAPERS), fit: st.fit, paginate: st.paginate,
+            zoom: typeof st.zoom === "number" ? st.zoom : st.zoom === "height" || st.zoom === "browser" ? "height" : "width", zoomPercent: Math.round(zoomRef.current * 100),
+            pages: st.paginate ? pg : 1, fitScale: Math.round(sc * 100) / 100,
+        };
+    };
     remoteRef.current = {
         describe: describeNow,
         apply: async (ops, message, by) => {
@@ -547,6 +588,59 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
         },
         undo: () => { const last = remoteUndo.current.pop(); if (!last) return false; setSource(last); setDirty(true); touch(); setAiReply(null); say("Undone"); return true; },
         exportPayload: () => ({ ...exportHtml(), name: slugify(stateRef.current.fileName || stateRef.current.name) }),
+        exportFile: async (kind) => {
+            const { name: n, fileName: f, source: src, settings: st } = stateRef.current, base = slugify(f || n);
+            if (!src) throw new Error("No document is open.");
+            if (kind === "html") return { name: base + ".html", data: fullHtml(n, src.css, serialize()), base64: false };
+            paginate();
+            const { exportDocx } = await import("./export-docx");
+            const page = hostRef.current!.querySelector<HTMLElement>(".cv-page")!, p = PAPERS[st.paper];
+            const bytes = new Uint8Array(await (await exportDocx(page, { pageWPt: p.w, pageHPt: p.h, paginate: st.paginate, name: n })).arrayBuffer());
+            let bin = ""; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+            return { name: base + ".docx", data: btoa(bin), base64: true };
+        },
+        getPage: () => pageNow(),
+        setPage: async (p) => {
+            const next: Partial<Settings> = {};
+            if (p.paper !== undefined) { if (!(p.paper in PAPERS)) throw new Error(`Unknown paper "${p.paper}". Use one of: ${Object.keys(PAPERS).join(", ")}.`); next.paper = p.paper as PaperId; }
+            if (typeof p.fit === "boolean") next.fit = p.fit;
+            if (typeof p.paginate === "boolean") next.paginate = p.paginate;
+            if (p.zoom !== undefined) {
+                if (p.zoom === "width" || p.zoom === "height") next.zoom = p.zoom;
+                else if (typeof p.zoom === "number" && Number.isFinite(p.zoom)) next.zoom = Math.min(4, Math.max(0.25, p.zoom));
+                else throw new Error('zoom is "width", "height", or a number such as 1.25 (= 125%).');
+            }
+            if (Object.keys(next).length) { patch(next); await settle(); }
+            return pageNow();
+        },
+        listImages: () => Array.from(hostRef.current?.querySelectorAll<HTMLImageElement>(".cv-page img") || []).map((img, i) => {
+            const src = img.getAttribute("src") || "", embedded = src.startsWith("data:");
+            return { id: "i" + i, alt: img.alt || "", width: img.naturalWidth, height: img.naturalHeight, kilobytes: embedded ? Math.round((src.length * 0.75) / 1024) : 0, embedded };
+        }),
+        setImage: async (id, dataUri, alt, by) => {
+            const src = stateRef.current.source; if (!src) throw new Error("No document is open.");
+            if (!/^data:image\/(png|jpeg|gif|webp|svg\+xml);base64,/.test(dataUri)) throw new Error("That isn't an image the editor can embed.");
+            const before: Source = { css: src.css, html: serialize() }, pagesBefore = stateRef.current.pages;
+            const doc = new DOMParser().parseFromString(before.html, "text/html");   // inert: nothing loads or runs while it is edited
+            const img = /^i\d+$/.test(id) ? doc.querySelectorAll(".cv-page img")[Number(id.slice(1))] : null;
+            if (!img) throw new Error(`There is no image ${id}. Call list_images for the ids.`);
+            img.setAttribute("src", dataUri); if (alt !== null) img.setAttribute("alt", alt);
+            remoteUndo.current.push(before); trimUndo(remoteUndo.current);
+            setSource({ css: src.css, html: doc.body.innerHTML }); setDirty(true);
+            await settle(); touch();
+            setAiReply({ message: `${by} replaced an image.`, undo: before, note: by });
+            return { replaced: true, pagesBefore, pagesAfter: stateRef.current.pages };
+        },
+        sourceHtml: () => {
+            const { name: n, fileName: f, source: src } = stateRef.current; if (!src) throw new Error("No document is open.");
+            return { html: fullHtml(n, src.css, serialize()), suggested: slugify(f || n) };
+        },
+        markSaved: (file) => {
+            const { name: n, settings: s, source: src } = stateRef.current;
+            clearTimeout(saveTimer.current);
+            if (src) { try { localStorage.setItem(LOCAL_KEY, JSON.stringify({ name: n, css: src.css, html: serialize(), settings: s, savedAt: new Date().toISOString(), unsaved: false })); } catch { /* ignore */ } }
+            setFileName(file.replace(/\.html?$/i, "")); setDirty(false); say(`Saved — ${file}`);
+        },
     };
     // the pill under the page: it knows whether an outside AI app is connected, and it can be sent away for good —
     // connecting is never required, and the shell's AI menu is always there
@@ -565,6 +659,13 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
         apply: (ops, message, by) => remoteRef.current!.apply(ops, message, by),
         undo: () => remoteRef.current!.undo(),
         exportPayload: () => remoteRef.current!.exportPayload(),
+        exportFile: (kind) => remoteRef.current!.exportFile(kind),
+        getPage: () => remoteRef.current!.getPage(),
+        setPage: (p) => remoteRef.current!.setPage(p),
+        listImages: () => remoteRef.current!.listImages(),
+        setImage: (id, dataUri, alt, by) => remoteRef.current!.setImage(id, dataUri, alt, by),
+        sourceHtml: () => remoteRef.current!.sourceHtml(),
+        markSaved: (file) => remoteRef.current!.markSaved(file),
     }), [remote]);
 
     /* ---- rows: move / duplicate / delete whichever block holds the caret (a job, the summary, a dual list…) ---- */
@@ -742,7 +843,7 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
                     <button className="pt-omni-clear cvm-import" aria-label={files ? "Open a résumé file" : "Import a source HTML file"} data-tip={files ? "Open a résumé file · ⌘O" : "Import a source HTML file"} onClick={() => (files ? files.open() : fileRef.current?.click())}><Upload /></button>
                     {hasRecents && omniOpen && (
                         <div className="pt-omni-results pt-open" role="listbox">
-                            {omniList.length === 0 ? (
+                            {omniRows === 0 ? (
                                 <div className="pt-omni-empty">{recents.length ? "No document matches." : "No recent documents yet — open or save one."}</div>
                             ) : omniList.map((r, i) => (
                                 <div key={r.path} role="option" aria-selected={i === omniIdx} className={"pt-omni-item cvm-omni-item" + (i === omniIdx ? " pt-active" : "")}
@@ -753,6 +854,12 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
                                         onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); togglePin(r); }}><Star /></button>
                                 </div>
                             ))}
+                            {omniNewName && (
+                                <div role="option" aria-selected={omniIdx === omniList.length} className={"pt-omni-item cvm-omni-item" + (omniIdx === omniList.length ? " pt-active" : "")}
+                                    onMouseEnter={() => setOmniIdx(omniList.length)} onMouseDown={(e) => { e.preventDefault(); void saveAsName(omniNewName); }}>
+                                    <Save /><span className="pt-oi-title">Save as “{omniNewName}”</span><span className="pt-oi-badge">{fileName ? "new copy" : "new file"}</span>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

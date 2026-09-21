@@ -25,7 +25,7 @@ const SMOKE_DIR = process.env.CVM_SMOKE_DIR || "";           // set by smoke.mjs
 
 if (SMOKE_DIR) { app.setPath("userData", path.join(SMOKE_DIR, "userData")); fs.mkdirSync(path.join(SMOKE_DIR, "downloads"), { recursive: true }); app.setPath("downloads", path.join(SMOKE_DIR, "downloads")); }   // a clean profile: no leftovers in, none out
 app.setName("Itera");
-let files = null, assistant = null, editor = null, mcp = null, updater = null;
+let files = null, assistant = null, editor = null, mcp = null, updater = null, lastExportDir = "";
 const openWhenReady = [];                                    // macOS can deliver open-file (double-clicked document, Dock drop) before we're ready
 app.on("open-file", (e, file) => { e.preventDefault(); if (files) files.openPath(file); else openWhenReady.push(file); });
 
@@ -102,6 +102,17 @@ function createWindow() {
     });
     files.attach(win); editor = win;
     win.on("closed", () => { if (editor === win) editor = null; });
+    // exports: aim the Save panel at a fast, local folder (where the last export went, else Downloads) — left alone,
+    // macOS reopens wherever it last was, and a network volume there makes the panel take ages to appear. The editor
+    // keeps its "scanning" state until we say the save is done (files:download), so there is no dead gap.
+    if (!SMOKE_DIR) win.webContents.session.on("will-download", (_e, item) => {
+        const dir = lastExportDir && fs.existsSync(lastExportDir) ? lastExportDir : app.getPath("downloads");
+        item.setSaveDialogOptions({ defaultPath: path.join(dir, item.getFilename()) });
+        item.once("done", (_ev, state) => {
+            if (state === "completed" && item.getSavePath()) lastExportDir = path.dirname(item.getSavePath());
+            if (!win.isDestroyed()) win.webContents.send("files:download", state);
+        });
+    });
     // the editor never leaves its origin: real links open in the user's browser, everything else is refused
     const external = (u) => { if (/^https?:\/\//i.test(u)) shell.openExternal(u); };
     win.webContents.setWindowOpenHandler(({ url }) => { external(url); return { action: "deny" }; });
@@ -356,7 +367,7 @@ async function smoke(win) {
     const init = (await rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "claude-ai", version: "0" } })).result;
     child.stdin.write(JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }) + "\n");
     fileSteps.mcpInitialized = init.serverInfo?.name === "itera" && !!init.capabilities?.tools && /get_resume/.test(init.instructions || "");
-    fileSteps.mcpTools = ((await rpc("tools/list", {})).result.tools || []).map((t) => t.name).join(",") === "get_resume,edit_resume,undo_last_edit,export_resume";
+    fileSteps.mcpTools = ((await rpc("tools/list", {})).result.tools || []).map((t) => t.name).join(",") === "get_resume,edit_resume,undo_last_edit,export_resume,list_documents,open_document,save_document,get_page_setup,set_page_setup,list_images,replace_image";
     const seen = (await tool("get_resume")).value;
     const job = seen.blocks.find((b) => b.kind === "job");
     fileSteps.mcpReadsResume = seen.blocks.length > 3 && !!job && seen.pages >= 1 && typeof seen.file === "string";
@@ -371,6 +382,30 @@ async function smoke(win) {
     fileSteps.mcpUndone = undone;
     const exported = await tool("export_resume", { format: "pdf" });
     fileSteps.mcpExported = !exported.isError && fs.existsSync(exported.value.saved) && fs.readFileSync(exported.value.saved).subarray(0, 5).toString() === "%PDF-";
+    const docx = await tool("export_resume", { format: "docx" });
+    fileSteps.mcpExportedDocx = !docx.isError && /\.docx$/.test(docx.value.saved) && fs.readFileSync(docx.value.saved).subarray(0, 2).toString() === "PK";
+    // page setup: read it, change the paper, put it back
+    const page0 = (await tool("get_page_setup")).value, pageA4 = (await tool("set_page_setup", { paper: "a4", fit_to_one_page: false })).value;
+    fileSteps.mcpPageSetup = page0.paper === "letter" && pageA4.paper === "a4" && pageA4.fit_to_one_page === false && pageA4.pages >= 1 && (await tool("set_page_setup", { paper: "nope" })).isError;
+    await tool("set_page_setup", { paper: page0.paper, fit_to_one_page: page0.fit_to_one_page });
+    // images: swap the first one for a file on disk, see it land, take it back
+    const pngFile = path.join(SMOKE_DIR, "pixel.png");
+    fs.writeFileSync(pngFile, Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64"));
+    const imgs = (await tool("list_images")).value.images, swapped = await tool("replace_image", { image: imgs[0]?.id, path: pngFile, alt: "MCP PIXEL" });
+    fileSteps.mcpImages = imgs.length >= 1 && !swapped.isError && swapped.value.replaced === true && (await js(`document.querySelector(".cv-page img").alt === "MCP PIXEL"`))
+        && (await tool("replace_image", { image: "i0", path: path.join(SMOKE_DIR, "saved.html") })).isError;
+    await tool("undo_last_edit");
+    // documents: never open over unsaved work; branch with save_as (no dialog); open by name
+    const docs0 = (await tool("list_documents")).value;
+    fileSteps.mcpRefusesOverUnsaved = docs0.unsaved_changes === true && (await tool("open_document", { document: "nothing-like-this" })).isError && (await tool("open_document", { document: "saved" })).isError;
+    const branch = await tool("save_document", { save_as: "MCP Branch / Test" });
+    const docs1 = (await tool("list_documents")).value;
+    fileSteps.mcpSaveAs = !branch.isError && branch.value.file === "MCP Branch Test.html" && fs.existsSync(path.join(SMOKE_DIR, "MCP Branch Test.html")) && docs1.open === "MCP Branch Test.html" && docs1.unsaved_changes === false
+        && (await tool("save_document", { save_as: "saved" })).isError;   // never over another file
+    fileSteps.mcpExportNamedAfterFile = /mcp-branch-test\.pdf$/.test((await tool("export_resume", { format: "pdf" })).value.saved || "");
+    const back = await tool("open_document", { document: "saved" });
+    await until("the MCP-opened document to show", () => files.state().current === savedFile, 8000);
+    fileSteps.mcpOpened = !back.isError && back.value.opened === "saved.html" && (await tool("get_resume")).value.file === "saved.html";
     child.kill();
 
     /* the welcome sheet: it loads, and its primary button dismisses it */
@@ -392,7 +427,7 @@ async function smoke(win) {
 
 app.whenReady().then(async () => {
     protocol.handle("app", handleApp);
-    mcp = setupMcp({ editorWindow: () => editor, currentFile: () => files?.state().current || "", socketPath: SMOKE_DIR && process.platform !== "win32" ? path.join(SMOKE_DIR, "mcp.sock") : "" });
+    mcp = setupMcp({ editorWindow: () => editor, currentFile: () => files?.state().current || "", files: () => files, socketPath: SMOKE_DIR && process.platform !== "win32" ? path.join(SMOKE_DIR, "mcp.sock") : "" });
     const updates = { check: () => updater.check({ manual: true }), auto: () => updater.auto(), setAuto: (v) => updater.setAuto(v) };   // late-bound: the updater is made just below
     assistant = setupAssistant({ origin: ORIGIN, editorWindow: () => editor, mcp, moveToApplications, updates });
     updater = setupUpdater({ editorWindow: () => editor, installedCopy, runningFromInstall });

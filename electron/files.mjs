@@ -54,14 +54,46 @@ export function setupFiles({ templatePath, smokeDir = "", onWelcome = () => {}, 
     }
     const okToReplace = (verb) => !dirty || ask({ message: "You have unsaved changes.", detail: `${verb} anyway and lose them?`, buttons: ["Cancel", verb], defaultId: 0, cancelId: 0 }) === 1;
 
+    const readDoc = (file) => { if (fs.statSync(file).size > MAX_FILE) throw new Error("That file is too large to be a résumé."); return fs.readFileSync(file, "utf8"); };
+    const writeAtomic = (target, html) => {   // never leave half a résumé behind
+        const tmp = target + ".cvm-tmp";
+        try { fs.writeFileSync(tmp, html); fs.renameSync(tmp, target); }
+        catch (e) { fs.rmSync(tmp, { force: true }); throw new Error("Could not save: " + (e?.message || e)); }
+    };
     function openPath(file) {
         if (!/\.html?$/i.test(file)) return;
         if (!okToReplace("Open")) return;
         let text;
-        try { if (fs.statSync(file).size > MAX_FILE) throw new Error("That file is too large to be a résumé."); text = fs.readFileSync(file, "utf8"); }
-        catch (e) { recent = recent.filter((p) => p !== file); persist(); buildMenu(); dialog.showErrorBox("Could not open the file", String(e?.message || e)); return; }
+        try { text = readDoc(file); }
+        catch (e) { recent = recent.filter((p) => p !== file); persist(); buildMenu(); emitRecent(); dialog.showErrorBox("Could not open the file", String(e?.message || e)); return; }
         dirty = false; setCurrent(file, text);
         send("files:opened", { text, name: path.basename(file) });
+    }
+    /** an AI app asks (MCP): by recent name, or by path. No dialogs — and never over the person's unsaved work. */
+    function openRemote(wanted) {
+        const q = String(wanted || "").trim(); if (!q) throw new Error("Say which document: a name from list_documents, or a file path.");
+        const list = recentList(), strip = (n) => n.replace(/\.html?$/i, "").toLowerCase();
+        const hit = list.find((r) => r.path === q) || list.find((r) => strip(r.name) === strip(q)) || list.find((r) => strip(r.name).includes(strip(q)));
+        const file = hit ? hit.path : (path.isAbsolute(q) && /\.html?$/i.test(q) && fs.existsSync(q) ? q : "");
+        if (!file) throw new Error(`No document called "${q}". Recent documents: ${list.map((r) => r.name).join(", ") || "(none yet)"}. An absolute path to an .html résumé also works.`);
+        if (file === current && !dirty) return { opened: path.basename(file), already_open: true };
+        if (dirty) throw new Error("The open résumé has unsaved changes. Call save_document first (or ask the person) — opening another document would discard them.");
+        const text = readDoc(file);
+        setCurrent(file, text); send("files:opened", { text, name: path.basename(file) });
+        return { opened: path.basename(file), path: file };
+    }
+    /** save with no dialog: to the open file, or (saveAs) a NEW file of that name beside it — else in Documents. Never overwrites another file. */
+    function writeDocument(html, { saveAs = "" } = {}) {
+        let target = current;
+        if (saveAs) {
+            const base = String(saveAs).replace(/\.html?$/i, "").replace(/[\\/:*?"<>|\u0000-\u001f]/g, " ").replace(/\s+/g, " ").trim().replace(/^\.+/, "").slice(0, 120);
+            if (!base) throw new Error("That name has no usable characters.");
+            target = path.join(current ? path.dirname(current) : app.getPath("documents"), base + ".html");
+            if (target !== current && fs.existsSync(target)) throw new Error(`“${base}” already exists in ${path.dirname(target)}. Pick another name, or open that document instead.`);
+        }
+        if (!target) throw new Error("This résumé has never been saved, so it needs a name: pass save_as.");
+        writeAtomic(target, String(html)); setCurrent(target, String(html));
+        return { file: path.basename(target), path: target };
     }
     async function openDialog() {
         // aim the native panel at a fast, relevant local folder — the open file's folder, else Documents —
@@ -91,12 +123,11 @@ export function setupFiles({ templatePath, smokeDir = "", onWelcome = () => {}, 
                 target = /\.html?$/i.test(r.filePath) ? r.filePath : r.filePath + ".html";
             }
         }
-        const tmp = target + ".cvm-tmp";
-        try { fs.writeFileSync(tmp, html); fs.renameSync(tmp, target); }   // never leave half a résumé behind
-        catch (e) { fs.rmSync(tmp, { force: true }); closeAfterSave = false; throw new Error("Could not save: " + (e?.message || e)); }
+        try { writeAtomic(target, html); } catch (e) { closeAfterSave = false; throw e; }
         setCurrent(target, html);
         return path.basename(target);
     });
+    ipcMain.handle("files:saveAs", (_e, html, name) => writeDocument(html, { saveAs: String(name || "") }).file);
     ipcMain.on("files:open", () => openDialog());
     ipcMain.on("files:dropped", (_e, file) => { if (typeof file === "string" && file) openPath(file); });
     ipcMain.on("files:dirty", (_e, flag) => {
@@ -168,7 +199,7 @@ export function setupFiles({ templatePath, smokeDir = "", onWelcome = () => {}, 
             });
             win.on("closed", () => { watcher?.close(); watcher = null; if (win === window) win = null; });
         },
-        openPath, openDialog,
+        openPath, openDialog, openRemote, writeDocument, recentList,
         state: () => ({ current, dirty }),
     };
 }

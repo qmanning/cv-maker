@@ -21,6 +21,9 @@ contextBridge.exposeInMainWorld("cvMakerFiles", {
     openPath: (p) => ipcRenderer.send("files:openPath", String(p)),
     pin: (p, on) => ipcRenderer.send("files:pin", { path: String(p), pinned: !!on }),
     onRecent: subscribe("files:recent-changed"),
+    saveAs: (html, name) => ipcRenderer.invoke("files:saveAs", String(html), String(name))
+        .catch((e) => { throw new Error(String(e && e.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, "")); }),
+    onDownload: subscribe("files:download"),
     // the brand menu's quick actions
     checkUpdates: () => ipcRenderer.send("shell:check-updates"),
     openExternal: (url) => ipcRenderer.send("shell:open-external", String(url)),
