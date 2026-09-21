@@ -10,7 +10,7 @@ import { buildBlock, topBlocks, type BlockKind } from "./cv-blocks";
 
 export interface AiRegion { id: string; html: string; list: boolean }
 export interface AiBlock { id: string; kind: string; regions: AiRegion[] }
-export interface AiDocument { name: string; paper: string; pages: number; fitScale: number; blocks: AiBlock[]; other: AiRegion[] }
+export interface AiDocument { name: string; paper: string; pages: number; fitScale: number; blocks: AiBlock[]; other: AiRegion[]; document?: "resume" | "letter" }
 
 export type AiOpName = "set_text" | "insert_block" | "duplicate_block" | "delete_block" | "move_block";
 export interface AiOp { op: AiOpName; target: string; html: string; kind: "" | BlockKind; fill: string[]; to: string }
@@ -30,6 +30,8 @@ export interface CvAssistant {
 /** The other direction: an AI app OUTSIDE the editor drives it (the desktop shell runs an MCP server for Claude
  *  Desktop and friends — no key involved at all). The shell calls in; the editor answers with these. */
 export interface CvRemoteHandlers {
+    /** put the résumé or the cover letter on the sheet (every other call acts on what is showing); resolves to what is showing once it has laid out */
+    showDocument(kind: "resume" | "letter" | null): Promise<"resume" | "letter">;
     /** the document as a model should see it, right now */
     describe(): AiDocument;
     /** apply operations as one undoable step; resolves once the page has re-laid itself out, so the caller learns whether it still fits */

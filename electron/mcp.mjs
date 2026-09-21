@@ -31,13 +31,23 @@ export function setupMcp({ editorWindow, currentFile, files = () => null, socket
 
     async function handle(method, params, clientName) {
         lastSeen = Date.now(); changed();
-        if (method === "describe") return { file: currentFile() ? path.basename(currentFile()) : "Untitled (not saved yet)", ...(await editor("describe")) };
+        const shellFiles = () => { const f = files(); if (!f) throw new Error("Itera is still starting. Try again in a moment."); return f; };
+        const want = params?.document == null || params.document === "" ? null : (/letter/i.test(String(params.document)) ? "letter" : "resume");
+        const named = (k) => (k === "letter" ? "cover_letter" : "resume");
+        // anything that reads or changes a document acts on the one on the sheet — so put the one they named there first
+        let kind = "resume";
+        if (!["documents", "open"].includes(method)) kind = await editor("showDocument", [want]);
+        if (method === "describe") {
+            const cur = files()?.state(kind).current ?? currentFile();
+            const { document: _shown, ...doc } = await editor("describe");
+            return { document: named(kind), file: cur ? path.basename(cur) : "Untitled (not saved yet)", ...doc };
+        }
         if (method === "apply") {
             const { ops, message } = normalize({ ops: params?.ops, message: params?.summary });
             const out = await editor("apply", [ops, message, clientName]);
-            return { applied: out.applied, skipped: out.skipped, pages_before: out.pagesBefore, pages_after: out.pagesAfter, fit_scale: out.fitScale };
+            return { document: named(kind), applied: out.applied, skipped: out.skipped, pages_before: out.pagesBefore, pages_after: out.pagesAfter, fit_scale: out.fitScale };
         }
-        if (method === "undo") return { undone: await editor("undo") };
+        if (method === "undo") return { document: named(kind), undone: await editor("undo") };
         if (method === "export") {
             const format = ["png", "docx", "html"].includes(params?.format) ? params.format : "pdf";
             let base, buffer;
@@ -51,23 +61,22 @@ export function setupMcp({ editorWindow, currentFile, files = () => null, socket
             let file = path.join(app.getPath("downloads"), `${base}.${format}`);
             for (let n = 2; fs.existsSync(file); n++) file = path.join(app.getPath("downloads"), `${base}-${n}.${format}`);
             fs.writeFileSync(file, buffer);
-            return { saved: file };
+            return { document: named(kind), saved: file };
         }
-        const shellFiles = () => { const f = files(); if (!f) throw new Error("Itera is still starting. Try again in a moment."); return f; };
         if (method === "documents") {
-            const f = shellFiles(), st = f.state();
-            return { open: st.current ? path.basename(st.current) : null, open_path: st.current || null, unsaved_changes: !!st.dirty, documents: f.recentList().map((r) => ({ name: r.name, path: r.path, master: !!r.pinned })) };
+            const f = shellFiles(), one = (k) => { const st = f.state(k); return { open: st.current ? path.basename(st.current) : null, open_path: st.current || null, unsaved_changes: !!st.dirty, documents: f.recentList(k).map((r) => ({ name: r.name, path: r.path, master: !!r.pinned })) }; };
+            return { showing: named(f.state().active), resume: one("resume"), cover_letter: one("letter") };
         }
         if (method === "open") {
-            const out = shellFiles().openRemote(params?.document);
+            const out = shellFiles().openRemote(params?.name ?? params?.document, params?.name != null ? (want || "") : "");
             if (!out.already_open) await new Promise((r) => setTimeout(r, 900));   // let the editor mount it before the next get_resume
             return out;
         }
         if (method === "save") {
             const f = shellFiles(), { html } = await editor("sourceHtml");
-            const out = f.writeDocument(html, { saveAs: typeof params?.save_as === "string" ? params.save_as : "" });
+            const out = f.writeDocument(html, { saveAs: typeof params?.save_as === "string" ? params.save_as : "", kind });
             await editor("markSaved", [out.file]);
-            return { saved: out.path, file: out.file };
+            return { document: named(kind), saved: out.path, file: out.file };
         }
         const pageOut = (p) => ({ paper: p.paper, paper_label: p.paperLabel, papers: p.papers, fit_to_one_page: p.fit, paginate: p.paginate, zoom: p.zoom, zoom_percent: p.zoomPercent, pages: p.pages, fit_scale: p.fitScale });
         if (method === "page_get") return pageOut(await editor("getPage"));

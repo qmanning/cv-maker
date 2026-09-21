@@ -25,6 +25,34 @@ export function parseSource(text: string): Source & { name: string; regions: num
     return { css, html: page.outerHTML, name: doc.title.trim(), regions: page.querySelectorAll("[data-cv-edit]").length };
 }
 
+/* ---------------- résumé + cover letter: two documents, one header ---------------- */
+
+export type DocKind = "resume" | "letter";
+/** a cover letter says so on its page (`data-cv-kind="letter"`) or carries a mirrored header; everything else is a résumé */
+export const docKind = (pageHtml: string): DocKind => (/data-cv-kind="letter"|data-cv-mirror="header"/.test(pageHtml) ? "letter" : "resume");
+
+const LETTER_MARK = "/* itera:letter";
+/** a letter file's CSS = a snapshot of the résumé's styles + (after the marker) the letter's own. This is the letter's own. */
+export const letterOwnCss = (css: string): string => { const i = css.indexOf(LETTER_MARK); return i < 0 ? css : css.slice(i); };
+/** …and this puts the OPEN résumé's styles back in front, so the mirrored header always looks like the résumé's */
+export const letterCss = (resumeCss: string, css: string): string => (css.indexOf(LETTER_MARK) < 0 ? css : resumeCss.trimEnd() + "\n" + letterOwnCss(css));
+
+/** the letter's header IS the résumé's header: copy it in (read-only — no editable regions), keeping the letter's body.
+ *  The résumé's header is its `[data-cv-header]`, else the page's first <header>. No header on either side → unchanged. */
+export function mirrorHeader(letterPageHtml: string, resumePageHtml: string): string {
+    const parse = (html: string) => new DOMParser().parseFromString(html, "text/html");   // inert: nothing loads or runs
+    const letter = parse(letterPageHtml), slot = letter.querySelector('[data-cv-mirror="header"]');
+    const from = parse(resumePageHtml), head = from.querySelector(".cv-page [data-cv-header]") || from.querySelector(".cv-page > header");
+    if (!slot || !head) return letterPageHtml;
+    const copy = letter.importNode(head, true) as Element;
+    [copy, ...Array.from(copy.querySelectorAll("*"))].forEach((el) => ["data-cv-edit", "contenteditable", "translate", "tabindex", "spellcheck", "role", "aria-multiline", "aria-label", "data-cv-repeat"].forEach((a) => el.removeAttribute(a)));
+    copy.querySelectorAll(".ProseMirror, .tiptap").forEach((el) => el.classList.remove("ProseMirror", "tiptap", "ProseMirror-focused"));
+    copy.classList.remove("ProseMirror", "tiptap", "ProseMirror-focused");
+    copy.setAttribute("data-cv-block", ""); copy.setAttribute("data-cv-mirror", "header");
+    slot.replaceWith(copy);
+    return letter.body.innerHTML;
+}
+
 // scale < 1 = "fit to one page": the content keeps its own width (so every line breaks where the
 // design breaks it) and the page is zoomed as a whole; the side margins absorb the difference
 export const pageBoxCss = (wPt: number, scale = 1) => `

@@ -16,7 +16,7 @@ import {
     AlignCenter, AlignLeft, AlignRight, ArrowDown, ArrowLeft, ArrowUp, Bold, BookOpen, BriefcaseBusiness, Plus, Text, Columns2, Copy, Download,
     Eraser, FileCode2, FileImage, FileText, FileType2, ImageUp, Italic, Link2, List, Minus, Moon, RotateCcw,
     Save, SpellCheck, Sun, Upload, Trash2, Underline as UnderlineIcon, ALargeSmall, MoveVertical, MoveHorizontal,
-    Sparkles, SendHorizontal, Undo2, Check, Settings2, X, Star, RefreshCw,
+    Sparkles, SendHorizontal, Undo2, Check, Settings2, X, Star, RefreshCw, FileUser, ChevronLeft, Files,
 } from "lucide-react";
 import { FontSize } from "@/components/ui/font-size-extension";
 import { FontWeight } from "@/components/ui/font-weight-extension";
@@ -25,9 +25,9 @@ import { BLOCK_KINDS, UNIT, insertBlock, topBlocks, type BlockKind } from "./cv-
 import { attachColorPicker, toHex, useInfospectorLook } from "./use-infospector-look";
 import { LookMenu } from "./LookMenu";
 import { applyOps, describeDocument, type CvAssistant, type CvRemote, type CvRemoteHandlers, type CvRemoteStatus, type RemotePage } from "./cv-assistant";
-import { FOOTER_PT, GAP_PT, MIN_FIT, PAPERS, PT, type PaperId, type Source, fullHtml, pageBoxCss, parseSource, slugify, stepZoom } from "./cv-source";
+import { FOOTER_PT, GAP_PT, MIN_FIT, PAPERS, PT, type DocKind, type PaperId, type Source, docKind, fullHtml, letterCss, mirrorHeader, pageBoxCss, parseSource, slugify, stepZoom } from "./cv-source";
 
-const LOCAL_KEY = "cvm:doc", START_SIZE_KEY = "cvm:startsize", HOME_KEY = "cvm:home";
+const LOCAL_KEY = "cvm:doc", LETTER_KEY = "cvm:letter", START_SIZE_KEY = "cvm:startsize", HOME_KEY = "cvm:home";
 const stored = (k: string) => { try { return localStorage.getItem(k) || ""; } catch { return ""; } };
 const store = (k: string, v: string) => { try { if (v) localStorage.setItem(k, v); else localStorage.removeItem(k); } catch { /* ignore */ } };
 const ZOOMS = [1, 1.25, 1.5, 2];
@@ -44,27 +44,29 @@ export interface RecentDoc { path: string; name: string; pinned?: boolean }
  *  Without it (every web build) the document lives in this browser — autosave + Import / Export → Source HTML. */
 export interface CvFiles {
     /** the file that is open right now, read fresh from disk — null when there is none */
-    current(): Promise<{ text: string; name: string } | null>;
+    current(kind?: DocKind): Promise<{ text: string; name: string } | null>;
     /** write the Source HTML to the open file; asks where when there is none, or when `as` is set.
      *  Resolves to the file's name, or null if the person cancelled. */
-    save(html: string, opts: { as?: boolean; suggested: string }): Promise<string | null>;
+    save(html: string, opts: { as?: boolean; suggested: string; kind?: DocKind }): Promise<string | null>;
     /** show the shell's Open dialog — the chosen file arrives through onOpen */
-    open(): void;
+    open(kind?: DocKind): void;
     /** the shell hands over a document: File → Open, a recent or dropped file, a reload after it changed on disk */
-    onOpen(handler: (doc: { text: string; name: string; note?: string }) => void): () => void;
+    onOpen(handler: (doc: { text: string; name: string; note?: string; kind?: DocKind }) => void): () => void;
     /** the shell's own File menu asks for a save (its ⌘S / ⇧⌘S never reach the page as key presses) */
-    onCommand(handler: (command: "save" | "saveAs") => void): () => void;
+    onCommand(handler: (command: "save" | "saveAs" | "saveAll") => void): () => void;
     /** unsaved edits? — the shell's title bar and close guard */
-    setDirty(dirty: boolean): void;
+    setDirty(dirty: boolean, kind?: DocKind): void;
+    /** which tab is showing — the shell's title bar, File menu and Save follow it */
+    setActive?(kind: DocKind): void;
     /** the last documents opened, newest first (a pinned "master" sorts to the top) — the omni typeahead */
-    recent?(): Promise<RecentDoc[]>;
+    recent?(kind?: DocKind): Promise<RecentDoc[]>;
     /** open a specific recent file by path — the chosen file arrives back through onOpen */
     openPath?(path: string): void;
     /** pin (or unpin) a file as the master, so it heads the list and is the default document */
     pin?(path: string, pinned: boolean): void;
     /** save a copy under a new name, beside the open file (else in Documents) — no dialog; rejects if that name is taken.
      *  Resolves to the new file's name, which becomes the open document. */
-    saveAs?(html: string, name: string): Promise<string>;
+    saveAs?(html: string, name: string, kind?: DocKind): Promise<string>;
     /** the recent list changed (an open, a save, a pin) — refresh the typeahead */
     onRecent?(handler: (list: RecentDoc[]) => void): () => void;
     /** the shell's own Save panel for an export finished (saved or cancelled) — the scan runs until then */
@@ -74,14 +76,22 @@ export interface CvFiles {
     openExternal?(url: string): void;
 }
 
-/** the Itera mark (public/itera/brand/itera-glyph.svg), inline so it takes currentColor and can animate */
+/** the Itera mark, for the toolbar: the same two overlapping sheets as public/itera/brand/itera-glyph.svg (which stays the
+ *  source of truth, untouched), redrawn from their centre lines as strokes so the weight can sit with the other icons —
+ *  the brand file's lines are a fixed 2 units. Takes currentColor; the overlap stays filled. */
 function IteraGlyph(props: { className?: string }) {
     return (
-        <svg viewBox="4.5 4.5 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg" className={props.className} aria-hidden="true">
-            <path d="M6 6V5C5.44772 5 5 5.44772 5 6L6 6ZM14.6667 14.6667V15.6667C15.219 15.6667 15.6667 15.219 15.6667 14.6667H14.6667ZM6 14.6667H5C5 14.9319 5.10536 15.1862 5.29289 15.3738C5.48043 15.5613 5.73478 15.6667 6 15.6667V14.6667ZM10.3333 10.3333V9.33333C9.78105 9.33333 9.33333 9.78105 9.33333 10.3333H10.3333ZM19 19V20C19.5523 20 20 19.5523 20 19H19ZM19 10.3333H20C20 9.78105 19.5523 9.33333 19 9.33333V10.3333ZM10.3333 15.5333H9.33333V15.5333H10.3333ZM13.8 19V20V20V19ZM11.2 12.0667V11.0667H10.2V12.0667H11.2ZM12.9333 12.0667H13.9333V11.0667H12.9333V12.0667ZM12.9333 13.8V14.8H13.9333V13.8H12.9333ZM11.2 13.8H10.2V14.8H11.2V13.8ZM12.0667 11.2V10.2H11.0667V11.2H12.0667ZM13.8 11.2H14.8V10.2H13.8V11.2ZM13.8 12.9333V13.9333H14.8V12.9333H13.8ZM12.0667 12.9333H11.0667V13.9333H12.0667V12.9333ZM11.2 11.2V10.2H10.2V11.2H11.2ZM12.9333 11.2H13.9333V10.2H12.9333V11.2ZM12.9333 12.9333V13.9333H13.9333V12.9333H12.9333ZM11.2 12.9333H10.2V13.9333H11.2V12.9333ZM12.0667 12.0667V11.0667H11.0667V12.0667H12.0667ZM13.8 12.0667H14.8V11.0667H13.8V12.0667ZM13.8 13.8V14.8H14.8V13.8H13.8ZM12.0667 13.8H11.0667V14.8H12.0667V13.8ZM6 6V7H11.2V6V5H6V6ZM14.6667 9.46667H13.6667V14.6667H14.6667H15.6667V9.46667H14.6667ZM14.6667 14.6667V13.6667H6V14.6667V15.6667H14.6667V14.6667ZM6 14.6667H7V6L6 6L5 6V14.6667H6ZM11.2 6V7C12.5623 7 13.6667 8.10436 13.6667 9.46667H14.6667H15.6667C15.6667 6.9998 13.6669 5 11.2 5V6ZM10.3333 10.3333H9.33333L9.33333 15.5333H10.3333H11.3333L11.3333 10.3333H10.3333ZM13.8 19V20H19V19V18H13.8V19ZM19 19H20V10.3333H19H18V19H19ZM19 10.3333V9.33333L10.3333 9.33333V10.3333V11.3333L19 11.3333V10.3333ZM10.3333 15.5333H9.33333C9.33333 18.0002 11.3331 20 13.8 20V19V18C12.4377 18 11.3333 16.8956 11.3333 15.5333H10.3333ZM11.2 12.0667V13.0667H12.9333V12.0667V11.0667H11.2V12.0667ZM12.9333 12.0667H11.9333V13.8H12.9333H13.9333V12.0667H12.9333ZM12.9333 13.8V12.8H11.2V13.8V14.8H12.9333V13.8ZM11.2 13.8H12.2V12.0667H11.2H10.2V13.8H11.2ZM12.0667 11.2V12.2H13.8V11.2V10.2H12.0667V11.2ZM13.8 11.2H12.8V12.9333H13.8H14.8V11.2H13.8ZM13.8 12.9333V11.9333H12.0667V12.9333V13.9333H13.8V12.9333ZM12.0667 12.9333H13.0667V11.2H12.0667H11.0667V12.9333H12.0667ZM11.2 11.2V12.2H12.9333V11.2V10.2H11.2V11.2ZM12.9333 11.2H11.9333V12.9333H12.9333H13.9333V11.2H12.9333ZM12.9333 12.9333V11.9333H11.2V12.9333V13.9333H12.9333V12.9333ZM11.2 12.9333H12.2V11.2H11.2H10.2V12.9333H11.2ZM12.0667 12.0667V13.0667H13.8V12.0667V11.0667H12.0667V12.0667ZM13.8 12.0667H12.8V13.8H13.8H14.8V12.0667H13.8ZM13.8 13.8V12.8H12.0667V13.8V14.8H13.8V13.8ZM12.0667 13.8H13.0667V12.0667H12.0667H11.0667V13.8H12.0667Z" />
+        <svg viewBox="4.5 4.5 16 16" fill="none" stroke="currentColor" strokeWidth={1.3} strokeLinejoin="round" xmlns="http://www.w3.org/2000/svg" className={props.className} aria-hidden="true">
+            <path d="M6 6H11.2A3.4667 3.4667 0 0 1 14.6667 9.4667V14.6667H6Z" />
+            <path d="M10.3333 10.3333H19V19H13.8A3.4667 3.4667 0 0 1 10.3333 15.5333Z" />
+            <rect x="10.3333" y="10.3333" width="4.3334" height="4.3334" fill="currentColor" stroke="none" />
         </svg>
     );
 }
+// two documents share the editor — a résumé and its cover letter — one per tab, each with its own file / autosave slot
+const keyOf = (kind: DocKind) => (kind === "letter" ? LETTER_KEY : LOCAL_KEY);
+const KIND_LABEL: Record<DocKind, string> = { resume: "Résumé", letter: "Cover Letter" };
+interface Slot { source: Source; name: string; fileName: string; dirty: boolean; undo: Source[] }
 const DEFAULT_SETTINGS: Settings = { paper: "letter", paginate: true, spellcheck: true, zoom: null, fit: true };
 
 function download(blob: Blob, filename: string) {
@@ -146,6 +156,8 @@ function normalizeGaps(page: HTMLElement, pageWPt: number): void {
 export interface CvMakerProps {
     /** the source HTML the editor starts from (Start-up → Page in the menu overrides it per browser) */
     templateUrl: string;
+    /** the cover letter a new letter starts from; defaults to sample-cover-letter.html beside templateUrl */
+    letterTemplateUrl?: string;
     /** POST endpoint that renders PDF/PNG in headless Chrome. Omit it — or let it fail — and PDF falls back to the
      *  browser's print dialog and PNG to an in-browser render, so the tool works with no server at all. */
     exportUrl?: string;
@@ -162,7 +174,7 @@ export interface CvMakerProps {
     remote?: CvRemote;
 }
 
-export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl = "/labs/infospector/host.css", rasterizerUrl = "/labs/infospector/vendor/html-to-image.js", files, assistant, remote }: CvMakerProps) {
+export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, backHref, glassCssUrl = "/labs/infospector/host.css", rasterizerUrl = "/labs/infospector/vendor/html-to-image.js", files, assistant, remote }: CvMakerProps) {
     const look = useInfospectorLook(glassCssUrl);
     const [source, setSource] = useState<Source | null>(null);
     const [name, setName] = useState("Résumé");
@@ -186,6 +198,10 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
     const [home, setHome] = useState(() => stored(HOME_KEY));                          // start-up source file; "" = the bundled one
     // desktop only: the open file's identity (basename, no extension) drives the export filename and the omni bar's label
     const [fileName, setFileName] = useState("");
+    // which of the two documents is on the sheet; the other waits in its slot (null = not loaded yet)
+    const [tab, setTab] = useState<DocKind>("resume");
+    const slots = useRef<Record<DocKind, Slot | null>>({ resume: null, letter: null });
+    const [exportKind, setExportKind] = useState<"pdf" | "png" | "docx" | "html" | null>(null);
     // desktop only: the recent-documents typeahead that lives in the omni bar
     const hasRecents = !!files?.recent;
     const [recents, setRecents] = useState<RecentDoc[]>([]);
@@ -196,8 +212,8 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
     const wrapRef = useRef<HTMLElement>(null), hostRef = useRef<HTMLDivElement>(null), paperRef = useRef<HTMLDivElement>(null);
     const editorsRef = useRef<Editor[]>([]), tipRef = useRef<HTMLDivElement>(null);
     const fileRef = useRef<HTMLInputElement>(null), imgFileRef = useRef<HTMLInputElement>(null), omniRef = useRef<HTMLDivElement>(null);
-    const stateRef = useRef({ name, fileName, settings, source, scale, pages }); stateRef.current = { name, fileName, settings, source, scale, pages };
-    const shellSaving = useRef(false), shellSavingTimer = useRef(0);
+    const stateRef = useRef({ name, fileName, settings, source, scale, pages, tab, dirty, contentPt }); stateRef.current = { name, fileName, settings, source, scale, pages, tab, dirty, contentPt };
+    const shellSaving = useRef(0), shellSavingTimer = useRef(0), exporting = useRef(false);
     const rafRef = useRef(0), saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined), toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
     const paper = PAPERS[settings.paper];
@@ -263,9 +279,9 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
         setDirty(true); schedule();
         clearTimeout(saveTimer.current);
         saveTimer.current = setTimeout(() => {
-            const { name: n, settings: s, source: src } = stateRef.current; if (!src) return;
+            const { name: n, settings: s, source: src, tab: t } = stateRef.current; if (!src) return;
             const doc: SavedDoc = { name: n, css: src.css, html: serialize(), settings: s, savedAt: new Date().toISOString(), unsaved: true };
-            try { localStorage.setItem(LOCAL_KEY, JSON.stringify(doc)); } catch { /* ignore */ }
+            try { localStorage.setItem(keyOf(t), JSON.stringify(doc)); } catch { /* ignore */ }
         }, 600);
     }, [schedule, serialize]);
 
@@ -346,25 +362,26 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
 
     /* ---- save (⌘S) ---- */
     const save = useCallback(async (as = false) => {
-        const { name: n, settings: s, source: src } = stateRef.current; if (!src) return;
+        const { name: n, settings: s, source: src, tab: t } = stateRef.current; if (!src) return;
         const doc = { name: n, css: src.css, html: serialize(), settings: s };
         if (files) {
             // a real file: the Source HTML goes to disk; this browser keeps a copy only as a safety net
             try {
-                const file = await files.save(fullHtml(n, src.css, doc.html), { as, suggested: slugify(stateRef.current.fileName || n) + ".html" });
+                const file = await files.save(fullHtml(n, src.css, doc.html), { as, suggested: slugify(stateRef.current.fileName || n) + ".html", kind: t });
                 if (!file) return;
                 clearTimeout(saveTimer.current);
-                try { localStorage.setItem(LOCAL_KEY, JSON.stringify({ ...doc, savedAt: new Date().toISOString(), unsaved: false })); } catch { /* ignore */ }
+                try { localStorage.setItem(keyOf(t), JSON.stringify({ ...doc, savedAt: new Date().toISOString(), unsaved: false })); } catch { /* ignore */ }
                 setFileName(file.replace(/\.html?$/i, ""));   // the saved file is now this document's identity
-                void files.recent?.().then(setRecents).catch(() => {});
+                void files.recent?.(t).then(setRecents).catch(() => {});
                 setDirty(false); say(`Saved — ${file}`);
             } catch (e) { say(e instanceof Error ? e.message : "Could not save the file"); }
             return;
         }
-        try { localStorage.setItem(LOCAL_KEY, JSON.stringify({ ...doc, savedAt: new Date().toISOString() })); setDirty(false); say("Saved in this browser · Export → Source HTML for a portable copy"); }
+        try { localStorage.setItem(keyOf(t), JSON.stringify({ ...doc, savedAt: new Date().toISOString() })); setDirty(false); say("Saved in this browser · Export → Source HTML for a portable copy"); }
         catch { say("Could not save in this browser — export the Source HTML instead"); }
     }, [serialize, say, files]);
-    useEffect(() => { files?.setDirty(dirty); }, [files, dirty]);
+    useEffect(() => { files?.setDirty(dirty, tab); }, [files, dirty, tab]);
+    useEffect(() => { files?.setActive?.(tab); }, [files, tab]);
     useEffect(() => {
         const key = (e: KeyboardEvent) => {
             if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") { e.preventDefault(); save(!!files && e.shiftKey); }
@@ -380,20 +397,22 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
         (Object.keys(on) as (keyof typeof on)[]).forEach((n) => window.addEventListener(n, on[n]));
         return () => (Object.keys(on) as (keyof typeof on)[]).forEach((n) => window.removeEventListener(n, on[n]));
     }, [zoomBy]);
-    useEffect(() => files?.onCommand((command) => save(command === "saveAs")), [files, save]);
+    // "saveAll" is the shell's close guard: the document on the sheet saves as usual, the one waiting in its slot straight from the slot
+    const saveAllRef = useRef<() => Promise<void>>(async () => {});
+    useEffect(() => files?.onCommand((command) => (command === "saveAll" ? void saveAllRef.current() : void save(command === "saveAs"))), [files, save]);
 
     /* ---- export ---- */
     const exportHtml = useCallback(() => {
         const { settings: s, source: src, name: n, scale: sc } = stateRef.current, p = PAPERS[s.paper];
         let body = serialize({ breaks: s.paginate }), heightPt: number = p.h;
-        const paged = s.paginate && pages > 1;
+        const pages = stateRef.current.pages, contentPt = stateRef.current.contentPt, paged = s.paginate && pages > 1;
         if (s.paginate) {
             const nos = !paged ? "" : Array.from({ length: pages }, (_, i) => `<div class="cvm-pageno" style="top: ${(i + 1) * p.h - 19}pt; zoom: ${(1 / sc).toFixed(4)}">${i + 1}</div>`).join("");
             body = body.replace(/<\/div>\s*$/, nos + "</div>");
         } else heightPt = Math.max(p.h, Math.ceil(contentPt) + 1);
         const css = `@page { size: ${p.w}pt ${heightPt}pt; margin: 0; }\nhtml, body { margin: 0; padding: 0; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }\n${pageBoxCss(p.w, sc)}\n${paged ? `.cv-page { min-height: ${((pages * p.h - 1) / sc).toFixed(2)}pt; }` : ""}`;
         return { html: fullHtml(n, src?.css || "", body, css), widthPt: p.w, heightPt };
-    }, [serialize, pages, contentPt]);
+    }, [serialize]);
 
     const printFallback = useCallback((html: string) => {
         const frame = document.createElement("iframe");
@@ -402,65 +421,133 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
         document.body.appendChild(frame);
     }, []);
 
-    const runExport = useCallback(async (kind: "pdf" | "png" | "docx" | "html") => {
-        setMenu(null); paginate();
-        const file = slugify(stateRef.current.fileName || stateRef.current.name), began = Date.now();
+    // one document → one file, named after it (a letter that doesn't say so gets "-cover-letter", so the pair never collide)
+    const exportActive = useCallback(async (kind: "pdf" | "png" | "docx" | "html") => {
+        paginate();
+        const st = stateRef.current, base = slugify(st.fileName || st.name), file = st.tab === "letter" && !/cover|letter/.test(base) ? base + "-cover-letter" : base;
         // in a desktop shell the file isn't "exported" until its Save panel is done — and that panel can be slow to appear
-        const dl = (blob: Blob, filename: string) => { if (files?.onDownload) shellSaving.current = true; download(blob, filename); };
+        const dl = (blob: Blob, filename: string) => { if (files?.onDownload) shellSaving.current++; download(blob, filename); };
+        if (kind === "html") return dl(new Blob([fullHtml(st.name, st.source?.css || "", serialize())], { type: "text/html" }), file + ".html");
+        if (kind === "docx") {
+            const { exportDocx } = await import("./export-docx");
+            const page = hostRef.current!.querySelector<HTMLElement>(".cv-page")!, p = PAPERS[st.settings.paper];
+            return dl(await exportDocx(page, { pageWPt: p.w, pageHPt: p.h, paginate: st.settings.paginate, name: st.name }), file + ".docx");
+        }
+        const payload = exportHtml();
+        // headless Chrome when there's an export server; otherwise (none configured, unreachable, or it declines)
+        // the browser does it itself: print dialog for PDF (still real text + links), html-to-image for PNG
+        let r: Response | null = null;
+        if (exportUrl) { try { r = await fetch(exportUrl, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...payload, format: kind, scale: 2 }) }); } catch { r = null; } }
+        if (r?.ok) return dl(await r.blob(), `${file}.${kind}`);
+        if (r && ![404, 405, 501].includes(r.status)) throw new Error((await r.json().catch(() => ({}))).error || "Export failed");
+        if (kind === "pdf") { say("Choose “Save as PDF” in the print dialog"); return printFallback(payload.html); }
+        dl(await rasterize(payload.html, payload.widthPt, payload.heightPt, rasterizerUrl), `${file}.png`);
+    }, [exportHtml, exportUrl, paginate, printFallback, rasterizerUrl, say, serialize, files]);
+
+    // Export → a format → Résumé / Cover Letter / All. A document is rendered from the live sheet, so exporting the one
+    // that isn't showing means showing it for a moment; the person ends up back on the tab they were on.
+    const switchTabRef = useRef<(to: DocKind) => Promise<void>>(async () => {});
+    const runExport = useCallback(async (kind: "pdf" | "png" | "docx" | "html", which: DocKind | "all" = stateRef.current.tab) => {
+        setMenu(null); setExportKind(null);
+        const home = stateRef.current.tab, began = Date.now();
+        const order: DocKind[] = which === "all" ? [home, home === "resume" ? "letter" : "resume"] : [which];
+        exporting.current = true;
         try {
             setBusy(kind.toUpperCase());
-            if (kind === "html") return dl(new Blob([fullHtml(stateRef.current.name, stateRef.current.source?.css || "", serialize())], { type: "text/html" }), file + ".html");
-            if (kind === "docx") {
-                const { exportDocx } = await import("./export-docx");
-                const page = hostRef.current!.querySelector<HTMLElement>(".cv-page")!, p = PAPERS[stateRef.current.settings.paper];
-                return dl(await exportDocx(page, { pageWPt: p.w, pageHPt: p.h, paginate: stateRef.current.settings.paginate, name: stateRef.current.name }), file + ".docx");
+            for (const [i, t] of order.entries()) {
+                if (stateRef.current.tab !== t) { await switchTabRef.current(t); await new Promise((r) => window.setTimeout(r, 900)); }   // mount + paginate
+                if (i) await new Promise((r) => window.setTimeout(r, 350));   // browsers drop a second download fired in the same breath
+                await exportActive(kind);
             }
-            const payload = exportHtml();
-            // headless Chrome when there's an export server; otherwise (none configured, unreachable, or it declines)
-            // the browser does it itself: print dialog for PDF (still real text + links), html-to-image for PNG
-            let r: Response | null = null;
-            if (exportUrl) { try { r = await fetch(exportUrl, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...payload, format: kind, scale: 2 }) }); } catch { r = null; } }
-            if (r?.ok) return dl(await r.blob(), `${file}.${kind}`);
-            if (r && ![404, 405, 501].includes(r.status)) throw new Error((await r.json().catch(() => ({}))).error || "Export failed");
-            if (kind === "pdf") { say("Choose “Save as PDF” in the print dialog"); return printFallback(payload.html); }
-            dl(await rasterize(payload.html, payload.widthPt, payload.heightPt, rasterizerUrl), `${file}.png`);
         } catch (e) { say(e instanceof Error ? e.message : "Export failed"); }
         finally {
-            // the scan stays up at least one sweep — and, in a shell, until its Save panel has come and gone (a minute at most)
-            if (shellSaving.current) { window.clearTimeout(shellSavingTimer.current); shellSavingTimer.current = window.setTimeout(() => { shellSaving.current = false; setBusy(""); }, 60000); }
+            if (stateRef.current.tab !== home) await switchTabRef.current(home);
+            exporting.current = false;
+            // the scan stays up at least one sweep — and, in a shell, until its Save panels have come and gone (a minute at most)
+            if (shellSaving.current > 0) { window.clearTimeout(shellSavingTimer.current); shellSavingTimer.current = window.setTimeout(() => { shellSaving.current = 0; setBusy(""); }, 60000); }
             else window.setTimeout(() => setBusy(""), Math.max(0, 900 - (Date.now() - began)));
         }
-    }, [exportHtml, exportUrl, paginate, printFallback, rasterizerUrl, say, serialize, files]);
-    useEffect(() => files?.onDownload?.(() => { if (!shellSaving.current) return; shellSaving.current = false; window.clearTimeout(shellSavingTimer.current); setBusy(""); }), [files]);
+    }, [exportActive, say]);
+    useEffect(() => files?.onDownload?.(() => {
+        if (shellSaving.current <= 0) return;
+        if (--shellSaving.current > 0 || exporting.current) return;
+        window.clearTimeout(shellSavingTimer.current); setBusy("");
+    }), [files]);
 
+    /* ---- two documents, one sheet: the résumé and its cover letter ---- */
+    const letterUrl = letterTemplateUrl || templateUrl.replace(/[^/]*$/, "sample-cover-letter.html");
+    // what is on the sheet right now, as a slot (so the other document can take the sheet)
+    const stash = useCallback(() => {
+        const st = stateRef.current; if (!st.source) return;
+        slots.current[st.tab] = { source: { css: st.source.css, html: serialize() }, name: st.name, fileName: st.fileName, dirty: st.dirty, undo: remoteUndo.current };
+    }, [serialize]);
+    // put a slot on the sheet. A letter takes its header (and the styles that draw it) from the résumé, every time.
+    const show = useCallback((kind: DocKind, slot: Slot) => {
+        const resume = slots.current.resume;
+        const source = kind === "letter" && resume ? { css: letterCss(resume.source.css, slot.source.css), html: mirrorHeader(slot.source.html, resume.source.html) } : slot.source;
+        slots.current[kind] = { ...slot, source };
+        remoteUndo.current = slot.undo; setAiReply(null); setActive(null); setPicked(null); setImgPop(null); setOmniOpen(false); setOmniQuery("");
+        setTab(kind); setName(slot.name); setFileName(slot.fileName); setSource(source); setDirty(slot.dirty);
+    }, []);
+    // a document that hasn't been on the sheet yet: unsaved edits this browser holds → the file on disk → this browser's copy → the template
+    const loadSlot = useCallback(async (kind: DocKind): Promise<Slot> => {
+        let local: SavedDoc | null = null; try { local = JSON.parse(localStorage.getItem(keyOf(kind)) || "null"); } catch { /* ignore */ }
+        const fresh = (src: Source, n: string, f = "", d = false): Slot => ({ source: src, name: n, fileName: f, dirty: d, undo: [] });
+        const onDisk = files && !(local?.html && local.unsaved) ? await files.current(kind).catch(() => null) : null;
+        if (onDisk) { const parsed = parseSource(onDisk.text); return fresh({ css: parsed.css, html: parsed.html }, parsed.name || onDisk.name, onDisk.name.replace(/\.html?$/i, "")); }
+        if (local?.html) return fresh({ css: local.css, html: local.html }, local.name || KIND_LABEL[kind], "", !!(files && local.unsaved));
+        const parsed = parseSource(await (await fetch(kind === "letter" ? letterUrl : templateUrl, { cache: "no-store" })).text());
+        return fresh({ css: parsed.css, html: parsed.html }, parsed.name || KIND_LABEL[kind]);
+    }, [files, letterUrl, templateUrl]);
+    const switchTab = useCallback(async (to: DocKind) => {
+        if (to === stateRef.current.tab || !stateRef.current.source) return;
+        stash();
+        try { show(to, slots.current[to] || await loadSlot(to)); }
+        catch { say(`Could not load the ${KIND_LABEL[to].toLowerCase()}`); }
+    }, [stash, show, loadSlot, say]);
+    switchTabRef.current = switchTab;
+    saveAllRef.current = async () => {
+        if (stateRef.current.dirty) await save();
+        const other: DocKind = stateRef.current.tab === "resume" ? "letter" : "resume", slot = slots.current[other];
+        if (!files || !slot?.dirty) return;
+        try {
+            const file = await files.save(fullHtml(slot.name, slot.source.css, slot.source.html), { suggested: slugify(slot.fileName || slot.name) + ".html", kind: other });
+            if (!file) return;
+            slots.current[other] = { ...slot, dirty: false, fileName: file.replace(/\.html?$/i, "") }; files.setDirty(false, other);
+            try { localStorage.setItem(keyOf(other), JSON.stringify({ name: slot.name, css: slot.source.css, html: slot.source.html, settings: stateRef.current.settings, savedAt: new Date().toISOString(), unsaved: false })); } catch { /* ignore */ }
+        } catch (e) { say(e instanceof Error ? e.message : "Could not save the file"); }
+    };
 
     /* ---- source file: load / reset ---- */
     const loadSourceText = useCallback((text: string, fallbackName: string, opened?: { note?: string }) => {
-        const parsed = parseSource(text);
-        setName(parsed.name || fallbackName); setSource({ css: parsed.css, html: parsed.html }); setDirty(!opened);
-        setFileName(opened ? fallbackName : "");   // a real file gives the document its identity; a reset/import leaves it to the printed name
+        const parsed = parseSource(text), kind = docKind(parsed.html);
+        // a cover letter opened from the résumé tab (or the other way round) goes to ITS tab, and the sheet follows
+        if (kind !== stateRef.current.tab) stash();
+        // a real file gives the document its identity; a reset/import leaves it to the printed name
+        show(kind, { source: { css: parsed.css, html: parsed.html }, name: parsed.name || fallbackName, fileName: opened ? fallbackName : "", dirty: !opened, undo: [] });
         if (opened) {   // it IS the file on disk: nothing unsaved, and the safety-net copy must not outvote it on the next start
             clearTimeout(saveTimer.current);
-            try { localStorage.setItem(LOCAL_KEY, JSON.stringify({ name: parsed.name || fallbackName, css: parsed.css, html: parsed.html, settings: stateRef.current.settings, savedAt: new Date().toISOString(), unsaved: false })); } catch { /* ignore */ }
+            try { localStorage.setItem(keyOf(kind), JSON.stringify({ name: parsed.name || fallbackName, css: parsed.css, html: parsed.html, settings: stateRef.current.settings, savedAt: new Date().toISOString(), unsaved: false })); } catch { /* ignore */ }
         }
         if (opened?.note) return say(opened.note);
         say(parsed.regions ? `Loaded — ${parsed.regions} editable regions` : "Loaded, but it has no [data-cv-edit] regions — nothing is editable");
-    }, [say]);
+    }, [say, stash, show]);
     useEffect(() => files?.onOpen((doc) => loadSourceText(doc.text, doc.name.replace(/\.html?$/i, ""), { note: doc.note })), [files, loadSourceText]);
     const resetSource = useCallback(() => setConfirm({
         msg: "Replace the document with the original source file? Your edits to this document will be lost.", ok: "Replace",
-        run: async () => loadSourceText(await fetchSource(templateUrl), "Résumé"),
-    }), [loadSourceText, templateUrl]);
+        run: async () => (stateRef.current.tab === "letter" ? loadSourceText(await (await fetch(letterUrl, { cache: "no-store" })).text(), KIND_LABEL.letter) : loadSourceText(await fetchSource(templateUrl), KIND_LABEL.resume)),
+    }), [loadSourceText, templateUrl, letterUrl]);
 
     /* ---- omni bar: a recent-documents typeahead (desktop shells only) ---- */
     // keep the list fresh: load once, then follow the shell (an open, a save, a pin all re-emit it)
     useEffect(() => {
         if (!files?.recent) return;
         let dead = false;
-        void files.recent().then((l) => { if (!dead) setRecents(l); }).catch(() => {});
-        const off = files.onRecent?.((l) => setRecents(l));
+        const refresh = () => void files.recent!(tab).then((l) => { if (!dead) setRecents(l); }).catch(() => {});
+        refresh();
+        const off = files.onRecent?.(refresh);   // each tab has its own list; whatever changed, ask again for this one
         return () => { dead = true; off?.(); };
-    }, [files]);
+    }, [files, tab]);
     // click away closes the dropdown
     useEffect(() => {
         if (!omniOpen) return;
@@ -473,7 +560,7 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
         return (q ? recents.filter((r) => r.name.toLowerCase().includes(q)) : recents).slice(0, 10);
     }, [recents, omniQuery]);
     const chooseRecent = useCallback((path: string) => { setOmniOpen(false); setOmniQuery(""); files?.openPath?.(path); }, [files]);
-    const togglePin = useCallback((r: RecentDoc) => { files?.pin?.(r.path, !r.pinned); void files?.recent?.().then(setRecents).catch(() => {}); }, [files]);
+    const togglePin = useCallback((r: RecentDoc) => { files?.pin?.(r.path, !r.pinned); void files?.recent?.(stateRef.current.tab).then(setRecents).catch(() => {}); }, [files]);
     // type a name no document has and the list offers to save this one under it — that is how a document is renamed / branched
     const omniNewName = useMemo(() => {
         const q = omniQuery.trim(); if (!q || !files?.saveAs) return "";
@@ -484,7 +571,7 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
         const wanted = raw.trim(), { name: n, source: src } = stateRef.current;
         if (!wanted || !src || !files?.saveAs) return;
         setOmniOpen(false); setOmniQuery("");
-        try { remoteRef.current?.markSaved(await files.saveAs(fullHtml(n, src.css, serialize()), wanted)); }
+        try { remoteRef.current?.markSaved(await files.saveAs(fullHtml(n, src.css, serialize()), wanted, stateRef.current.tab)); }
         catch (e) { say(e instanceof Error ? e.message : "Could not save the file"); }
     }, [files, serialize, say]);
     const omniRows = omniList.length + (omniNewName ? 1 : 0);
@@ -559,7 +646,7 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
     const remoteRef = useRef<CvRemoteHandlers | null>(null);
     const describeNow = useCallback(() => {
         const { settings: st, name: n, scale: sc, pages: pg } = stateRef.current;
-        return describeDocument(serialize(), { name: n, paper: PAPERS[st.paper].name, pages: st.paginate ? pg : 1, fitScale: Math.round(sc * 100) / 100 });
+        return { ...describeDocument(serialize(), { name: n, paper: PAPERS[st.paper].name, pages: st.paginate ? pg : 1, fitScale: Math.round(sc * 100) / 100 }), document: stateRef.current.tab };
     }, [serialize]);
     const settle = () => new Promise<void>((r) => window.setTimeout(r, 700));   // remount + paginate, so the caller learns what the change did
     const pageNow = (): RemotePage => {
@@ -571,6 +658,7 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
         };
     };
     remoteRef.current = {
+        showDocument: async (kind) => { if (kind && kind !== stateRef.current.tab) { await switchTabRef.current(kind); await settle(); } return stateRef.current.tab; },
         describe: describeNow,
         apply: async (ops, message, by) => {
             const src = stateRef.current.source; if (!src) throw new Error("No document is open.");
@@ -638,7 +726,7 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
         markSaved: (file) => {
             const { name: n, settings: s, source: src } = stateRef.current;
             clearTimeout(saveTimer.current);
-            if (src) { try { localStorage.setItem(LOCAL_KEY, JSON.stringify({ name: n, css: src.css, html: serialize(), settings: s, savedAt: new Date().toISOString(), unsaved: false })); } catch { /* ignore */ } }
+            if (src) { try { localStorage.setItem(keyOf(stateRef.current.tab), JSON.stringify({ name: n, css: src.css, html: serialize(), settings: s, savedAt: new Date().toISOString(), unsaved: false })); } catch { /* ignore */ } }
             setFileName(file.replace(/\.html?$/i, "")); setDirty(false); say(`Saved — ${file}`);
         },
     };
@@ -655,6 +743,7 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
     const openConnect = useCallback(() => (remote?.configure ?? assistant?.configure)?.(), [assistant, remote]);
 
     useEffect(() => remote?.serve({
+        showDocument: (kind) => remoteRef.current!.showDocument(kind),
         describe: () => remoteRef.current!.describe(),
         apply: (ops, message, by) => remoteRef.current!.apply(ops, message, by),
         undo: () => remoteRef.current!.undo(),
@@ -761,6 +850,7 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
 
     const openMenu = (id: "size" | "export" | "more" | "brand", e: React.MouseEvent, align: "left" | "right") => {
         const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        setExportKind(null);
         setMenu((m) => (m?.id === id ? null : { id, top: r.bottom + 8, ...(align === "left" ? { left: r.left } : { right: window.innerWidth - r.right }) }));
     };
 
@@ -832,15 +922,15 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
                 <div ref={omniRef} className={"pt-omni" + (hasRecents ? " cvm-omni-recent" : "") + ((hasRecents ? (omniOpen ? omniQuery : fileName) : name) ? " pt-has-value" : "")}>
                     <span className="pt-omni-icon"><FileText /></span>
                     {hasRecents ? (
-                        <input type="text" spellCheck={false} aria-label="Open a recent document" placeholder={fileName || "Untitled — search recent documents"}
+                        <input type="text" spellCheck={false} aria-label="Open a recent document" placeholder={fileName || (tab === "letter" ? "Untitled — search recent cover letters" : "Untitled — search recent documents")}
                             value={omniOpen ? omniQuery : fileName}
-                            onFocus={() => { setOmniOpen(true); setOmniQuery(""); setOmniIdx(0); void files?.recent?.().then(setRecents).catch(() => {}); }}
+                            onFocus={() => { setOmniOpen(true); setOmniQuery(""); setOmniIdx(0); void files?.recent?.(tab).then(setRecents).catch(() => {}); }}
                             onChange={(e) => { setOmniOpen(true); setOmniQuery(e.target.value); setOmniIdx(0); }}
                             onKeyDown={omniKey} />
                     ) : (
                         <input type="text" value={name} spellCheck={false} aria-label="Document name" placeholder="Document name" onChange={(e) => { setName(e.target.value); setDirty(true); }} />
                     )}
-                    <button className="pt-omni-clear cvm-import" aria-label={files ? "Open a résumé file" : "Import a source HTML file"} data-tip={files ? "Open a résumé file · ⌘O" : "Import a source HTML file"} onClick={() => (files ? files.open() : fileRef.current?.click())}><Upload /></button>
+                    <button className="pt-omni-clear cvm-import" aria-label={files ? `Open a ${KIND_LABEL[tab].toLowerCase()} file` : "Import a source HTML file"} data-tip={files ? `Open a ${KIND_LABEL[tab].toLowerCase()} file · ⌘O` : "Import a source HTML file"} onClick={() => (files ? files.open(tab) : fileRef.current?.click())}><Upload /></button>
                     {hasRecents && omniOpen && (
                         <div className="pt-omni-results pt-open" role="listbox">
                             {omniRows === 0 ? (
@@ -867,6 +957,10 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
                 <button className="pt-rbtn cvm-secondary" {...pill(settings.spellcheck)} aria-label="Spellcheck" data-tip={settings.spellcheck ? "Spellcheck on" : "Spellcheck off"} onClick={() => patch({ spellcheck: !settings.spellcheck })}><SpellCheck /></button>
                 <button className="pt-rbtn pt-badge-btn" aria-label="Save" data-tip={files ? "Save · ⌘S   Save As · ⇧⌘S" : "Save in this browser · ⌘S"} onClick={() => save()}><Save />{dirty && <span className="cvm-dirty" />}</button>
                 <button className="pt-rbtn pt-badge-btn" aria-haspopup="true" aria-label="Export" data-tip={busy ? `Exporting ${busy}…` : "Export"} onClick={(e) => openMenu("export", e, "right")}><Download /></button>
+                <div className="cvm-seg" role="tablist" aria-label="Document">
+                    <button role="tab" aria-selected={tab === "resume"} aria-label="Résumé" data-tip="Résumé" className={tab === "resume" ? "cvm-on" : ""} onClick={() => void switchTab("resume")}><FileUser /></button>
+                    <button role="tab" aria-selected={tab === "letter"} aria-label="Cover Letter" data-tip="Cover Letter" className={tab === "letter" ? "cvm-on" : ""} onClick={() => void switchTab("letter")}><FileText /></button>
+                </div>
             </div>
 
             {/* format bar */}
@@ -918,11 +1012,23 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
             )}
             {menu?.id === "export" && (
                 <div className="pt-menu-pop pt-open" role="menu" style={{ right: menu.right, top: menu.top, minWidth: 230 }}>
-                    <button className="pt-menu-item cvm-row" onClick={() => runExport("pdf")}><FileType2 />PDF<span className="cvm-hint">real text · links</span></button>
-                    <button className="pt-menu-item cvm-row" onClick={() => runExport("docx")}><FileText />Word (DOCX)<span className="cvm-hint">ATS-friendly</span></button>
-                    <button className="pt-menu-item cvm-row" onClick={() => runExport("png")}><FileImage />PNG<span className="cvm-hint">2×</span></button>
-                    <div className="pt-menu-div" />
-                    <button className="pt-menu-item cvm-row" onClick={() => runExport("html")}><FileCode2 />Source HTML<span className="cvm-hint">re-loadable</span></button>
+                    {!exportKind ? (
+                        <>
+                            <button className="pt-menu-item cvm-row" aria-haspopup="menu" onClick={() => setExportKind("pdf")}><FileType2 />PDF<span className="cvm-hint">real text · links ›</span></button>
+                            <button className="pt-menu-item cvm-row" aria-haspopup="menu" onClick={() => setExportKind("docx")}><FileText />Word (DOCX)<span className="cvm-hint">ATS-friendly ›</span></button>
+                            <button className="pt-menu-item cvm-row" aria-haspopup="menu" onClick={() => setExportKind("png")}><FileImage />PNG<span className="cvm-hint">2× ›</span></button>
+                            <div className="pt-menu-div" />
+                            <button className="pt-menu-item cvm-row" aria-haspopup="menu" onClick={() => setExportKind("html")}><FileCode2 />Source HTML<span className="cvm-hint">re-loadable ›</span></button>
+                        </>
+                    ) : (
+                        <>
+                            <button className="pt-menu-item cvm-row cvm-back" onClick={() => setExportKind(null)}><ChevronLeft />{{ pdf: "PDF", docx: "Word (DOCX)", png: "PNG", html: "Source HTML" }[exportKind]}</button>
+                            <div className="pt-menu-div" />
+                            <button className="pt-menu-item cvm-row" onClick={() => runExport(exportKind, "resume")}><FileUser />Résumé{tab === "resume" && <span className="cvm-hint">this tab</span>}</button>
+                            <button className="pt-menu-item cvm-row" onClick={() => runExport(exportKind, "letter")}><FileText />Cover Letter{tab === "letter" && <span className="cvm-hint">this tab</span>}</button>
+                            <button className="pt-menu-item cvm-row" onClick={() => runExport(exportKind, "all")}><Files />All<span className="cvm-hint">two files</span></button>
+                        </>
+                    )}
                 </div>
             )}
             {menu?.id === "brand" && (

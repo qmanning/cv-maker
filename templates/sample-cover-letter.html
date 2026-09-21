@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Mara Quill — Cover Letter</title>
+<style>
+                 everything is scoped under .cv-page; sizes are in pt (1pt = 1 Figma px)
+    [data-cv-edit]          an edit-in-place rich-text region (paragraphs, bullets, links, rules)
+    .cv-flow                a region whose copy flows across columns from ONE input
+    [data-cv-block]         a unit pagination keeps together on one page
+    [data-cv-keep-next]     …and keeps with the block that follows it (section headings)
+    [data-cv-repeat]        a block that can be duplicated / moved / deleted (jobs)
+  The page size, page breaks and page numbers belong to the editor, not to this file.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Mara Quill — Résumé</title>
+<style>
+.cv-page {
+  --cv-content-w: 562pt;          /* Figma content width: keeps the line breaks of the design */
+  --cv-pad-top: 16pt;
+  --cv-pad-bottom: 16pt;
+  --cv-blue: #3666f8;
+  --cv-rule: #eeeeee;
+  font-family: Helvetica, "Helvetica Neue", Arial, sans-serif;
+  font-size: 9pt; line-height: 1.15; color: #000; background: #fff;
+  -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision;
+}
+.cv-page *, .cv-page *::before, .cv-page *::after { box-sizing: border-box; }
+.cv-page p, .cv-page ul, .cv-page li, .cv-page h1, .cv-page h2 { margin: 0; padding: 0; }
+.cv-page p { min-height: 1em; overflow-wrap: break-word; }
+.cv-page strong { font-weight: 700; }
+.cv-page a { color: var(--cv-blue); text-decoration: underline; text-underline-position: from-font; text-decoration-skip-ink: none; }
+.cv-page hr { border: 0; border-top: 1px solid var(--cv-rule); margin: 6pt 0; }
+.cv-page ul { list-style: disc outside; }
+.cv-page li { margin-left: 12pt; break-inside: avoid; }
+.cv-page li + li { margin-top: 8pt; }
+.cv-page [data-col-break] { break-before: column; }
+
+/* header */
+.cv-header { display: flex; align-items: center; gap: 13pt; padding-bottom: 8pt; border-bottom: 1px solid #000; margin-bottom: 12pt; }
+.cv-logo { width: 40pt; height: 40pt; flex: none; display: block; }
+.cv-id { flex: none; font-weight: 700; font-size: 10pt; line-height: 1.28; white-space: nowrap; }
+.cv-id p + p { margin-top: 1pt; }
+.cv-id p:first-child { font-size: 12pt; letter-spacing: -0.24pt; }
+.cv-id p:last-child { letter-spacing: -0.2pt; }
+.cv-details { flex: 1 1 0; min-width: 0; align-self: stretch; display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between; gap: 4pt; }
+.cv-headline { width: 284pt; text-align: right; font-weight: 700; font-size: 9pt; line-height: 1.27; letter-spacing: -0.18pt; }
+.cv-links { display: flex; justify-content: flex-end; gap: 16pt; width: 100%; font-weight: 700; font-size: 7pt; line-height: 1.28; letter-spacing: -0.14pt; white-space: nowrap; }
+
+/* summary */
+.cv-summary { font-size: 9pt; line-height: 1.41; letter-spacing: -0.18pt; padding-bottom: 8pt; margin-bottom: 12pt; }
+.cv-summary p + p { margin-top: 13.7pt; }
+
+/* headings */
+.cv-h1 { font-weight: 700; font-size: 12pt; letter-spacing: -0.24pt; margin-bottom: 4pt; }
+.cv-h2 { font-weight: 700; font-size: 10pt; line-height: 1.725; letter-spacing: -0.2pt; }
+
+/* experience */
+.cv-job { margin-bottom: 8pt; }
+.cv-job-title { font-weight: 700; font-size: 10pt; line-height: 1.725; letter-spacing: -0.22pt; }
+.cv-job-meta { font-weight: 700; font-size: 8pt; line-height: 1.2; letter-spacing: -0.22pt; }
+.cv-job-body { font-size: 8pt; line-height: 1.35; letter-spacing: -0.16pt; margin-top: 4pt; padding: 4pt 0 8pt; border-bottom: 1px solid var(--cv-rule); }
+.cv-flow { column-count: 2; column-gap: 4pt; }
+.cv-note { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-weight: 500; font-size: 7pt; margin: -2pt 0 12pt; padding-bottom: 8pt; border-bottom: 1px solid var(--cv-rule); }
+
+/* education */
+.cv-edu { border-bottom: 1px solid var(--cv-rule); margin-bottom: 12pt; }
+.cv-edu-body { font-size: 7pt; letter-spacing: -0.14pt; padding: 4pt 0 8pt; }
+.cv-edu-body li { margin-left: 10.5pt; }
+
+/* skills: two independent columns */
+.cv-cols2 { display: flex; align-items: flex-start; gap: 16pt; padding-bottom: 4pt; }
+.cv-cols2 > div { flex: 1 1 0; min-width: 0; }
+.cv-cols2 .cv-h2 { line-height: 1.06; margin-bottom: 8pt; }
+.cv-skill-body { font-size: 7pt; line-height: 1.14; letter-spacing: -0.14pt; }
+
+/* itera:letter — everything above is a snapshot of the résumé's styles (refreshed whenever a résumé is open, so the
+   header always matches); only what follows belongs to the letter */
+.cl-date, .cl-recipient, .cl-greeting, .cl-body, .cl-close { font-size: 10pt; line-height: 1.5; }
+.cl-date { margin-top: 22pt; }
+.cl-recipient { margin-top: 14pt; }
+.cl-recipient p { margin: 0; }
+.cl-greeting { margin-top: 16pt; }
+.cl-body { margin-top: 10pt; }
+.cl-body p { margin: 0 0 10pt; }
+.cl-close { margin-top: 8pt; }
+.cl-close p { margin: 0; }
+.cl-close p + p { margin-top: 22pt; font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="cv-page" data-cv-kind="letter">
+
+  <header class="cv-header" data-cv-block data-cv-mirror="header">
+    <img class="cv-logo" alt="MQ monogram" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40' width='40' height='40'%3E%3Crect x='1' y='1' width='38' height='38' rx='9' fill='none' stroke='black' stroke-width='2'/%3E%3Ctext x='20' y='26' text-anchor='middle' font-family='Helvetica, Arial, sans-serif' font-weight='700' font-size='14' fill='black'%3EMQ%3C/text%3E%3C/svg%3E" />
+    <div class="cv-id">
+      <p>Mara Quill</p>
+      <p>(503) 555-0142</p>
+      <p>Product Designer</p>
+    </div>
+    <div class="cv-details">
+      <div class="cv-headline">
+        <p>Product Designer for complicated things: transit, robotics, and the tools behind them</p>
+      </div>
+      <div class="cv-links">
+        <p><a href="https://mara.example">mara.example</a></p>
+        <p><a href="https://www.linkedin.com/in/maraquill">linkedin.com/in/maraquill</a></p>
+        <p><a href="mailto:hi@mara.example">hi@mara.example</a></p>
+        <p><a href="https://github.com/maraquill">github.com/maraquill</a></p>
+        <p>Portland, Oregon</p>
+      </div>
+    </div>
+  </header>
+
+  <div class="cl-date" data-cv-block data-cv-edit><p>September 21, 2026</p></div>
+
+  <div class="cl-recipient" data-cv-block data-cv-edit>
+    <p><strong>Jordan Avery</strong></p>
+    <p>Director of Product Design, Northline Mobility</p>
+    <p>Seattle, Washington</p>
+  </div>
+
+  <div class="cl-greeting" data-cv-block data-cv-keep-next data-cv-edit><p>Dear Jordan,</p></div>
+
+  <div class="cl-body" data-cv-block data-cv-edit>
+    <p>I'm writing about the Staff Product Designer role on Northline's operator tools team. I've spent the last decade designing for the unglamorous half of transit and robotics, the screens dispatchers and warehouse operators live in all day, and that is the work your posting describes.</p>
+    <p>At <strong>Halcyon Transit</strong> I cut fare-purchase time in the rider app from 94 seconds to 31, and I rode more than sixty routes with working operators before drawing a single screen for the new dispatch tool. At <strong>Tidewater Robotics</strong> I designed the fleet dashboard that let one operator supervise 40 robots instead of 12. In both places the design got better because I went and watched the job being done first.</p>
+    <p>What draws me to Northline is that you publish your on-time numbers and your misses. I'd like to help the people who run that system see a problem a few minutes sooner than they do today, and I'd bring my own research, working prototypes, and a habit of reading the support tickets.</p>
+    <p>I'd welcome the chance to talk about what the operator tools team is taking on next year.</p>
+  </div>
+
+  <div class="cl-close" data-cv-block data-cv-edit>
+    <p>Sincerely,</p>
+    <p>Mara Quill</p>
+  </div>
+
+</div>
+</body>
+</html>

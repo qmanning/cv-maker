@@ -250,7 +250,7 @@ async function smoke(win) {
     const saved = [];
     win.webContents.session.on("will-download", (_e, item) => {
         const to = path.join(SMOKE_DIR, "download-" + item.getFilename());
-        item.setSavePath(to); item.once("done", (_ev, state) => saved.push({ file: path.basename(to), state }));
+        item.setSavePath(to); item.once("done", (_ev, state) => { saved.push({ file: path.basename(to), state }); win.webContents.send("files:download", state); });   // as createWindow's handler does: the editor scans until told
     });
     const js = (code) => win.webContents.executeJavaScript(code, true);
     const until = async (what, fn, ms = 30000) => { const t = Date.now(); while (Date.now() - t < ms) { if (await fn()) return; await new Promise((r) => setTimeout(r, 150)); } throw new Error("timed out waiting for " + what); };
@@ -259,7 +259,10 @@ async function smoke(win) {
     for (const [label, ext] of [["PDF", "pdf"], ["PNG", "png"]]) {
         await js(`document.querySelector('[data-tip="Export"]').click()`);
         await until("the export menu", () => js(`!!document.querySelector(".pt-menu-pop.pt-open")`));
-        await js(`[...document.querySelectorAll(".pt-menu-pop.pt-open .pt-menu-item")].find((b) => b.textContent.trim().startsWith(${JSON.stringify(label)})).click()`);
+        const item = (starts) => `[...document.querySelectorAll(".pt-menu-pop.pt-open .pt-menu-item")].find((b) => b.textContent.trim().startsWith(${JSON.stringify(starts)}))`;
+        await js(`${item(label)}.click()`);                                      // the format…
+        await until("the export submenu", () => js(`!!${item("Résumé")}`));
+        await js(`${item("Résumé")}.click()`);                                   // …then which document (Résumé / Cover Letter / All)
         await until(label + " download", () => saved.some((s) => s.file.endsWith("." + ext)));
     }
     fs.writeFileSync(path.join(SMOKE_DIR, "editor.png"), (await win.webContents.capturePage()).toPNG());
@@ -397,15 +400,32 @@ async function smoke(win) {
     await tool("undo_last_edit");
     // documents: never open over unsaved work; branch with save_as (no dialog); open by name
     const docs0 = (await tool("list_documents")).value;
-    fileSteps.mcpRefusesOverUnsaved = docs0.unsaved_changes === true && (await tool("open_document", { document: "nothing-like-this" })).isError && (await tool("open_document", { document: "saved" })).isError;
+    fileSteps.mcpRefusesOverUnsaved = docs0.showing === "resume" && docs0.resume.unsaved_changes === true && (await tool("open_document", { name: "nothing-like-this" })).isError && (await tool("open_document", { name: "saved" })).isError;
     const branch = await tool("save_document", { save_as: "MCP Branch / Test" });
-    const docs1 = (await tool("list_documents")).value;
+    const docs1 = (await tool("list_documents")).value.resume;
     fileSteps.mcpSaveAs = !branch.isError && branch.value.file === "MCP Branch Test.html" && fs.existsSync(path.join(SMOKE_DIR, "MCP Branch Test.html")) && docs1.open === "MCP Branch Test.html" && docs1.unsaved_changes === false
         && (await tool("save_document", { save_as: "saved" })).isError;   // never over another file
     fileSteps.mcpExportNamedAfterFile = /mcp-branch-test\.pdf$/.test((await tool("export_resume", { format: "pdf" })).value.saved || "");
-    const back = await tool("open_document", { document: "saved" });
+    const back = await tool("open_document", { name: "saved" });
     await until("the MCP-opened document to show", () => files.state().current === savedFile, 8000);
-    fileSteps.mcpOpened = !back.isError && back.value.opened === "saved.html" && (await tool("get_resume")).value.file === "saved.html";
+    fileSteps.mcpOpened = !back.isError && back.value.opened === "saved.html" && back.value.document === "resume" && (await tool("get_resume")).value.file === "saved.html";
+    // the cover letter: the same tools with document: "cover_letter" — Itera shows it, and its header is the résumé's, read-only
+    const L = { document: "cover_letter" };
+    const seenLetter = (await tool("get_resume", L)).value;
+    const headerMirrored = await js(`(() => { const h = document.querySelector('.cv-page header[data-cv-mirror="header"]'); return !!h && !h.querySelector("[contenteditable=true]") && h.textContent.includes("Edited By Another Program") === document.querySelector(".cv-page") .textContent.includes("Edited By Another Program"); })()`);
+    fileSteps.mcpLetterShown = seenLetter.document === "cover_letter" && seenLetter.file === "Untitled (not saved yet)" && seenLetter.blocks.length >= 5 && headerMirrored && (await js(`document.querySelector(".cvm-seg .cvm-on")?.getAttribute("aria-label") === "Cover Letter"`));
+    const greeting = seenLetter.blocks.flatMap((b) => b.regions).find((r) => /Dear/.test(r.html));
+    const letterEdit = await tool("edit_resume", { ...L, summary: "Addressed the letter.", ops: [{ op: "set_text", target: greeting.id, html: "<p>Dear MCP Hiring Team,</p>" }] });
+    fileSteps.mcpLetterEdited = !letterEdit.isError && letterEdit.value.document === "cover_letter" && letterEdit.value.applied === 1 && (await js(`document.querySelector(".cl-greeting").textContent.includes("MCP Hiring Team")`));
+    const letterSaved = await tool("save_document", { ...L, save_as: "MCP Letter" });
+    const letterOnDisk = fs.existsSync(path.join(SMOKE_DIR, "MCP Letter.html")) ? fs.readFileSync(path.join(SMOKE_DIR, "MCP Letter.html"), "utf8") : "";
+    fileSteps.mcpLetterSaved = !letterSaved.isError && letterSaved.value.document === "cover_letter" && /MCP Hiring Team/.test(letterOnDisk) && /data-cv-mirror="header"/.test(letterOnDisk) && /itera:letter/.test(letterOnDisk);
+    const docs2 = (await tool("list_documents")).value;
+    fileSteps.mcpTwoFiles = docs2.cover_letter.open === "MCP Letter.html" && docs2.resume.open === "saved.html" && docs2.cover_letter.documents.length === 1 && !docs2.resume.documents.some((d) => d.name === "MCP Letter");
+    fileSteps.mcpLetterExported = /mcp-letter\.pdf$/.test((await tool("export_resume", { ...L, format: "pdf" })).value.saved || "");
+    // …and back: naming the résumé puts it on the sheet again, untouched by any of that
+    const again = (await tool("get_resume", { document: "resume" })).value;
+    fileSteps.mcpBackToResume = again.document === "resume" && again.file === "saved.html" && again.blocks.some((b) => b.kind === "job") && files.state("letter").current.endsWith("MCP Letter.html");
     child.kill();
 
     /* the welcome sheet: it loads, and its primary button dismisses it */
@@ -431,7 +451,7 @@ app.whenReady().then(async () => {
     const updates = { check: () => updater.check({ manual: true }), auto: () => updater.auto(), setAuto: (v) => updater.setAuto(v) };   // late-bound: the updater is made just below
     assistant = setupAssistant({ origin: ORIGIN, editorWindow: () => editor, mcp, moveToApplications, updates });
     updater = setupUpdater({ editorWindow: () => editor, installedCopy, runningFromInstall });
-    files = setupFiles({ onAssistant: (section) => assistant.openSettings(section), updates, templatePath: path.join(ROOT, "templates", "sample-resume.html"), smokeDir: SMOKE_DIR, onWelcome: () => showWelcome(BrowserWindow.getAllWindows().find((w) => w !== welcome)) });
+    files = setupFiles({ onAssistant: (section) => assistant.openSettings(section), updates, templatePath: path.join(ROOT, "templates", "sample-resume.html"), letterTemplatePath: path.join(ROOT, "templates", "sample-cover-letter.html"), smokeDir: SMOKE_DIR, onWelcome: () => showWelcome(BrowserWindow.getAllWindows().find((w) => w !== welcome)) });
     const win = createWindow();
     win.webContents.once("did-finish-load", () => openWhenReady.splice(0).forEach((f) => files.openPath(f)));
     if (SMOKE_DIR) {
