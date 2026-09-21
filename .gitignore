@@ -3,3 +3,5 @@ node_modules/
 .DS_Store
 electron/.smoke/
 electron/out/
+electron/.gk/
+electron/.smoke-packaged/

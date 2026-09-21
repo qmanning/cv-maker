@@ -1,0 +1,40 @@
+# Builds the desktop app when a version tag is pushed (v0.2.0 …) and attaches the installers to a
+# DRAFT GitHub Release — nothing is public until the draft is published by hand.
+# The builds are unsigned (macOS: ad-hoc). See README → "Desktop app" → "First launch".
+name: desktop-release
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: write
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            flag: --mac
+          - os: windows-latest
+            flag: --win
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build installers
+        working-directory: electron
+        run: |
+          npm ci
+          npx electron-builder ${{ matrix.flag }} --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - name: Attach to a draft release
+        shell: bash
+        working-directory: electron/out
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --draft --title "CV Maker ${GITHUB_REF_NAME#v}" --notes "See CHANGELOG.md. Unsigned builds — README → Desktop app → First launch."
+          for f in *.dmg *.exe; do [ -e "$f" ] && gh release upload "$GITHUB_REF_NAME" "$f" --clobber; done
