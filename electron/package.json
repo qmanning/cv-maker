@@ -47,6 +47,7 @@
                     "dist/**",
                     "vendor/**",
                     "templates/**",
+                    "brand/**",
                     "LICENSE"
                 ]
             }

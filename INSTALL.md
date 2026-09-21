@@ -46,7 +46,7 @@ the user's pages — so it can live at any path your server serves, at any depth
 ## 2. Copy the folder
 
 Copy the whole `itera/` folder to `<static dir>/labs/itera/` (create `labs/`). Keep the
-folder name `itera`. Result must contain at least: `index.html`, `config.js`, `dist/itera.js`,
+folder name `itera`. Result must contain at least: `index.html`, `config.js`, `brand/` (the favicon), `dist/itera.js`,
 `dist/itera.css`, `dist/chunks/`, `templates/sample-resume.html`, `vendor/html-to-image.js`,
 `vendor/infospector/host.css`, `vendor/infospector/lib.js`, `vendor/infospector/colorpicker.js`,
 `README.md`, `LICENSE`.
