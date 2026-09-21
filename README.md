@@ -13,12 +13,13 @@ Itera is an edit-in-place résumé editor that runs entirely in the browser. The
 - **Add a row anywhere.** Hover between two blocks, click the **+**, and drop in a Content block, an Experience block, a Dual list, or a Divider — cloned from your document's own blocks, so it matches any template.
 - **Move, duplicate, and delete any block** — click into it and a small tool pill appears beside it.
 - **Swap any image** — click it, choose a file, and it's embedded straight into the document as a data URI. No uploads, no broken links later.
+- **A cover letter beside the résumé.** The picker at the right of the bar switches the sheet between the two. They are two documents (two files), and the letter's header *is* the résumé's: change your phone number or headline on the résumé and the letter follows. A default letter ships in `templates/sample-cover-letter.html`.
 - **US Letter and A4**, switchable any time.
 - **Fit to one page** scales the whole design down as a single unit (never below 80%) so every line still breaks exactly where it was designed to.
 - **Pagination, your way.** On: real page breaks and centered page numbers once you're past one page. Off: one continuous page, no breaks.
 - **Live zoom that tracks the window** — Fit width, Fit height, or a handful of fixed zoom levels.
 - **Spellcheck toggle, light/dark theme**, and the same glass "look" system as Infospector (background pattern, colors, material and light — right-click the canvas).
-- **Four export formats**: PDF (real text, real links), Word DOCX (native columns and tables, built for ATS parsing), PNG at 2×, and Source HTML — the one you reload to keep a variant.
+- **Four export formats**: PDF (real text, real links), Word DOCX (real paragraphs, bullets and tables, built for ATS parsing), PNG at 2×, and Source HTML — the one you reload to keep a variant. Pick a format, then **Résumé**, **Cover Letter** or **All**.
 - **Nothing leaves your browser.** Autosaves to `localStorage`. No server, no account, no analytics — unless you run the optional local export server yourself.
 
 ![Itera editing a résumé in place](docs/screenshots/editor.png)
@@ -93,11 +94,19 @@ layout — columns, header, rules. The editor never rewrites your CSS; it only m
 | Format | What you get | Needs a server? |
 | --- | --- | --- |
 | PDF | Real, selectable text and live links — ATS-readable | No — falls back to the browser's print dialog ("Save as PDF") |
-| Word (DOCX) | Real paragraphs and bullets, native Word columns for flowing regions, borderless tables for side-by-side columns, hyperlinks, page-number footer | No — always renders in-browser |
+| Word (DOCX) | Real paragraphs and bullets, borderless tables for anything side by side (flowing columns are split where they break on screen — Word's own section columns show up as one column and stray squares in Quick Look, Pages and many ATS parsers), hyperlinks, page-number footer | No — always renders in-browser |
 | PNG (2×) | A flat image of the page, rasterized in-browser via `vendor/html-to-image.js` | No |
 | Source HTML | The file itself, reloadable — how you keep variants | No |
 
-A scan-line animation plays over the sheet while an export renders.
+Choose a format, then what to export: **Résumé**, **Cover Letter**, or **All** (two files; a letter whose name doesn't say so gets `-cover-letter`). Files are named after the open document. A scan-line animation plays over the sheet until the export is done — in the desktop app, until its Save panel has come and gone.
+
+## Résumé + cover letter
+
+The two-segment picker at the far right of the bar switches between the résumé and its cover letter. Everything in the bar — the document name, Open/Import, Save, Export — acts on the tab that is showing, and a file opened from the wrong tab lands in its own (a letter marks itself with `data-cv-kind="letter"`).
+
+- **Two files.** Each is a plain `.html` you own. In the desktop app each tab has its own open file, recent list and pinned master; on the web each has its own autosave slot.
+- **One header.** The letter's `<header data-cv-mirror="header">` is filled from the résumé's header (its `[data-cv-header]`, else the page's first `<header>`) every time the letter takes the sheet — read-only, with the résumé's styles put in front of the letter's own (everything after the `/* itera:letter` marker in its `<style>`). The file keeps a snapshot, so it still stands alone.
+- **Your own letter template** needs only that header slot plus `[data-cv-block][data-cv-edit]` regions for the date, recipient, greeting, body and sign-off.
 
 ## Optional export server
 
@@ -177,7 +186,8 @@ change lands on the sheet as one step with **Undo** beside it.
 - **No keys, no account, no network.** The AI app starts `electron/mcp/server.mjs` (dependency-free, run by
   Itera's own binary, so nobody needs Node) and that talks to the running app over a local socket only
   your user account can open. Itera itself never calls an AI service in this mode.
-- **Four tools:** `get_resume`, `edit_resume`, `undo_last_edit`, `export_resume` (PDF / PNG to Downloads).
+- **Eleven tools**, each taking `document: "resume" | "cover_letter"` (Itera shows that one and acts on it): `get_resume`, `edit_resume`, `undo_last_edit`, `export_resume` (PDF / PNG / DOCX / HTML to Downloads), `list_documents`, `open_document`, `save_document` (`save_as` branches a copy beside the open file — tailor a copy, never the master), `get_page_setup` / `set_page_setup` (paper, fit to one page, pagination, zoom), `list_images` / `replace_image`.
+- **It never discards your work.** `open_document` refuses while that document has unsaved changes, and `save_as` never overwrites another file.
 - **The design can't break.** The model never rewrites the file. It sees the résumé as addressable blocks
   and regions and answers with operations (set this text, add / duplicate / move / delete that block);
   the editor applies them, and every scrap of model-written HTML is parsed inertly and passed through an
