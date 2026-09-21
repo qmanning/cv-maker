@@ -36,7 +36,7 @@ export function setupMcp({ editorWindow, currentFile, files = () => null, socket
         const named = (k) => (k === "letter" ? "cover_letter" : "resume");
         // anything that reads or changes a document acts on the one on the sheet — so put the one they named there first
         let kind = "resume";
-        if (!["documents", "open"].includes(method)) kind = await editor("showDocument", [want]);
+        if (!["documents", "open", "keywords_get", "keywords_set"].includes(method)) kind = await editor("showDocument", [want]);
         if (method === "describe") {
             const cur = files()?.state(kind).current ?? currentFile();
             const { document: _shown, ...doc } = await editor("describe");
@@ -77,6 +77,12 @@ export function setupMcp({ editorWindow, currentFile, files = () => null, socket
             const out = f.writeDocument(html, { saveAs: typeof params?.save_as === "string" ? params.save_as : "", kind });
             await editor("markSaved", [out.file]);
             return { document: named(kind), saved: out.path, file: out.file };
+        }
+        const kwOut = (k) => ({ job: k.job, keywords: k.keywords.map((u) => ({ keyword: u.keyword, resume: u.resume, cover_letter: u.letter })), missing_everywhere: k.keywords.filter((u) => !u.resume && !u.letter).map((u) => u.keyword) });
+        if (method === "keywords_get") return kwOut(await editor("getKeywords"));
+        if (method === "keywords_set") {
+            if (!Array.isArray(params?.keywords)) throw new Error("keywords must be a list of words or short phrases.");
+            return kwOut(await editor("setKeywords", [params.keywords.filter((k) => typeof k === "string"), typeof params?.job === "string" ? params.job : null]));
         }
         const pageOut = (p) => ({ paper: p.paper, paper_label: p.paperLabel, papers: p.papers, fit_to_one_page: p.fit, paginate: p.paginate, zoom: p.zoom, zoom_percent: p.zoomPercent, pages: p.pages, fit_scale: p.fitScale });
         if (method === "page_get") return pageOut(await editor("getPage"));

@@ -16,7 +16,7 @@ import {
     AlignCenter, AlignLeft, AlignRight, ArrowDown, ArrowLeft, ArrowUp, Bold, BookOpen, BriefcaseBusiness, Plus, Text, Columns2, Copy, Download,
     Eraser, FileCode2, FileImage, FileText, FileType2, ImageUp, Italic, Link2, List, Minus, Moon, RotateCcw,
     Save, SpellCheck, Sun, Upload, Trash2, Underline as UnderlineIcon, ALargeSmall, MoveVertical, MoveHorizontal,
-    Sparkles, SendHorizontal, Undo2, Check, Settings2, X, Star, RefreshCw, FileUser, ChevronLeft, Files,
+    Sparkles, SendHorizontal, Undo2, Check, Settings2, X, Star, RefreshCw, FileUser, ChevronLeft, Files, ScanSearch, CircleCheck, CircleDashed,
 } from "lucide-react";
 import { FontSize } from "@/components/ui/font-size-extension";
 import { FontWeight } from "@/components/ui/font-weight-extension";
@@ -25,9 +25,10 @@ import { BLOCK_KINDS, UNIT, insertBlock, topBlocks, type BlockKind } from "./cv-
 import { attachColorPicker, toHex, useInfospectorLook } from "./use-infospector-look";
 import { LookMenu } from "./LookMenu";
 import { applyOps, describeDocument, type CvAssistant, type CvRemote, type CvRemoteHandlers, type CvRemoteStatus, type RemotePage } from "./cv-assistant";
+import { coverage, findRanges, normalizeKeywords, pageText, type KeywordUse } from "./cv-keywords";
 import { FOOTER_PT, GAP_PT, MIN_FIT, PAPERS, PT, type DocKind, type PaperId, type Source, docKind, fullHtml, letterCss, mirrorHeader, pageBoxCss, parseSource, slugify, stepZoom } from "./cv-source";
 
-const LOCAL_KEY = "cvm:doc", LETTER_KEY = "cvm:letter", START_SIZE_KEY = "cvm:startsize", HOME_KEY = "cvm:home";
+const LOCAL_KEY = "cvm:doc", LETTER_KEY = "cvm:letter", KW_KEY = "cvm:keywords", KW_POS_KEY = "cvm:kw-pos", START_SIZE_KEY = "cvm:startsize", HOME_KEY = "cvm:home";
 const stored = (k: string) => { try { return localStorage.getItem(k) || ""; } catch { return ""; } };
 const store = (k: string, v: string) => { try { if (v) localStorage.setItem(k, v); else localStorage.removeItem(k); } catch { /* ignore */ } };
 const ZOOMS = [1, 1.25, 1.5, 2];
@@ -202,6 +203,12 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
     const [tab, setTab] = useState<DocKind>("resume");
     const slots = useRef<Record<DocKind, Slot | null>>({ resume: null, letter: null });
     const [exportKind, setExportKind] = useState<"pdf" | "png" | "docx" | "html" | null>(null);
+    // ATS keywords: what a job ad is screened for (from the person, or their AI reading the ad) — one list for both documents
+    const [kw, setKw] = useState<{ job: string; keywords: string[] }>(() => { try { const v = JSON.parse(stored(KW_KEY) || "null"); return { job: typeof v?.job === "string" ? v.job : "", keywords: normalizeKeywords(v?.keywords) }; } catch { return { job: "", keywords: [] }; } });
+    const [kwOpen, setKwOpen] = useState(false), [kwActive, setKwActive] = useState<string | null>(null), [kwDraft, setKwDraft] = useState("");
+    const [kwPos, setKwPos] = useState<{ x: number; y: number } | null>(() => { try { const v = JSON.parse(stored(KW_POS_KEY) || "null"); return v && Number.isFinite(v.x) && Number.isFinite(v.y) ? v : null; } catch { return null; } });
+    const [kwUses, setKwUses] = useState<KeywordUse[]>([]), [kwRev, setKwRev] = useState(0);
+    const kwCount = useRef(0); kwCount.current = kw.keywords.length;
     // desktop only: the recent-documents typeahead that lives in the omni bar
     const hasRecents = !!files?.recent;
     const [recents, setRecents] = useState<RecentDoc[]>([]);
@@ -212,7 +219,7 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
     const wrapRef = useRef<HTMLElement>(null), hostRef = useRef<HTMLDivElement>(null), paperRef = useRef<HTMLDivElement>(null);
     const editorsRef = useRef<Editor[]>([]), tipRef = useRef<HTMLDivElement>(null);
     const fileRef = useRef<HTMLInputElement>(null), imgFileRef = useRef<HTMLInputElement>(null), omniRef = useRef<HTMLDivElement>(null);
-    const stateRef = useRef({ name, fileName, settings, source, scale, pages, tab, dirty, contentPt }); stateRef.current = { name, fileName, settings, source, scale, pages, tab, dirty, contentPt };
+    const stateRef = useRef({ name, fileName, settings, source, scale, pages, tab, dirty, contentPt, kwJob: kw.job, keywords: kw.keywords }); stateRef.current = { name, fileName, settings, source, scale, pages, tab, dirty, contentPt, kwJob: kw.job, keywords: kw.keywords };
     const shellSaving = useRef(0), shellSavingTimer = useRef(0), exporting = useRef(false);
     const rafRef = useRef(0), saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined), toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -276,7 +283,7 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
 
     /* ---- local autosave ---- */
     const touch = useCallback(() => {
-        setDirty(true); schedule();
+        setDirty(true); schedule(); if (kwCount.current) setKwRev((r) => r + 1);
         clearTimeout(saveTimer.current);
         saveTimer.current = setTimeout(() => {
             const { name: n, settings: s, source: src, tab: t } = stateRef.current; if (!src) return;
@@ -518,6 +525,61 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
         } catch (e) { say(e instanceof Error ? e.message : "Could not save the file"); }
     };
 
+    // what a model is told about the document also says which regions flow in columns (read off the live page; ids are in document order on both sides)
+    const withColumns = useCallback(<T extends { blocks: { regions: { id: string; columns?: number }[] }[]; other: { id: string; columns?: number }[] }>(doc: T): T => {
+        const live = Array.from(hostRef.current?.querySelectorAll<HTMLElement>(".cv-page [data-cv-edit]") || []);
+        const mark = (r: { id: string; columns?: number }) => { const el = live[Number(r.id.slice(1))], n = el ? parseInt(getComputedStyle(el).columnCount, 10) : NaN; if (n > 1) r.columns = n; };
+        doc.blocks.forEach((b) => b.regions.forEach(mark)); doc.other.forEach(mark);
+        return doc;
+    }, []);
+
+    /* ---- ATS keywords: which of the ad's words each document already uses, and where ---- */
+    // both documents' words: the one on the sheet as it is being typed, the other from its slot. A letter's header is the résumé's words.
+    const kwTexts = useCallback(() => {
+        const st = stateRef.current, other: DocKind = st.tab === "resume" ? "letter" : "resume", slot = slots.current[other];
+        const live = st.source ? pageText(serialize(), { skipMirror: st.tab === "letter" }) : "", waiting = slot ? pageText(slot.source.html, { skipMirror: other === "letter" }) : "";
+        return st.tab === "resume" ? { resume: live, letter: waiting } : { resume: waiting, letter: live };
+    }, [serialize]);
+    const kwCoverage = useCallback((list: string[]) => { const t = kwTexts(); return coverage(list, t.resume, t.letter); }, [kwTexts]);
+    const applyKeywords = useCallback((list: unknown, job?: string) => {
+        const next = { job: typeof job === "string" ? job.trim().slice(0, 120) : stateRef.current.kwJob, keywords: normalizeKeywords(list) };
+        setKw(next); store(KW_KEY, next.keywords.length || next.job ? JSON.stringify(next) : ""); setKwActive(null);
+        return next;
+    }, []);
+    // recount a beat after typing stops (and whenever the sheet changes hands)
+    useEffect(() => {
+        if (!kw.keywords.length) { setKwUses([]); return; }
+        const t = window.setTimeout(() => setKwUses(kwCoverage(kw.keywords)), 250);
+        return () => window.clearTimeout(t);
+    }, [kw.keywords, kwRev, source, tab, kwCoverage]);
+    // click a keyword → every place the document on the sheet uses it lights up. Drawn with the CSS Custom Highlight API:
+    // ranges only, so the markup the editors own is never touched.
+    useEffect(() => {
+        type HL = { highlights?: { set(name: string, h: unknown): void; delete(name: string): void } };
+        const reg = (CSS as unknown as HL).highlights, Ctor = (window as unknown as { Highlight?: new (...r: Range[]) => unknown }).Highlight;
+        const page = hostRef.current?.querySelector(".cv-page");
+        if (!reg || !Ctor) return;
+        if (!kwActive || !page) { reg.delete("cvm-kw"); return; }
+        const t = window.setTimeout(() => {
+            const ranges = findRanges(page, kwActive, { skipMirror: stateRef.current.tab === "letter" });
+            if (ranges.length) reg.set("cvm-kw", new Ctor(...ranges)); else reg.delete("cvm-kw");
+        }, 60);
+        return () => { window.clearTimeout(t); reg.delete("cvm-kw"); };
+    }, [kwActive, kwRev, source, tab]);
+    const pickKeyword = useCallback((term: string) => {
+        setKwActive((cur) => (cur === term ? null : term));
+        const page = hostRef.current?.querySelector(".cv-page"); if (!page) return;
+        const first = findRanges(page, term, { skipMirror: stateRef.current.tab === "letter" })[0];
+        (first?.startContainer.parentElement as HTMLElement | null)?.scrollIntoView({ block: "center", behavior: "smooth" });
+    }, []);
+    const dragKw = (e: React.PointerEvent) => {
+        if ((e.target as HTMLElement).closest("button, input")) return;
+        const box = (e.currentTarget.parentElement as HTMLElement).getBoundingClientRect(), dx = e.clientX - box.left, dy = e.clientY - box.top;
+        const move = (ev: PointerEvent) => setKwPos({ x: Math.max(8, Math.min(window.innerWidth - 120, ev.clientX - dx)), y: Math.max(8, Math.min(window.innerHeight - 60, ev.clientY - dy)) });
+        const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); setKwPos((pos) => { if (pos) store(KW_POS_KEY, JSON.stringify(pos)); return pos; }); };
+        window.addEventListener("pointermove", move); window.addEventListener("pointerup", up); e.preventDefault();
+    };
+
     /* ---- source file: load / reset ---- */
     const loadSourceText = useCallback((text: string, fallbackName: string, opened?: { note?: string }) => {
         const parsed = parseSource(text), kind = docKind(parsed.html);
@@ -619,8 +681,9 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
                 setAiBusy(round ? "Tightening to fit the page…" : "Thinking…");
                 const { settings: st, name: n, scale: sc, pages: pg, source: src } = stateRef.current; if (!src) break;
                 const html = round ? serialize() : undo.html;
-                const res = await assistant.run({ prompt: request, document: describeDocument(html, { name: n, paper: PAPERS[st.paper].name, pages: st.paginate ? pg : 1, fitScale: Math.round(sc * 100) / 100 }) });
+                const res = await assistant.run({ prompt: request, document: withColumns(describeDocument(html, { name: n, paper: PAPERS[st.paper].name, pages: st.paginate ? pg : 1, fitScale: Math.round(sc * 100) / 100 })), keywords: stateRef.current.keywords });
                 if (!round) message = res.message;
+                if (!round && Array.isArray(res.keywords) && res.keywords.length) { applyKeywords(res.keywords, res.job); setKwOpen(true); }
                 if (!res.ops?.length) break;
                 const out = applyOps(html, res.ops); applied += out.applied; skipped.push(...out.skipped);
                 if (!out.applied) break;
@@ -635,7 +698,7 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
             if (applied) touch();
         } catch (e) { setAiReply({ message: e instanceof Error ? e.message : "Your AI could not be reached.", undo: null, note: "" }); setAsk(prompt); }
         finally { setAiBusy(""); }
-    }, [assistant, aiBusy, aiStatus, serialize, touch]);
+    }, [assistant, aiBusy, aiStatus, serialize, touch, applyKeywords, withColumns]);
     // every entry is a whole copy of the document, and a résumé with a photo embedded as a data URI can be megabytes —
     // so the history is bounded by SIZE as well as by count (the newest step always survives)
     const trimUndo = (stack: Source[]) => { let bytes = stack.reduce((n, e) => n + e.html.length + e.css.length, 0); while (stack.length > 1 && (stack.length > 30 || bytes > 24_000_000)) { const gone = stack.shift()!; bytes -= gone.html.length + gone.css.length; } };
@@ -646,8 +709,8 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
     const remoteRef = useRef<CvRemoteHandlers | null>(null);
     const describeNow = useCallback(() => {
         const { settings: st, name: n, scale: sc, pages: pg } = stateRef.current;
-        return { ...describeDocument(serialize(), { name: n, paper: PAPERS[st.paper].name, pages: st.paginate ? pg : 1, fitScale: Math.round(sc * 100) / 100 }), document: stateRef.current.tab };
-    }, [serialize]);
+        return { ...withColumns(describeDocument(serialize(), { name: n, paper: PAPERS[st.paper].name, pages: st.paginate ? pg : 1, fitScale: Math.round(sc * 100) / 100 })), document: stateRef.current.tab };
+    }, [serialize, withColumns]);
     const settle = () => new Promise<void>((r) => window.setTimeout(r, 700));   // remount + paginate, so the caller learns what the change did
     const pageNow = (): RemotePage => {
         const { settings: st, pages: pg, scale: sc } = stateRef.current;
@@ -719,6 +782,8 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
             setAiReply({ message: `${by} replaced an image.`, undo: before, note: by });
             return { replaced: true, pagesBefore, pagesAfter: stateRef.current.pages };
         },
+        setKeywords: (list, job) => { const next = applyKeywords(list, job ?? undefined); setKwOpen(true); setKwRev((r) => r + 1); return { job: next.job, keywords: kwCoverage(next.keywords) }; },
+        getKeywords: () => ({ job: stateRef.current.kwJob, keywords: kwCoverage(stateRef.current.keywords) }),
         sourceHtml: () => {
             const { name: n, fileName: f, source: src } = stateRef.current; if (!src) throw new Error("No document is open.");
             return { html: fullHtml(n, src.css, serialize()), suggested: slugify(f || n) };
@@ -753,6 +818,8 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
         setPage: (p) => remoteRef.current!.setPage(p),
         listImages: () => remoteRef.current!.listImages(),
         setImage: (id, dataUri, alt, by) => remoteRef.current!.setImage(id, dataUri, alt, by),
+        setKeywords: (list, job) => remoteRef.current!.setKeywords(list, job),
+        getKeywords: () => remoteRef.current!.getKeywords(),
         sourceHtml: () => remoteRef.current!.sourceHtml(),
         markSaved: (file) => remoteRef.current!.markSaved(file),
     }), [remote]);
@@ -908,6 +975,8 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
     return (
         <div className="cvm-root" data-ready={look.ready}>
             {source && <style>{`${source.css}\n${pageBoxCss(paper.w, scale)}`}</style>}
+            {/* where the picked ATS keyword is used: highlighter yellow via the CSS Custom Highlight API (ranges only — no markup is touched) */}
+            <style>{"::highlight(cvm-kw) { background-color: #ffe14d; color: #000; }"}</style>
 
             {/* main bar — Infospector's #pt-bar */}
             <div id="pt-bar" className="cvm-bar">
@@ -1039,6 +1108,9 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
                     {/* on narrow windows spellcheck leaves the bar (so nothing is ever pushed off-screen) and lives here */}
                     <button className="pt-menu-item cvm-row cvm-narrow-only" onClick={() => patch({ spellcheck: !settings.spellcheck })}><SpellCheck />Spellcheck<span className="cvm-hint">{settings.spellcheck ? "on" : "off"}</span></button>
                     <div className="pt-menu-div" />
+                    <div className="pt-ctx-title">Window</div>
+                    <button className="pt-menu-item cvm-row" onClick={() => { setMenu(null); setKwOpen((o) => !o); }}><ScanSearch />ATS keywords<span className="cvm-hint">{kw.keywords.length ? `${kwUses.filter((u) => u[tab] > 0).length} of ${kw.keywords.length} used` : kwOpen ? "hide" : "none yet"}</span></button>
+                    <div className="pt-menu-div" />
                     <div className="pt-ctx-title">Document</div>
                     <button className="pt-menu-item cvm-row pt-danger" onClick={() => { setMenu(null); resetSource(); }}><RotateCcw />Reset to original source</button>
                     <div className="pt-menu-div" />
@@ -1047,6 +1119,42 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
                     <button className="pt-menu-item cvm-row cvm-credit" onClick={visitHomepage}><span>Itera <span className="cvm-hint" style={{ marginLeft: 4 }}>by Q Manning</span></span><span className="cvm-hint">qmanning.com ↗</span></button>
                 </div>
             )}
+            {kwOpen && (() => {
+                const used = kwUses.filter((u) => u[tab] > 0).length, other: DocKind = tab === "resume" ? "letter" : "resume";
+                const add = () => { const next = normalizeKeywords([...kw.keywords, ...kwDraft.split(",")]); if (next.length !== kw.keywords.length) applyKeywords(next); setKwDraft(""); };
+                return (
+                    <div className="pt-menu-pop pt-open cvm-kw" role="dialog" aria-label="ATS keywords" style={kwPos ? { left: kwPos.x, top: kwPos.y } : { right: 20, top: 92 }} onMouseDown={(e) => { if (!(e.target as HTMLElement).closest("input")) keep(e); }}>
+                        <div className="cvm-kw-head" onPointerDown={dragKw}>
+                            <ScanSearch /><b>ATS keywords</b>
+                            {kw.keywords.length > 0 && <span className="cvm-kw-tally" data-tip={`Used in the ${KIND_LABEL[tab].toLowerCase()}`}>{used}/{kw.keywords.length}</span>}
+                            <button className="cvm-kw-x" aria-label="Close" data-tip="Close · reopen from the Itera menu" onClick={() => { setKwOpen(false); setKwActive(null); }}><X /></button>
+                        </div>
+                        {kw.job && <div className="cvm-kw-job">{kw.job}</div>}
+                        {kw.keywords.length === 0 ? (
+                            <p className="cvm-kw-empty">{remote || assistant ? "Give your AI a job ad and ask it for the keywords an ATS will screen for — they land here. Or add your own below." : "Add the words a job ad is screened for, and see where your documents already use them."}</p>
+                        ) : (
+                            <div className="cvm-kw-list" role="listbox" aria-label="Keywords">
+                                {kw.keywords.map((term) => {
+                                    const u = kwUses.find((x) => x.keyword === term), n = u ? u[tab] : 0, elsewhere = u ? u[other] : 0;
+                                    return (
+                                        <div key={term} role="option" aria-selected={kwActive === term} className={"cvm-kw-row" + (n ? " cvm-used" : "") + (kwActive === term ? " pt-active" : "")} data-tip={n ? "Show where it's used" : elsewhere ? `Not in the ${KIND_LABEL[tab].toLowerCase()} — used in the ${KIND_LABEL[other].toLowerCase()}` : "Not used yet"} onClick={() => (n ? pickKeyword(term) : setKwActive(null))}>
+                                            {n ? <CircleCheck /> : <CircleDashed />}
+                                            <span className="cvm-kw-term">{term}</span>
+                                            {elsewhere > 0 && <span className="cvm-kw-else">{other === "letter" ? "letter" : "résumé"} ×{elsewhere}</span>}
+                                            {n > 1 && <span className="cvm-kw-n">×{n}</span>}
+                                            <button className="cvm-kw-del" aria-label={`Remove ${term}`} onClick={(e) => { e.stopPropagation(); applyKeywords(kw.keywords.filter((k) => k !== term)); }}><X /></button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                        <div className="cvm-kw-add">
+                            <input type="text" value={kwDraft} spellCheck={false} placeholder="Add a keyword…" aria-label="Add a keyword" onChange={(e) => setKwDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }} />
+                            {kw.keywords.length > 0 && <button className="cvm-kw-clear" onClick={() => applyKeywords([], "")}>Clear</button>}
+                        </div>
+                    </div>
+                );
+            })()}
             {activeBlock && blockRect && paperRect && (
                 <div className="pt-menu-pop pt-open cvm-blocktools" style={{ left: Math.max(8, paperRect.left - 52), top: Math.max(124, Math.min(window.innerHeight - 170, blockRect.top)) }} onMouseDown={keep}>
                     <button className="cvm-fbtn" data-tip="Move up" onClick={() => blockOp("up")}><ArrowUp /></button>

@@ -36,7 +36,7 @@ contextBridge.exposeInMainWorld("cvMakerAssistant", {
     status: () => ipcRenderer.invoke("assistant:status"),
     configure: () => ipcRenderer.send("assistant:configure"),
     onStatus: subscribe("assistant:status-changed"),
-    run: (request) => ipcRenderer.invoke("assistant:run", { prompt: String(request && request.prompt || ""), document: request && request.document })
+    run: (request) => ipcRenderer.invoke("assistant:run", { prompt: String(request && request.prompt || ""), document: request && request.document, keywords: request && request.keywords })
         .catch((e) => { throw new Error(String(e && e.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, "")); }),
 });
 

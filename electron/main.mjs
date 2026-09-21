@@ -370,7 +370,7 @@ async function smoke(win) {
     const init = (await rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "claude-ai", version: "0" } })).result;
     child.stdin.write(JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }) + "\n");
     fileSteps.mcpInitialized = init.serverInfo?.name === "itera" && !!init.capabilities?.tools && /get_resume/.test(init.instructions || "");
-    fileSteps.mcpTools = ((await rpc("tools/list", {})).result.tools || []).map((t) => t.name).join(",") === "get_resume,edit_resume,undo_last_edit,export_resume,list_documents,open_document,save_document,get_page_setup,set_page_setup,list_images,replace_image";
+    fileSteps.mcpTools = ((await rpc("tools/list", {})).result.tools || []).map((t) => t.name).join(",") === "get_resume,edit_resume,undo_last_edit,export_resume,list_documents,open_document,save_document,get_page_setup,set_page_setup,set_keywords,get_keywords,list_images,replace_image";
     const seen = (await tool("get_resume")).value;
     const job = seen.blocks.find((b) => b.kind === "job");
     fileSteps.mcpReadsResume = seen.blocks.length > 3 && !!job && seen.pages >= 1 && typeof seen.file === "string";
@@ -426,6 +426,14 @@ async function smoke(win) {
     // …and back: naming the résumé puts it on the sheet again, untouched by any of that
     const again = (await tool("get_resume", { document: "resume" })).value;
     fileSteps.mcpBackToResume = again.document === "resume" && again.file === "saved.html" && again.blocks.some((b) => b.kind === "job") && files.state("letter").current.endsWith("MCP Letter.html");
+    // ATS keywords: the robot sets the list, the panel shows it, counts cover BOTH documents, and the model is told which regions are two-column
+    const kws = (await tool("set_keywords", { job: "Staff Designer, Northline", keywords: ["dispatch", "MCP Hiring Team", "Kubernetes", "dispatch"] })).value;
+    const byName = Object.fromEntries((kws.keywords || []).map((k) => [k.keyword, k]));
+    fileSteps.mcpKeywords = kws.keywords.length === 3 && byName.dispatch.resume >= 1 && byName["MCP Hiring Team"].cover_letter === 1 && byName["MCP Hiring Team"].resume === 0 && kws.missing_everywhere.join() === "Kubernetes"
+        && (await js(`!!document.querySelector(".cvm-kw") && document.querySelectorAll(".cvm-kw-row").length === 3 && /Northline/.test(document.querySelector(".cvm-kw-job")?.textContent || "")`))
+        && (await tool("get_keywords")).value.keywords.length === 3;
+    fileSteps.mcpColumnsHint = again.blocks.filter((b) => b.kind === "job").every((b) => b.regions.some((r) => r.columns === 2)) && !again.blocks[0].regions.some((r) => r.columns);
+    await tool("set_keywords", { keywords: [] });
     child.kill();
 
     /* the welcome sheet: it loads, and its primary button dismisses it */

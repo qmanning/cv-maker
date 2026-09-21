@@ -8,7 +8,8 @@
 // CSS are never the model's to touch — which is what keeps the layout intact.
 import { buildBlock, topBlocks, type BlockKind } from "./cv-blocks";
 
-export interface AiRegion { id: string; html: string; list: boolean }
+/** `columns`: the region's copy flows across this many columns on the page (2 → an even number of bullets balances) */
+export interface AiRegion { id: string; html: string; list: boolean; columns?: number }
 export interface AiBlock { id: string; kind: string; regions: AiRegion[] }
 export interface AiDocument { name: string; paper: string; pages: number; fitScale: number; blocks: AiBlock[]; other: AiRegion[]; document?: "resume" | "letter" }
 
@@ -24,7 +25,7 @@ export interface CvAssistant {
     /** the shell tells the editor when those settings change */
     onStatus(handler: (status: { ready: boolean; label: string }) => void): () => void;
     /** one request: the person's words + the document → what to say back and what to change */
-    run(request: { prompt: string; document: AiDocument }): Promise<{ message: string; ops: AiOp[] }>;
+    run(request: { prompt: string; document: AiDocument; keywords?: string[] }): Promise<{ message: string; ops: AiOp[]; keywords?: string[]; job?: string }>;
 }
 
 /** The other direction: an AI app OUTSIDE the editor drives it (the desktop shell runs an MCP server for Claude
@@ -50,6 +51,9 @@ export interface CvRemoteHandlers {
     listImages(): RemoteImage[];
     /** swap one image for a data: URI (the shell read the file) — one undoable step, like an edit */
     setImage(id: string, dataUri: string, alt: string | null, by: string): Promise<{ replaced: boolean; pagesBefore: number; pagesAfter: number }>;
+    /** ATS keywords: replace the list (an AI read them off a job ad) and show the panel; resolves to how often each document uses each one */
+    setKeywords(keywords: string[], job: string | null): { job: string; keywords: { keyword: string; resume: number; letter: number }[] };
+    getKeywords(): { job: string; keywords: { keyword: string; resume: number; letter: number }[] };
     /** the full Source HTML to write to disk, and the name a new file should get — the shell does the writing */
     sourceHtml(): { html: string; suggested: string };
     /** the shell wrote the file: it is now this document's identity and nothing is unsaved */

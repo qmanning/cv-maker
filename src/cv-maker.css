@@ -186,3 +186,32 @@ body > .pt-cpick { z-index: 2100; }
 .cvm-dot { width: 8px; height: 8px; border-radius: 50%; background: #3ecf8e; box-shadow: 0 0 0 3px rgba(62, 207, 142, .18); flex: none; }
 .cvm-live .cvm-dot { animation: cvm-ask-pulse 1.4s ease-in-out infinite; }
 @media (max-width: 560px) { .cvm-ask-connect span { display: none; } }
+
+/* ATS keywords — a small floating glass panel (drag its header; reopen from the Itera menu) */
+.pt-menu-pop.cvm-kw { position: fixed; z-index: 190; width: 268px; max-height: min(70vh, 560px); display: flex; flex-direction: column; padding: var(--glass-pad, 8px); }
+.cvm-kw-head { display: flex; align-items: center; gap: 8px; padding: 4px 4px 6px 8px; cursor: grab; user-select: none; touch-action: none; }
+.cvm-kw-head:active { cursor: grabbing; }
+.cvm-kw-head > svg { width: 16px; height: 16px; color: var(--pt-text-dim); flex: none; }
+.cvm-kw-head b { font-weight: 600; font-size: 12.5px; margin-right: auto; }
+.cvm-kw-tally { font: 600 11px var(--pt-font); color: var(--pt-text-dim); border: 1px solid var(--pt-glass-brd-strong); border-radius: 999px; padding: 1px 7px; }
+.cvm-kw-x, .cvm-kw-del { flex: none; display: grid; place-items: center; width: 22px; height: 22px; padding: 0; border: none; border-radius: 50%; background: transparent; color: var(--pt-text-faint); cursor: pointer; }
+.cvm-kw-x:hover, .cvm-kw-del:hover { background: var(--pt-glass); color: var(--pt-text); }
+.cvm-kw-x svg, .cvm-kw-del svg { width: 13px; height: 13px; }
+.cvm-kw-job { padding: 0 8px 6px; color: var(--pt-text-faint); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cvm-kw-empty { margin: 2px 8px 8px; color: var(--pt-text-faint); font-size: 12px; line-height: 1.45; }
+.cvm-kw-list { overflow: auto; display: flex; flex-direction: column; gap: 1px; }
+.cvm-kw-row { display: flex; align-items: center; gap: 8px; padding: 6px 4px 6px 8px; border-radius: 10px; color: var(--pt-text-faint); cursor: default; }
+.cvm-kw-row.cvm-used { color: var(--pt-text); cursor: pointer; }
+.cvm-kw-row.cvm-used:hover, .cvm-kw-row.pt-active { background: var(--pt-accent-soft); }
+.cvm-kw-row > svg { flex: none; width: 15px; height: 15px; }
+.cvm-kw-row.cvm-used > svg { color: var(--pt-ok, #35c77a); }
+.cvm-kw-term { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; }
+.cvm-kw-n { flex: none; font: 600 11px var(--pt-font); color: var(--pt-text-dim); }
+.cvm-kw-else { flex: none; font-size: 10.5px; color: var(--pt-text-faint); }
+.cvm-kw-del { opacity: 0; } .cvm-kw-row:hover .cvm-kw-del { opacity: 1; }
+.cvm-kw-add { display: flex; gap: 6px; padding: 8px 2px 2px; }
+.cvm-kw-add input { flex: 1 1 auto; min-width: 0; height: 30px; padding: 0 10px; border-radius: var(--cvm-ctl-r); border: 1px solid var(--pt-glass-brd); background: var(--pt-glass-2); color: var(--pt-text); font: 12.5px var(--pt-font); outline: none; }
+.cvm-kw-add input:focus { border-color: var(--pt-accent); }
+.cvm-kw-clear { flex: none; height: 30px; padding: 0 10px; border-radius: var(--cvm-ctl-r); border: 1px solid var(--pt-glass-brd); background: transparent; color: var(--pt-text-dim); font: 12px var(--pt-font); cursor: pointer; }
+.cvm-kw-clear:hover { color: var(--pt-text); }
+/* (the ::highlight(cvm-kw) rule is injected by CvMaker at runtime: CSS compilers don't all parse ::highlight() yet) */

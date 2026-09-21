@@ -46,7 +46,7 @@ export function setupAssistant({ origin, editorWindow, mcp, moveToApplications =
         if (!prompt.trim() || !request?.document || typeof request.document !== "object") throw new Error("Nothing to ask.");
         const started = Date.now();
         try {
-            const out = await run({ ...settings, apiKey: apiKey() }, { prompt, document: request.document });
+            const out = await run({ ...settings, apiKey: apiKey() }, { prompt, document: request.document, keywords: Array.isArray(request.keywords) ? request.keywords.filter((k) => typeof k === "string").slice(0, 60) : [] });
             console.log(`[assistant] ${settings.provider}/${settings.model} — ${out.ops.length} op(s) in ${Date.now() - started}ms`);
             return out;
         } catch (err) { console.log(`[assistant] failed: ${err?.message || err}`); throw new Error(String(err?.message || err)); }   // a plain Error crosses IPC cleanly

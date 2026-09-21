@@ -14,6 +14,7 @@ Itera is an edit-in-place résumé editor that runs entirely in the browser. The
 - **Move, duplicate, and delete any block** — click into it and a small tool pill appears beside it.
 - **Swap any image** — click it, choose a file, and it's embedded straight into the document as a data URI. No uploads, no broken links later.
 - **A cover letter beside the résumé.** The picker at the right of the bar switches the sheet between the two. They are two documents (two files), and the letter's header *is* the résumé's: change your phone number or headline on the résumé and the letter follows. A default letter ships in `templates/sample-cover-letter.html`.
+- **ATS keywords panel.** The words a job ad is screened for, each marked used / not yet, with a ×N count and a note when only the other document uses it. Click one and every hit on the page lights up (CSS Custom Highlight — the document's markup is never touched). Add them yourself, or have your AI read the ad. Itera menu ▸ ATS keywords.
 - **US Letter and A4**, switchable any time.
 - **Fit to one page** scales the whole design down as a single unit (never below 80%) so every line still breaks exactly where it was designed to.
 - **Pagination, your way.** On: real page breaks and centered page numbers once you're past one page. Off: one continuous page, no breaks.
@@ -186,7 +187,8 @@ change lands on the sheet as one step with **Undo** beside it.
 - **No keys, no account, no network.** The AI app starts `electron/mcp/server.mjs` (dependency-free, run by
   Itera's own binary, so nobody needs Node) and that talks to the running app over a local socket only
   your user account can open. Itera itself never calls an AI service in this mode.
-- **Eleven tools**, each taking `document: "resume" | "cover_letter"` (Itera shows that one and acts on it): `get_resume`, `edit_resume`, `undo_last_edit`, `export_resume` (PDF / PNG / DOCX / HTML to Downloads), `list_documents`, `open_document`, `save_document` (`save_as` branches a copy beside the open file — tailor a copy, never the master), `get_page_setup` / `set_page_setup` (paper, fit to one page, pagination, zoom), `list_images` / `replace_image`.
+- **Thirteen tools**, each taking `document: "resume" | "cover_letter"` (Itera shows that one and acts on it): `get_resume`, `edit_resume`, `undo_last_edit`, `export_resume` (PDF / PNG / DOCX / HTML to Downloads), `list_documents`, `open_document`, `save_document` (`save_as` branches a copy beside the open file — tailor a copy, never the master), `get_page_setup` / `set_page_setup` (paper, fit to one page, pagination, zoom), `list_images` / `replace_image`, and `set_keywords` / `get_keywords` (the ATS panel: the AI reads the ad, Itera counts both documents).
+- **Layout hints, not rules.** Regions that flow in two columns are described with `columns: 2`, and the model is told an even number of bullets balances there — a default the person can override, and only where the template has such regions.
 - **It never discards your work.** `open_document` refuses while that document has unsaved changes, and `save_as` never overwrites another file.
 - **The design can't break.** The model never rewrites the file. It sees the résumé as addressable blocks
   and regions and answers with operations (set this text, add / duplicate / move / delete that block);
