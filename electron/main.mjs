@@ -5,7 +5,7 @@
 //                              template or load the ES-module chunks; a real origin also keeps localStorage)
 //   app://cv-maker/config.js   generated here: points the editor's existing `exportServer` option at ↓
 //   app://cv-maker/__export    POST — the ../server.mjs contract, answered by Electron's own Chromium (export.mjs)
-import { app, BrowserWindow, protocol, net, shell } from "electron";
+import { app, BrowserWindow, dialog, protocol, net, shell } from "electron";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -107,6 +107,19 @@ function createWindow() {
     win.webContents.session.setPermissionRequestHandler((_wc, _perm, cb) => cb(false));
     win.loadURL(ORIGIN + "/index.html");
     return win;
+}
+
+/* ---- macOS: run from Applications, not from the disk image. From the image the app gets a random temporary path
+   (App Translocation), which breaks anything that remembers where CV Maker lives — above all the MCP connection. ---- */
+function moveToApplications() {
+    if (process.platform !== "darwin" || !app.isPackaged || app.isInApplicationsFolder()) return false;
+    try { return app.moveToApplicationsFolder({ conflictHandler: (kind) => kind === "exists" ? dialog.showMessageBoxSync({ type: "question", buttons: ["Cancel", "Replace"], defaultId: 1, cancelId: 0, message: "There is already a CV Maker in your Applications folder.", detail: "Replace it with this one?" }) === 1 : true }); }
+    catch (e) { dialog.showErrorBox("Couldn't move CV Maker", String(e?.message || e) + "\n\nDrag CV Maker into Applications yourself, then open it from there."); return false; }
+}
+function offerMoveToApplications(parent) {
+    if (process.platform !== "darwin" || !app.isPackaged || SMOKE_DIR || app.isInApplicationsFolder()) return;
+    const choice = dialog.showMessageBoxSync(parent, { type: "question", buttons: ["Move to Applications", "Not Now"], defaultId: 0, cancelId: 1, message: "Move CV Maker to your Applications folder?", detail: "It is running from the disk image. Moving it lets your AI app (Claude, ChatGPT) find CV Maker every time, and you can eject the image afterwards. CV Maker will reopen from Applications." });
+    if (choice === 0) moveToApplications();
 }
 
 /* ---- the welcome sheet: shown once on first run, and from Help ▸ Welcome to CV Maker ---- */
@@ -239,7 +252,9 @@ async function smoke(win) {
     fs.writeFileSync(path.join(SMOKE_DIR, "mcp-edit.png"), (await win.webContents.capturePage()).toPNG());
     const bad = await tool("edit_resume", { summary: "x", ops: [{ op: "set_text", target: "r999", html: "<p>x</p>" }] });
     fileSteps.mcpReportsSkips = bad.value.applied === 0 && bad.value.skipped.length === 1;
-    fileSteps.mcpUndone = (await tool("undo_last_edit")).value.undone === true && (await js(`!document.querySelector(".cv-page").textContent.includes("MCP WROTE THIS")`));
+    const undone = (await tool("undo_last_edit")).value.undone === true;
+    await until("the MCP undo to show", () => js(`!document.querySelector(".cv-page").textContent.includes("MCP WROTE THIS")`), 8000);
+    fileSteps.mcpUndone = undone;
     const exported = await tool("export_resume", { format: "pdf" });
     fileSteps.mcpExported = !exported.isError && fs.existsSync(exported.value.saved) && fs.readFileSync(exported.value.saved).subarray(0, 5).toString() === "%PDF-";
     child.kill();
@@ -278,7 +293,7 @@ async function smoke(win) {
 app.whenReady().then(async () => {
     protocol.handle("app", handleApp);
     mcp = setupMcp({ editorWindow: () => editor, currentFile: () => files?.state().current || "", socketPath: SMOKE_DIR && process.platform !== "win32" ? path.join(SMOKE_DIR, "mcp.sock") : "" });
-    assistant = setupAssistant({ origin: ORIGIN, editorWindow: () => editor, mcp });
+    assistant = setupAssistant({ origin: ORIGIN, editorWindow: () => editor, mcp, moveToApplications });
     files = setupFiles({ onAssistant: () => assistant.openSettings(), templatePath: path.join(ROOT, "templates", "sample-resume.html"), smokeDir: SMOKE_DIR, onWelcome: () => showWelcome(BrowserWindow.getAllWindows().find((w) => w !== welcome)) });
     const win = createWindow();
     win.webContents.once("did-finish-load", () => openWhenReady.splice(0).forEach((f) => files.openPath(f)));
@@ -289,7 +304,7 @@ app.whenReady().then(async () => {
         app.exit(result.ok ? 0 : 1);
         return;
     }
-    win.webContents.once("did-finish-load", () => welcomeOnFirstRun(win));
+    win.webContents.once("did-finish-load", () => { offerMoveToApplications(win); welcomeOnFirstRun(win); });
     app.on("activate", () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
 

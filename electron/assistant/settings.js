@@ -48,6 +48,7 @@
 
     /* ---- the no-key way: your own AI app, over MCP ---- */
     function paintMcp(m) {
+        $("needs-move").hidden = !m.needsMove; $("needs-move-text").textContent = m.needsMove;
         const c = m.claude, pill = $("claude-pill");
         pill.textContent = c.connected ? (c.current ? "Connected" : "Needs reconnecting") : ""; pill.className = "pill" + (c.connected && c.current ? " on" : "");
         $("claude-sub").textContent = !c.installed ? "Claude Desktop isn't installed on this computer. Get it free at claude.ai/download, then come back."
@@ -66,10 +67,12 @@
         $("codex-connect").hidden = x.connected && x.current; $("codex-connect").disabled = !x.installed;
         $("codex-connect").textContent = x.connected ? "Reconnect ChatGPT / Codex" : "Connect ChatGPT / Codex";
         $("codex-disconnect").hidden = !x.connected; $("codex-steps").hidden = !(x.connected && x.current);
+        if (m.needsMove) { $("claude-connect").disabled = true; $("codex-connect").disabled = true; $("copy-json").disabled = true; $("copy-cc").disabled = true; }
         const live = $("live-pill"); live.textContent = m.clients ? (m.clients === 1 ? "1 app connected right now" : m.clients + " apps connected right now") : ""; live.className = "pill" + (m.clients ? " on" : "");
     }
     const flash = (t) => { $("copied").textContent = t; setTimeout(() => { $("copied").textContent = ""; }, 1800); };
     paintMcp(await api.mcp.state()); api.mcp.onChange(paintMcp);
+    $("move-now").addEventListener("click", () => api.mcp.moveToApplications());
     $("claude-connect").addEventListener("click", async () => { try { paintMcp(await api.mcp.connectClaude()); } catch (e) { $("claude-sub").textContent = clean(e); } });
     $("claude-disconnect").addEventListener("click", async () => paintMcp(await api.mcp.disconnectClaude()));
     $("codex-connect").addEventListener("click", async () => { try { paintMcp(await api.mcp.connectCodex()); } catch (e) { $("codex-sub").textContent = clean(e); } });

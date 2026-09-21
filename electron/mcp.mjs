@@ -66,6 +66,10 @@ export function setupMcp({ editorWindow, currentFile, socketPath = "" }) {
 
     /* ---- how an AI app should start the server: this app's own binary, as plain Node ---- */
     const serverScript = app.isPackaged ? path.join(process.resourcesPath, "mcp", "server.mjs") : path.join(here, "mcp", "server.mjs");
+    // macOS runs a quarantined app that hasn't been moved by the person from a random, temporary, read-only path
+    // ("App Translocation"), and a disk image goes away when ejected — neither is a path to hand to another app
+    const temporaryHome = () => app.isPackaged && (/\/AppTranslocation\//.test(process.execPath) || process.execPath.startsWith("/Volumes/"));
+    const needsMove = "Move CV Maker into your Applications folder and open it from there first. Right now it is running from the disk image, so your AI app would lose track of it after a restart.";
     const entry = () => ({ command: process.execPath, args: [serverScript], env: { ELECTRON_RUN_AS_NODE: "1" } });
 
     const claudeConfigPath = () => process.env.CVM_CLAUDE_CONFIG ? process.env.CVM_CLAUDE_CONFIG : process.platform === "darwin" ? path.join(os.homedir(), "Library", "Application Support", "Claude", "claude_desktop_config.json")
@@ -78,6 +82,7 @@ export function setupMcp({ editorWindow, currentFile, socketPath = "" }) {
         return { installed, connected: !!mine, current };
     }
     function connectClaude() {
+        if (temporaryHome()) throw new Error(needsMove);
         const file = claudeConfigPath();
         if (!fs.existsSync(path.dirname(file))) throw new Error("Claude Desktop doesn't seem to be installed on this computer.");
         let config = {};
@@ -109,6 +114,7 @@ export function setupMcp({ editorWindow, currentFile, socketPath = "" }) {
         return { installed, connected, current: connected && raw.includes(`command = ${JSON.stringify(entry().command)}`) && raw.includes(JSON.stringify(entry().args[0])) };
     }
     function connectCodex() {
+        if (temporaryHome()) throw new Error(needsMove);
         const file = codexConfigPath();
         if (!fs.existsSync(path.dirname(file))) throw new Error("ChatGPT / Codex doesn't seem to be set up on this computer yet.");
         const raw = readCodex() ?? "";
@@ -126,7 +132,7 @@ export function setupMcp({ editorWindow, currentFile, socketPath = "" }) {
     return {
         codexState, connectCodex, disconnectCodex,
         socket: SOCKET, entry, claudeState, connectClaude, disconnectClaude,
-        state: () => ({ claude: claudeState(), codex: codexState(), codexCommand: `codex mcp add ${SERVER_NAME} --env ELECTRON_RUN_AS_NODE=1 -- ${JSON.stringify(entry().command)} ${JSON.stringify(entry().args[0])}`, clients, lastSeen, snippet: JSON.stringify({ mcpServers: { [SERVER_NAME]: entry() } }, null, 2), claudeCode: `claude mcp add ${SERVER_NAME} --env ELECTRON_RUN_AS_NODE=1 -- ${JSON.stringify(entry().command)} ${JSON.stringify(entry().args[0])}` }),
+        state: () => ({ needsMove: temporaryHome() ? needsMove : "", claude: claudeState(), codex: codexState(), codexCommand: `codex mcp add ${SERVER_NAME} --env ELECTRON_RUN_AS_NODE=1 -- ${JSON.stringify(entry().command)} ${JSON.stringify(entry().args[0])}`, clients, lastSeen, snippet: JSON.stringify({ mcpServers: { [SERVER_NAME]: entry() } }, null, 2), claudeCode: `claude mcp add ${SERVER_NAME} --env ELECTRON_RUN_AS_NODE=1 -- ${JSON.stringify(entry().command)} ${JSON.stringify(entry().args[0])}` }),
         onChange: (fn) => { listeners.add(fn); return () => listeners.delete(fn); },
         revealClaudeConfig: () => shell.showItemInFolder(claudeConfigPath()),
     };
