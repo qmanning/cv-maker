@@ -449,6 +449,9 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
         } catch (e) { setAiReply({ message: e instanceof Error ? e.message : "Your AI could not be reached.", undo: null, note: "" }); setAsk(prompt); }
         finally { setAiBusy(""); }
     }, [assistant, aiBusy, aiStatus, serialize, touch]);
+    // every entry is a whole copy of the document, and a résumé with a photo embedded as a data URI can be megabytes —
+    // so the history is bounded by SIZE as well as by count (the newest step always survives)
+    const trimUndo = (stack: Source[]) => { let bytes = stack.reduce((n, e) => n + e.html.length + e.css.length, 0); while (stack.length > 1 && (stack.length > 30 || bytes > 24_000_000)) { const gone = stack.shift()!; bytes -= gone.html.length + gone.css.length; } };
     const remoteUndo = useRef<Source[]>([]);   // edits made from outside (see the remote handlers below)
     const undoAssistant = useCallback(() => { if (aiReply?.undo) { setSource(aiReply.undo); setDirty(true); touch(); say("Undone"); remoteUndo.current.pop(); } setAiReply(null); }, [aiReply, say, touch]);
 
@@ -465,7 +468,7 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
             const before: Source = { css: src.css, html: serialize() }, pagesBefore = stateRef.current.pages;
             const out = applyOps(before.html, ops);
             if (out.applied) {
-                remoteUndo.current.push(before); if (remoteUndo.current.length > 30) remoteUndo.current.shift();
+                remoteUndo.current.push(before); trimUndo(remoteUndo.current);
                 setSource({ css: src.css, html: out.html }); setDirty(true);
                 await new Promise((r) => window.setTimeout(r, 700));   // remount + paginate, so the caller learns whether it still fits
                 touch();
