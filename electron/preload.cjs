@@ -40,6 +40,9 @@ ipcRenderer.on("remote:call", async (_e, { id, method, args }) => {
 // AI ▸ Ask Your AI… (⌘K): the menu's accelerator swallows the key press, so the shell asks us to focus the prompt bar
 ipcRenderer.on("assistant:focus", () => { const box = document.querySelector(".cvm-ask textarea"); if (box) box.focus(); });
 
+// View ▸ Zoom In / Zoom Out / Fit Width, chosen with the mouse: the editor listens for these (see CvMaker's zoomBy)
+ipcRenderer.on("view:zoom", (_e, which) => { if (["in", "out", "fit"].includes(which)) window.dispatchEvent(new Event("cvm:zoom-" + which)); });
+
 // drop a résumé file anywhere on the window to open it (the page never sees the path; the shell reads the file)
 window.addEventListener("dragover", (e) => { if (e.dataTransfer && Array.from(e.dataTransfer.types).includes("Files")) e.preventDefault(); });
 window.addEventListener("drop", (e) => {

@@ -212,6 +212,18 @@ async function smoke(win) {
     fs.writeFileSync(savedFile, onDisk.replace("Typed In Smoke", "Edited By Another Program"));
     await until("the sheet to follow the file", () => js(`document.querySelector(".cv-page").textContent.includes("Edited By Another Program")`));
     fileSteps.followedExternalEdit = true; fileSteps.cleanAfterReload = !files.state().dirty;
+    /* ⌘+ / ⌘− zoom the sheet by its %, from the keyboard and from the View menu */
+    const pct = () => js(`parseInt((document.querySelector(".pt-dim-scale")?.textContent || "").replace(/[^0-9]/g, ""), 10)`);
+    const z0 = await pct();
+    win.webContents.sendInputEvent({ type: "keyDown", keyCode: "=", modifiers: [process.platform === "darwin" ? "meta" : "control"] });
+    await until("⌘+ to zoom the sheet in", async () => (await pct()) > z0, 6000);
+    const z1 = await pct();
+    win.webContents.send("view:zoom", "out");
+    await until("View ▸ Zoom Out to zoom the sheet out", async () => (await pct()) < z1, 6000);
+    win.webContents.send("view:zoom", "fit");
+    await until("Fit Width to restore the fit", async () => (await pct()) === z0, 6000);
+    fileSteps.zoomKeys = true;
+
     /* ask your AI, against a fake OpenAI-compatible server in this process: words in → the sheet changes → Undo puts it back */
     const http = await import("node:http");
     let asked = null;
