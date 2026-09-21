@@ -5,7 +5,7 @@
 //                              template or load the ES-module chunks; a real origin also keeps localStorage)
 //   app://itera/config.js   generated here: points the editor's existing `exportServer` option at ↓
 //   app://itera/__export    POST — the ../server.mjs contract, answered by Electron's own Chromium (export.mjs)
-import { app, BrowserWindow, dialog, Menu, protocol, net, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, net, shell } from "electron";
 import fs from "node:fs";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
@@ -168,6 +168,59 @@ function welcomeOnFirstRun(parent) {
     if (fs.existsSync(flag)) return;
     try { fs.writeFileSync(flag, new Date().toISOString()); } catch { /* it will just show again */ }
     showWelcome(parent);
+}
+
+/* ---- leak check (npm run leaks): hammer the paths that allocate — remounting the document through MCP edits and undos,
+   exports (a throwaway window each), the Settings window, zoom — then force GC and compare with a warmed-up baseline ---- */
+async function leakCheck(win) {
+    const { spawn } = await import("node:child_process");
+    const js = (code) => win.webContents.executeJavaScript(code, true);
+    const until = async (what, fn, ms = 30000) => { const t = Date.now(); while (Date.now() - t < ms) { if (await fn()) return; await new Promise((r) => setTimeout(r, 100)); } throw new Error("timed out waiting for " + what); };
+    await until("the editor", () => js(`!!document.querySelector(".cv-page [data-cv-edit]")`));
+    const dbg = win.webContents.debugger; dbg.attach("1.3"); await dbg.sendCommand("Performance.enable"); await dbg.sendCommand("HeapProfiler.enable");
+    const measure = async () => {
+        for (let i = 0; i < 3; i++) { await dbg.sendCommand("HeapProfiler.collectGarbage"); await new Promise((r) => setTimeout(r, 150)); }
+        global.gc?.();
+        const m = Object.fromEntries((await dbg.sendCommand("Performance.getMetrics")).metrics.map((x) => [x.name, x.value]));
+        return { pageHeapMB: +(m.JSHeapUsedSize / 1048576).toFixed(2), domNodes: m.Nodes, listeners: m.JSEventListeners, documents: m.Documents, frames: m.Frames,
+            editors: await js(`document.querySelectorAll(".ProseMirror").length`), styleTags: await js(`document.querySelectorAll("style, link[rel=stylesheet]").length`),
+            mainHeapMB: +(process.memoryUsage().heapUsed / 1048576).toFixed(2), mainRssMB: +(process.memoryUsage().rss / 1048576).toFixed(1), windows: BrowserWindow.getAllWindows().length,
+            ipcListeners: ["remote:result", "files:dirty", "files:open", "assistant:configure"].reduce((n, c) => n + ipcMain.listenerCount(c), 0) };
+    };
+    const started = mcp.entry();
+    const child = spawn(started.command, started.args, { env: { ...process.env, ...started.env, CVM_MCP_SOCKET: mcp.socket }, stdio: ["pipe", "pipe", "inherit"] });
+    const answers = new Map(); let buf = "", rpcId = 0;
+    child.stdout.on("data", (d) => { buf += d; let i; while ((i = buf.indexOf("\n")) >= 0) { const line = buf.slice(0, i); buf = buf.slice(i + 1); try { const m = JSON.parse(line); const fn = answers.get(m.id); answers.delete(m.id); fn?.(m); } catch { /* not ours */ } } });
+    const rpc = (method, params) => new Promise((resolve) => { const id = ++rpcId; answers.set(id, resolve); child.stdin.write(JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n"); });
+    const tool = async (name, args = {}) => JSON.parse((await rpc("tools/call", { name, arguments: args })).result.content[0].text);
+    await rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "leak-check", version: "0" } });
+    const round = async (i) => {
+        const doc = await tool("get_resume"), job = doc.blocks.find((b) => b.kind === "job");
+        await tool("edit_resume", { summary: "round " + i, ops: [{ op: "set_text", target: job.regions[0].id, html: `<p>Round ${i} ${"x".repeat(40)}</p>` }, { op: "insert_block", target: job.id, kind: "experience", fill: ["<p>Temp</p>", "<p>2020</p>", "<ul><li><p>one</p></li><li><p>two</p></li></ul>"] }] });
+        await tool("undo_last_edit");
+        win.webContents.send("view:zoom", i % 2 ? "in" : "out");
+        if (i % 5 === 0) { await tool("export_resume", { format: i % 10 === 0 ? "png" : "pdf" }); }
+        if (i % 4 === 0) {
+            assistant.openSettings();
+            const panel = BrowserWindow.getAllWindows().find((w) => w !== win && w.webContents.getURL().includes("/__assistant/") || (w !== win && w.getTitle() === "Settings"));
+            if (!panel) throw new Error("the Settings window did not open");
+            await until("settings to load", () => panel.isDestroyed() || (!panel.webContents.isLoading() && panel.webContents.getURL().includes("/__assistant/")), 15000);
+            if (!panel.isDestroyed()) panel.destroy();
+            await new Promise((r) => setTimeout(r, 120));
+        }
+    };
+    const ROUNDS = Number(process.env.CVM_LEAK_ROUNDS || 40);
+    for (let i = 1; i <= 6; i++) await round(i);                                 // warm-up: caches, JIT, lazy chunks
+    win.webContents.send("view:zoom", "fit"); await new Promise((r) => setTimeout(r, 900));
+    const before = await measure();
+    for (let i = 1; i <= ROUNDS; i++) await round(i);
+    win.webContents.send("view:zoom", "fit"); await new Promise((r) => setTimeout(r, 900));
+    const middle = await measure();
+    for (let i = 1; i <= ROUNDS; i++) await round(i);
+    win.webContents.send("view:zoom", "fit"); await new Promise((r) => setTimeout(r, 900));
+    const after = await measure();
+    child.kill(); dbg.detach();
+    return { leak: { rounds: ROUNDS, before, middle, after } };
 }
 
 /* ---- smoke, second launch: the app comes back with the same file open, showing what's on disk, nothing unsaved ---- */
@@ -348,8 +401,8 @@ app.whenReady().then(async () => {
     win.webContents.once("did-finish-load", () => openWhenReady.splice(0).forEach((f) => files.openPath(f)));
     if (SMOKE_DIR) {
         let result;
-        try { result = { ok: true, ...(await (process.env.CVM_SMOKE_RELAUNCH ? smokeRelaunch(win) : smoke(win))) }; } catch (e) { result = { ok: false, error: String(e?.message || e) }; }
-        fs.writeFileSync(path.join(SMOKE_DIR, process.env.CVM_SMOKE_RELAUNCH ? "relaunch.json" : "result.json"), JSON.stringify(result, null, 2));
+        try { result = { ok: true, ...(await (process.env.CVM_LEAK ? leakCheck(win) : process.env.CVM_SMOKE_RELAUNCH ? smokeRelaunch(win) : smoke(win))) }; } catch (e) { result = { ok: false, error: String(e?.message || e) }; }
+        fs.writeFileSync(path.join(SMOKE_DIR, process.env.CVM_LEAK ? "leak.json" : process.env.CVM_SMOKE_RELAUNCH ? "relaunch.json" : "result.json"), JSON.stringify(result, null, 2));
         app.exit(result.ok ? 0 : 1);
         return;
     }

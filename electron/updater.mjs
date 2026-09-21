@@ -35,12 +35,18 @@ export function setupUpdater({ editorWindow, installedCopy, runningFromInstall }
         return pickAssets(await res.json(), process.platform, process.arch);
     }
 
-    async function download(url, onProgress) {
+    // straight to disk: a release archive is ~130 MB, and collecting it in memory first would briefly hold it twice
+    async function downloadTo(file, url, onProgress) {
         const res = await fetch(url, { headers: { "user-agent": `Itera/${app.getVersion()}`, accept: "application/octet-stream" }, signal: AbortSignal.timeout(20 * 60 * 1000) });
         if (!res.ok || !res.body) throw new Error(`the download failed (${res.status})`);
-        const total = Number(res.headers.get("content-length")) || 0, chunks = []; let got = 0;
-        for await (const chunk of res.body) { got += chunk.length; if (got > MAX_BYTES) throw new Error("the download is implausibly large"); chunks.push(chunk); onProgress?.(total ? got / total : 2); }
-        return Buffer.concat(chunks);
+        const total = Number(res.headers.get("content-length")) || 0, out = fs.createWriteStream(file); let got = 0;
+        try {
+            for await (const chunk of res.body) {
+                got += chunk.length; if (got > MAX_BYTES) throw new Error("the download is implausibly large");
+                if (!out.write(chunk)) await new Promise((r) => out.once("drain", r));
+                onProgress?.(total ? got / total : 2);
+            }
+        } finally { await new Promise((r) => out.end(r)); }
     }
 
     async function install(update) {
@@ -48,9 +54,10 @@ export function setupUpdater({ editorWindow, installedCopy, runningFromInstall }
         const stage = fs.mkdtempSync(path.join(parent, ".itera-update-"));
         try {
             w?.setProgressBar(2);
-            const [archive, sig] = await Promise.all([download(update.url, (p) => w?.setProgressBar(p)), download(update.sigUrl)]);
-            if (!verifyUpdate(archive, sig.toString("utf8"))) throw new Error("the download isn't signed by Itera's publisher, so it was thrown away");
-            const zip = path.join(stage, "update.zip"); fs.writeFileSync(zip, archive);
+            const zip = path.join(stage, "update.zip"), sigFile = path.join(stage, "update.zip.sig");
+            await Promise.all([downloadTo(zip, update.url, (p) => w?.setProgressBar(p)), downloadTo(sigFile, update.sigUrl)]);
+            if (fs.statSync(sigFile).size > 4096 || !verifyUpdate(fs.readFileSync(zip), fs.readFileSync(sigFile, "utf8"))) throw new Error("the download isn't signed by Itera's publisher, so it was thrown away");
+            fs.rmSync(sigFile);
             const run = (cmd, args) => { const r = spawnSync(cmd, args, { encoding: "utf8" }); if (r.status !== 0) throw new Error((r.stderr || r.error?.message || cmd + " failed").trim().split("\n")[0]); return r.stdout.trim(); };
             run("/usr/bin/ditto", ["-x", "-k", zip, stage]); fs.rmSync(zip);
             const fresh = path.join(stage, path.basename(dest));

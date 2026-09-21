@@ -14,7 +14,8 @@
         "smoke": "node smoke.mjs",
         "icon": "electron build/make-icon.mjs",
         "dist": "electron-builder --mac",
-        "dist:win": "electron-builder --win"
+        "dist:win": "electron-builder --win",
+        "leaks": "node leaks.mjs"
     },
     "devDependencies": {
         "electron": "^44.4.3",
