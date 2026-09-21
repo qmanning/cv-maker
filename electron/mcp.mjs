@@ -7,12 +7,15 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import readline from "node:readline";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { renderExport } from "./export.mjs";
 import { normalize } from "./assistant/prompt.mjs";
-import { INSTRUCTIONS, TOOLS, callTool } from "./mcp/catalog.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
+// catalog.mjs ships LOOSE beside mcp/server.mjs (extraResources), not inside the asar — the app and the stdio server share
+// the one file. electron-builder keeps that mcp/ folder out of the asar, so import it by absolute path from where it really
+// is, whether Itera runs packaged (process.resourcesPath) or from source (here).
+const { INSTRUCTIONS, TOOLS, callTool } = await import(pathToFileURL(app.isPackaged ? path.join(process.resourcesPath, "mcp", "catalog.mjs") : path.join(here, "mcp", "catalog.mjs")).href);
 const SERVER_NAME = "itera";
 const LEGACY_NAMES = ["cv-maker"];   // what this app called itself until September 2026 — cleaned up whenever we write a config
 

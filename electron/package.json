@@ -39,7 +39,6 @@
             "welcome.html",
             "assistant.mjs",
             "mcp.mjs",
-            "mcp/catalog.mjs",
             "updater.mjs",
             "updater-core.mjs",
             "assistant/**",
