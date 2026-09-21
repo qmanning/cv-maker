@@ -11,7 +11,7 @@ const MAX_FILE = 25 * 1024 * 1024;
 const FILTERS = [{ name: "Résumé (HTML)", extensions: ["html", "htm"] }];
 const hash = (text) => crypto.createHash("sha1").update(text).digest("hex");
 
-export function setupFiles({ templatePath, smokeDir = "", onWelcome = () => {}, onAssistant = () => {} }) {
+export function setupFiles({ templatePath, smokeDir = "", onWelcome = () => {}, onAssistant = () => {}, updates = null }) {
     const statePath = () => path.join(app.getPath("userData"), "files.json");
     let win = null, current = "", dirty = false, known = "", watcher = null, watchTimer = null, closeAfterSave = false, recent = [];
     try { const s = JSON.parse(fs.readFileSync(statePath(), "utf8")); recent = (s.recent || []).filter((p) => typeof p === "string"); if (s.current && fs.existsSync(s.current)) current = s.current; } catch { /* first run */ }
@@ -96,9 +96,14 @@ export function setupFiles({ templatePath, smokeDir = "", onWelcome = () => {}, 
 
     function buildMenu() {
         const mac = process.platform === "darwin";
+        const updateItems = updates ? [{ label: "Check for Updates…", click: () => updates.check() }, { label: "Check Automatically", type: "checkbox", checked: updates.auto(), click: (item) => updates.setAuto(item.checked) }] : [];
         const openRecent = recent.filter((p) => fs.existsSync(p)).map((p) => ({ label: path.basename(p), sublabel: path.dirname(p), toolTip: p, click: () => openPath(p) }));
         Menu.setApplicationMenu(Menu.buildFromTemplate([
-            ...(mac ? [{ role: "appMenu" }] : []),
+            ...(mac ? [{ label: app.name, submenu: [
+                { role: "about" },
+                ...updateItems,
+                { type: "separator" }, { role: "services" }, { type: "separator" }, { role: "hide" }, { role: "hideOthers" }, { role: "unhide" }, { type: "separator" }, { role: "quit" },
+            ] }] : []),
             { label: "File", submenu: [
                 { label: "New Résumé", accelerator: "CmdOrCtrl+N", click: newDocument },
                 { label: "Open…", accelerator: "CmdOrCtrl+O", click: openDialog },
@@ -120,7 +125,7 @@ export function setupFiles({ templatePath, smokeDir = "", onWelcome = () => {}, 
                 { type: "separator" },
                 { role: "togglefullscreen" }, ...(app.isPackaged ? [] : [{ type: "separator" }, { role: "reload" }, { role: "toggleDevTools" }])] },
             { role: "windowMenu" },
-            { role: "help", submenu: [{ label: "Welcome to Itera", click: () => onWelcome() }, { type: "separator" }, { label: "Itera on the Web", click: () => shell.openExternal("https://qmanning.com/labs/itera") }, { label: "Source on GitHub", click: () => shell.openExternal("https://github.com/qmanning/itera") }] },
+            { role: "help", submenu: [{ label: "Welcome to Itera", click: () => onWelcome() }, ...(mac ? [] : [{ type: "separator" }, ...updateItems]), { type: "separator" }, { label: "Itera on the Web", click: () => shell.openExternal("https://qmanning.com/labs/itera") }, { label: "Source on GitHub", click: () => shell.openExternal("https://github.com/qmanning/itera") }] },
         ]));
     }
 

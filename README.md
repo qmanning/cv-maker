@@ -155,8 +155,10 @@ or run it from source (above) — same editor, and neither shows a warning.
 - **Windows** — on *"Windows protected your PC"*, click **More info → Run anyway**.
 
 Build the installers yourself with `npm run dist` (macOS) or `npm run dist:win`; pushing a `v*` tag
-makes GitHub build both and attach them to a draft release. Unsigned also means no auto-update:
-grab the next version from Releases.
+makes GitHub build both and attach them to a draft release. **Updates:** once installed, Itera checks this repo's Releases when it starts and offers to update itself —
+it downloads the new version, verifies it is signed by Itera's publisher, installs it and reopens, with no second
+macOS warning. *Itera ▸ Check for Updates…* asks now; *Check Automatically* turns the check off. That check is the
+only network request Itera makes on its own. (Windows: the dialog opens the download page for now.) See `RELEASING.md`.
 
 Exports render in a throwaway window with JavaScript off and every network request refused, the same
 posture as `server.mjs`. `npm run smoke` launches the app hidden, exports a PDF and a PNG through the
