@@ -11,6 +11,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { renderExport, validExportBody, EXPORT_SCHEME } from "./export.mjs";
 import { setupFiles } from "./files.mjs";
+import { setupAssistant } from "./assistant.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = app.isPackaged ? path.join(here, "web") : path.resolve(here, "..");   // the prebuilt folder (electron-builder copies it to web/)
@@ -21,7 +22,7 @@ const SMOKE_DIR = process.env.CVM_SMOKE_DIR || "";           // set by smoke.mjs
 
 if (SMOKE_DIR) app.setPath("userData", path.join(SMOKE_DIR, "userData"));   // a clean profile: no leftovers in, none out
 app.setName("CV Maker");
-let files = null;
+let files = null, assistant = null, editor = null;
 const openWhenReady = [];                                    // macOS can deliver open-file (double-clicked document, Dock drop) before we're ready
 app.on("open-file", (e, file) => { e.preventDefault(); if (files) files.openPath(file); else openWhenReady.push(file); });
 
@@ -68,9 +69,10 @@ async function handleApp(req) {
     if (req.method !== "GET" && req.method !== "HEAD") return new Response("", { status: 405 });
     if (url.pathname.startsWith("/__welcome/")) {   // the sheet's two buttons are plain links to here: act, close it, navigate nowhere
         const sheet = welcome; welcome = null;
-        setImmediate(() => { if (sheet && !sheet.isDestroyed()) sheet.close(); if (url.pathname === "/__welcome/open") files.openDialog(); });
+        setImmediate(() => { if (sheet && !sheet.isDestroyed()) sheet.close(); if (url.pathname === "/__welcome/open") files.openDialog(); if (url.pathname === "/__welcome/connect") assistant.openSettings(); });
         return new Response(null, { status: 204 });
     }
+    if (url.pathname.startsWith("/__assistant/")) return assistant?.serve(url.pathname) || new Response("", { status: 404 });
     if (url.pathname === "/welcome.html") {   // the first-run sheet; ⌘ reads Ctrl off the Mac
         const html = fs.readFileSync(path.join(here, "welcome.html"), "utf8").replaceAll("⌘", process.platform === "darwin" ? "⌘" : "Ctrl+");
         return new Response(html, { headers: { "content-type": "text/html; charset=utf-8", "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'" } });
@@ -95,7 +97,8 @@ function createWindow() {
         show: !SMOKE_DIR, backgroundColor: "#111214", title: "CV Maker",
         webPreferences: { preload: path.join(here, "preload.cjs"), contextIsolation: true, nodeIntegration: false, sandbox: true, spellcheck: true, backgroundThrottling: !SMOKE_DIR },
     });
-    files.attach(win);
+    files.attach(win); editor = win;
+    win.on("closed", () => { if (editor === win) editor = null; });
     // the editor never leaves its origin: real links open in the user's browser, everything else is refused
     const external = (u) => { if (/^https?:\/\//i.test(u)) shell.openExternal(u); };
     win.webContents.setWindowOpenHandler(({ url }) => { external(url); return { action: "deny" }; });
@@ -111,7 +114,7 @@ function showWelcome(parent) {
     if (!parent || parent.isDestroyed()) return;
     if (welcome && !welcome.isDestroyed()) return welcome.focus();
     welcome = new BrowserWindow({
-        parent, modal: true, show: false, width: 600, height: 620, useContentSize: true, resizable: false, minimizable: false, maximizable: false, fullscreenable: false,
+        parent, modal: true, show: false, width: 620, height: 680, useContentSize: true, resizable: false, minimizable: false, maximizable: false, fullscreenable: false,
         backgroundColor: "#14161c", title: "Welcome to CV Maker",
         webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, javascript: false },
     });
@@ -172,6 +175,44 @@ async function smoke(win) {
     fs.writeFileSync(savedFile, onDisk.replace("Typed In Smoke", "Edited By Another Program"));
     await until("the sheet to follow the file", () => js(`document.querySelector(".cv-page").textContent.includes("Edited By Another Program")`));
     fileSteps.followedExternalEdit = true; fileSteps.cleanAfterReload = !files.state().dirty;
+    /* ask your AI, against a fake OpenAI-compatible server in this process: words in → the sheet changes → Undo puts it back */
+    const http = await import("node:http");
+    let asked = null;
+    const fake = http.createServer((req, res) => {
+        let body = ""; req.on("data", (c) => { body += c; }); req.on("end", () => {
+            asked = JSON.parse(body);
+            const args = { message: "I rewrote the first line.", ops: [{ op: "set_text", target: "r0", html: '<p onclick="alert(1)">AI WROTE THIS<script>1</script></p>', kind: "", fill: [], to: "" }] };
+            res.writeHead(200, { "content-type": "application/json" });
+            res.end(JSON.stringify({ choices: [{ message: { role: "assistant", content: null, tool_calls: [{ id: "c1", type: "function", function: { name: "edit_resume", arguments: JSON.stringify(args) } }] } }] }));
+        });
+    });
+    await new Promise((r) => fake.listen(0, "127.0.0.1", r));
+    // set it up the way a person would: AI Settings → Something else → custom server → Test → Save
+    assistant.openSettings();
+    const panel = BrowserWindow.getAllWindows().find((w) => w.getTitle() === "AI Settings" || w.webContents.getURL().includes("/__assistant/"));
+    const pjs = (code) => panel.webContents.executeJavaScript(code, true);
+    await until("AI Settings to load", async () => !panel.webContents.isLoading() && (await pjs(`!!document.querySelector("#preset option")`)));
+    await pjs(`(() => { const r = document.querySelector('input[value="openai-compatible"]'); r.checked = true; r.dispatchEvent(new Event("change")); const p = document.getElementById("preset"); p.value = "custom"; p.dispatchEvent(new Event("change")); document.getElementById("baseUrl").value = "http://127.0.0.1:${fake.address().port}/v1"; document.getElementById("modelText").value = "smoke-model"; document.getElementById("test").click(); })()`);
+    await until("the connection test", () => pjs(`document.getElementById("result").className === "ok"`));
+    fileSteps.aiSettingsTest = await pjs(`document.getElementById("result").textContent`);
+    fs.writeFileSync(path.join(SMOKE_DIR, "ai-settings.png"), (await panel.webContents.capturePage()).toPNG());
+    await pjs(`document.getElementById("save").click()`);
+    await until("AI Settings to close", () => panel.isDestroyed());
+    fileSteps.aiConfigured = assistant.status().ready;
+    await until("the prompt bar to be ready", () => js(`!!document.querySelector(".cvm-ask textarea") && /Ask your AI/.test(document.querySelector(".cvm-ask textarea").placeholder)`));
+    await js(`(() => { const box = document.querySelector(".cvm-ask textarea"); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set.call(box, "Make the first line say AI WROTE THIS"); box.dispatchEvent(new Event("input", { bubbles: true })); })()`);
+    await js(`document.querySelector(".cvm-ask").requestSubmit()`);
+    await until("the AI's edit to land", () => js(`document.querySelector(".cv-page").textContent.includes("AI WROTE THIS") && !!document.querySelector(".cvm-ask-reply")`));
+    fileSteps.aiEdited = true;
+    fileSteps.aiSawDocument = /<resume>/.test(asked?.messages?.[1]?.content || "") && asked?.tools?.[0]?.function?.name === "edit_resume" && !("authorization" in (asked.headers || {}));
+    fileSteps.aiHtmlCleaned = await js(`!document.querySelector(".cv-page [onclick]") && !document.querySelector(".cv-page script")`);
+    fileSteps.aiReply = await js(`document.querySelector(".cvm-ask-reply p").textContent`);
+    fs.writeFileSync(path.join(SMOKE_DIR, "assistant.png"), (await win.webContents.capturePage()).toPNG());
+    await js(`[...document.querySelectorAll(".cvm-ask-reply button")].find((b) => b.textContent.includes("Undo")).click()`);
+    await until("Undo to put it back", () => js(`!document.querySelector(".cv-page").textContent.includes("AI WROTE THIS")`));
+    fileSteps.aiUndone = true;
+    fake.close();
+
     /* the welcome sheet: it loads, and its primary button dismisses it */
     showWelcome(win);
     const sheet = welcome;
@@ -187,7 +228,8 @@ async function smoke(win) {
 
 app.whenReady().then(async () => {
     protocol.handle("app", handleApp);
-    files = setupFiles({ templatePath: path.join(ROOT, "templates", "sample-resume.html"), smokeDir: SMOKE_DIR, onWelcome: () => showWelcome(BrowserWindow.getAllWindows().find((w) => w !== welcome)) });
+    assistant = setupAssistant({ origin: ORIGIN, editorWindow: () => editor });
+    files = setupFiles({ onAssistant: () => assistant.openSettings(), templatePath: path.join(ROOT, "templates", "sample-resume.html"), smokeDir: SMOKE_DIR, onWelcome: () => showWelcome(BrowserWindow.getAllWindows().find((w) => w !== welcome)) });
     const win = createWindow();
     win.webContents.once("did-finish-load", () => openWhenReady.splice(0).forEach((f) => files.openPath(f)));
     if (SMOKE_DIR) {

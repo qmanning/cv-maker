@@ -35,6 +35,8 @@
             "files.mjs",
             "preload.cjs",
             "welcome.html",
+            "assistant.mjs",
+            "assistant/**",
             "package.json",
             {
                 "from": "..",
@@ -120,5 +122,8 @@
             "allowToChangeInstallationDirectory": true
         },
         "publish": null
+    },
+    "dependencies": {
+        "@anthropic-ai/sdk": "^0.127.0"
     }
 }

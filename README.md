@@ -157,6 +157,27 @@ posture as `server.mjs`. `npm run smoke` launches the app hidden, exports a PDF 
 real UI, and — if puppeteer is resolvable (or `CVM_PUPPETEER_FROM=/path/with/node_modules`) — compares
 the PDF with puppeteer's, text run by text run. It isn't signed or auto-updating yet.
 
+**Ask your own AI to change it.** This is what the desktop app is for. A prompt bar sits under the
+page (⌘K): *"Tailor this to the job description I'm pasting." "Tighten it to one page." "Make these
+bullets lead with results."* The change lands on the sheet as one step, with **Undo** beside it.
+
+- **Bring your own model** (AI ▸ AI Settings…): Claude with an Anthropic API key, or anything that speaks
+  the OpenAI chat API — OpenAI, Gemini, OpenRouter, or a model on your own computer through Ollama or
+  LM Studio. There is a **Test** button.
+- **Your key stays yours.** It is encrypted with the operating system's keychain (`safeStorage`), lives only
+  in the app's main process, and is sent to exactly one place: the provider you chose. The editor window
+  never sees it and its CSP can't reach the network anyway. Nothing goes to qmanning.com. With a local
+  model, nothing leaves the computer.
+- **The design can't break.** The model never rewrites the file. It sees the résumé as addressable blocks
+  and regions and answers with operations (set this text, add / duplicate / move / delete that block);
+  the editor applies them, and every scrap of model-written HTML goes through an allowlist first
+  (`src/cv-assistant.ts`). New blocks are cloned from your template's own.
+- **It can see the page; the model can't.** If an edit spills onto another page, the editor notices and
+  asks the model to tighten what it just wrote — up to twice — before showing you the result.
+- It is told not to invent facts: if it needs something it doesn't have ("add my last job"), it asks.
+
+The web and drop-in builds don't show the prompt bar: there, point your own assistant at the `.html` file.
+
 **Your résumé is a real file.** In the desktop app the document is one Source HTML file on disk —
 **File → Open / Open Recent**, drop a file on the window, **Save** (⌘S) and **Save As** (⇧⌘S), an
 edited dot in the title bar, and a prompt before closing with unsaved work. The app watches the open

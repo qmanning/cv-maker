@@ -11,7 +11,7 @@ const MAX_FILE = 25 * 1024 * 1024;
 const FILTERS = [{ name: "Résumé (HTML)", extensions: ["html", "htm"] }];
 const hash = (text) => crypto.createHash("sha1").update(text).digest("hex");
 
-export function setupFiles({ templatePath, smokeDir = "", onWelcome = () => {} }) {
+export function setupFiles({ templatePath, smokeDir = "", onWelcome = () => {}, onAssistant = () => {} }) {
     const statePath = () => path.join(app.getPath("userData"), "files.json");
     let win = null, current = "", dirty = false, known = "", watcher = null, watchTimer = null, closeAfterSave = false, recent = [];
     try { const s = JSON.parse(fs.readFileSync(statePath(), "utf8")); recent = (s.recent || []).filter((p) => typeof p === "string"); if (s.current && fs.existsSync(s.current)) current = s.current; } catch { /* first run */ }
@@ -111,6 +111,7 @@ export function setupFiles({ templatePath, smokeDir = "", onWelcome = () => {} }
                 ...(mac ? [] : [{ type: "separator" }, { role: "quit" }]),
             ] },
             { role: "editMenu" },
+            { label: "AI", submenu: [{ label: "Ask Your AI…", accelerator: "CmdOrCtrl+K", click: () => send("assistant:focus") }, { type: "separator" }, { label: "AI Settings…", click: () => onAssistant() }] },
             { label: "View", submenu: [{ role: "togglefullscreen" }, ...(app.isPackaged ? [] : [{ type: "separator" }, { role: "reload" }, { role: "toggleDevTools" }])] },
             { role: "windowMenu" },
             { role: "help", submenu: [{ label: "Welcome to CV Maker", click: () => onWelcome() }, { type: "separator" }, { label: "CV Maker on the Web", click: () => shell.openExternal("https://qmanning.com/labs/cv-maker") }, { label: "Source on GitHub", click: () => shell.openExternal("https://github.com/qmanning/cv-maker") }] },
