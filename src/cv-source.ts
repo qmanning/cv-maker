@@ -1,5 +1,5 @@
-// src/components/labs/cv-maker/cv-source.ts
-// CV Maker's pure, DOM-parsing/string-building helpers — pulled out of CvMaker.tsx so they can be
+// src/components/labs/itera/cv-source.ts
+// Itera's pure, DOM-parsing/string-building helpers — pulled out of CvMaker.tsx so they can be
 // unit-tested without mounting the component. No React, no fetch, no localStorage: just source text in,
 // source text out.
 

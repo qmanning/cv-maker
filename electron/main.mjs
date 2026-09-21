@@ -1,10 +1,10 @@
-// electron/main.mjs — CV Maker as a desktop app. It wraps the SAME prebuilt folder the web version
+// electron/main.mjs — Itera as a desktop app. It wraps the SAME prebuilt folder the web version
 // ships (../index.html + dist/ + vendor/ + templates/); nothing in src/ knows Electron exists.
 //
-//   app://cv-maker/…           the folder, served read-only from an allowlist (file:// can't fetch() the
+//   app://itera/…           the folder, served read-only from an allowlist (file:// can't fetch() the
 //                              template or load the ES-module chunks; a real origin also keeps localStorage)
-//   app://cv-maker/config.js   generated here: points the editor's existing `exportServer` option at ↓
-//   app://cv-maker/__export    POST — the ../server.mjs contract, answered by Electron's own Chromium (export.mjs)
+//   app://itera/config.js   generated here: points the editor's existing `exportServer` option at ↓
+//   app://itera/__export    POST — the ../server.mjs contract, answered by Electron's own Chromium (export.mjs)
 import { app, BrowserWindow, dialog, protocol, net, shell } from "electron";
 import fs from "node:fs";
 import path from "node:path";
@@ -17,13 +17,13 @@ import { setupMcp } from "./mcp.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = app.isPackaged ? path.join(here, "web") : path.resolve(here, "..");   // the prebuilt folder (electron-builder copies it to web/)
-const ORIGIN = "app://cv-maker";
+const ORIGIN = "app://itera";
 const SERVED = [/^\/index\.html$/, /^\/(dist|vendor|templates)\/[^\0]+$/];
 const MAX_BODY = 25 * 1024 * 1024;
 const SMOKE_DIR = process.env.CVM_SMOKE_DIR || "";           // set by smoke.mjs: drive one PDF + one PNG export, keep the evidence, quit
 
 if (SMOKE_DIR) { app.setPath("userData", path.join(SMOKE_DIR, "userData")); fs.mkdirSync(path.join(SMOKE_DIR, "downloads"), { recursive: true }); app.setPath("downloads", path.join(SMOKE_DIR, "downloads")); }   // a clean profile: no leftovers in, none out
-app.setName("CV Maker");
+app.setName("Itera");
 let files = null, assistant = null, editor = null, mcp = null;
 const openWhenReady = [];                                    // macOS can deliver open-file (double-clicked document, Dock drop) before we're ready
 app.on("open-file", (e, file) => { e.preventDefault(); if (files) files.openPath(file); else openWhenReady.push(file); });
@@ -66,7 +66,7 @@ async function handleExport(req) {
 
 async function handleApp(req) {
     const url = new URL(req.url);
-    if (url.host !== "cv-maker") return new Response("", { status: 404 });
+    if (url.host !== "itera") return new Response("", { status: 404 });
     if (url.pathname === "/__export") return req.method === "POST" ? handleExport(req) : json(405, { error: "POST only" });
     if (req.method !== "GET" && req.method !== "HEAD") return new Response("", { status: 405 });
     if (url.pathname.startsWith("/__welcome/")) {   // the sheet's two buttons are plain links to here: act, close it, navigate nowhere
@@ -80,7 +80,7 @@ async function handleApp(req) {
         return new Response(html, { headers: { "content-type": "text/html; charset=utf-8", "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'" } });
     }
     if (url.pathname === "/config.js") {
-        return new Response(`window.CV_MAKER = { exportServer: ${JSON.stringify(ORIGIN + "/__export")} };\n`, { headers: { "content-type": "text/javascript; charset=utf-8" } });
+        return new Response(`window.ITERA = { exportServer: ${JSON.stringify(ORIGIN + "/__export")} };\n`, { headers: { "content-type": "text/javascript; charset=utf-8" } });
     }
     const pathname = decodeURIComponent(url.pathname === "/" ? "/index.html" : url.pathname);
     const file = path.join(ROOT, pathname);
@@ -96,7 +96,7 @@ async function handleApp(req) {
 function createWindow() {
     const win = new BrowserWindow({
         width: 1320, height: 960, minWidth: 720, minHeight: 520,
-        show: !SMOKE_DIR, backgroundColor: "#111214", title: "CV Maker",
+        show: !SMOKE_DIR, backgroundColor: "#111214", title: "Itera",
         webPreferences: { preload: path.join(here, "preload.cjs"), contextIsolation: true, nodeIntegration: false, sandbox: true, spellcheck: true, backgroundThrottling: !SMOKE_DIR },
     });
     files.attach(win); editor = win;
@@ -111,9 +111,9 @@ function createWindow() {
 }
 
 /* ---- macOS: run from Applications, not from the disk image. From the image the app gets a random temporary path
-   (App Translocation), which breaks anything that remembers where CV Maker lives — above all the MCP connection. ---- */
+   (App Translocation), which breaks anything that remembers where Itera lives — above all the MCP connection. ---- */
 function installedCopy() {
-    const bundle = path.resolve(process.execPath, "..", "..", "..");   // …/CV Maker.app/Contents/MacOS/CV Maker
+    const bundle = path.resolve(process.execPath, "..", "..", "..");   // …/Itera.app/Contents/MacOS/Itera
     const home = process.env.CVM_INSTALL_DIR || "/Applications";       // (the env override is for tests)
     let dir = home; try { fs.accessSync(dir, fs.constants.W_OK); } catch { dir = path.join(app.getPath("home"), "Applications"); }
     return { bundle, dest: path.join(dir, path.basename(bundle)) };
@@ -126,7 +126,7 @@ function moveToApplications() {
     const { bundle, dest } = installedCopy();
     try {
         if (fs.existsSync(dest)) {
-            const replace = process.env.CVM_INSTALL_DIR ? 1 : dialog.showMessageBoxSync({ type: "question", buttons: ["Cancel", "Replace"], defaultId: 1, cancelId: 0, message: "There is already a CV Maker in your Applications folder.", detail: "Replace it with this one?" });
+            const replace = process.env.CVM_INSTALL_DIR ? 1 : dialog.showMessageBoxSync({ type: "question", buttons: ["Cancel", "Replace"], defaultId: 1, cancelId: 0, message: "There is already a Itera in your Applications folder.", detail: "Replace it with this one?" });
             if (replace !== 1) return false;
             fs.rmSync(dest, { recursive: true, force: true });
         }
@@ -137,22 +137,22 @@ function moveToApplications() {
         if (!process.env.CVM_INSTALL_NO_RELAUNCH) spawn("/usr/bin/open", ["-n", dest], { detached: true, stdio: "ignore" }).unref();
         setTimeout(() => app.exit(0), 300);
         return true;
-    } catch (e) { dialog.showErrorBox("Couldn't install CV Maker", String(e?.message || e) + "\n\nDrag CV Maker into your Applications folder yourself, then open it from there."); return false; }
+    } catch (e) { dialog.showErrorBox("Couldn't install Itera", String(e?.message || e) + "\n\nDrag Itera into your Applications folder yourself, then open it from there."); return false; }
 }
 function offerMoveToApplications(parent) {
     if (process.platform !== "darwin" || !app.isPackaged || SMOKE_DIR || runningFromInstall()) return false;
-    const choice = process.env.CVM_INSTALL_AUTO ? 0 : dialog.showMessageBoxSync(parent, { type: "question", buttons: ["Install in Applications", "Not Now"], defaultId: 0, cancelId: 1, message: "Install CV Maker in your Applications folder?", detail: "You're running it from the disk image. CV Maker will copy itself to Applications and reopen from there. After that you can eject the disk image, and macOS won't ask about it again." });
+    const choice = process.env.CVM_INSTALL_AUTO ? 0 : dialog.showMessageBoxSync(parent, { type: "question", buttons: ["Install in Applications", "Not Now"], defaultId: 0, cancelId: 1, message: "Install Itera in your Applications folder?", detail: "You're running it from the disk image. Itera will copy itself to Applications and reopen from there. After that you can eject the disk image, and macOS won't ask about it again." });
     return choice === 0 ? moveToApplications() : false;
 }
 
-/* ---- the welcome sheet: shown once on first run, and from Help ▸ Welcome to CV Maker ---- */
+/* ---- the welcome sheet: shown once on first run, and from Help ▸ Welcome to Itera ---- */
 let welcome = null;
 function showWelcome(parent) {
     if (!parent || parent.isDestroyed()) return;
     if (welcome && !welcome.isDestroyed()) return welcome.focus();
     welcome = new BrowserWindow({
         parent, modal: true, show: false, width: 620, height: 680, useContentSize: true, resizable: false, minimizable: false, maximizable: false, fullscreenable: false,
-        backgroundColor: "#14161c", title: "Welcome to CV Maker",
+        backgroundColor: "#14161c", title: "Welcome to Itera",
         webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, javascript: false },
     });
     welcome.setMenuBarVisibility(false);
@@ -276,7 +276,7 @@ async function smoke(win) {
     const tool = async (name, args = {}) => { const r = (await rpc("tools/call", { name, arguments: args })).result; return { isError: !!r.isError, value: (() => { try { return JSON.parse(r.content[0].text); } catch { return r.content[0].text; } })() }; };
     const init = (await rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "claude-ai", version: "0" } })).result;
     child.stdin.write(JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }) + "\n");
-    fileSteps.mcpInitialized = init.serverInfo?.name === "cv-maker" && !!init.capabilities?.tools && /get_resume/.test(init.instructions || "");
+    fileSteps.mcpInitialized = init.serverInfo?.name === "itera" && !!init.capabilities?.tools && /get_resume/.test(init.instructions || "");
     fileSteps.mcpTools = ((await rpc("tools/list", {})).result.tools || []).map((t) => t.name).join(",") === "get_resume,edit_resume,undo_last_edit,export_resume";
     const seen = (await tool("get_resume")).value;
     const job = seen.blocks.find((b) => b.kind === "job");
@@ -297,21 +297,21 @@ async function smoke(win) {
     /* one-click connect: both config writers keep whatever else is in those files */
     const claudeFile = path.join(SMOKE_DIR, "claude", "claude_desktop_config.json"), codexHome = path.join(SMOKE_DIR, "codex");
     fs.mkdirSync(path.dirname(claudeFile), { recursive: true }); fs.mkdirSync(codexHome, { recursive: true });
-    fs.writeFileSync(claudeFile, JSON.stringify({ theme: "dark", mcpServers: { other: { command: "npx" } } }));
+    fs.writeFileSync(claudeFile, JSON.stringify({ theme: "dark", mcpServers: { other: { command: "npx" }, "cv-maker": { command: "/old/name" } } }));
     fs.writeFileSync(path.join(codexHome, "config.toml"), 'model = "x"\n\n[mcp_servers.other]\ncommand = "npx"\n\n[mcp_servers.cv-maker]\ncommand = "/old/place"\n\n[mcp_servers.cv-maker.env]\nOLD = "1"\n\n[profiles.p]\nk = 1\n');
     process.env.CVM_CLAUDE_CONFIG = claudeFile; process.env.CODEX_HOME = codexHome;
     mcp.connectClaude(); mcp.connectCodex();
     const cj = JSON.parse(fs.readFileSync(claudeFile, "utf8")), toml = fs.readFileSync(path.join(codexHome, "config.toml"), "utf8");
-    fileSteps.claudeConfigWritten = cj.theme === "dark" && !!cj.mcpServers.other && cj.mcpServers["cv-maker"].env.ELECTRON_RUN_AS_NODE === "1" && fs.existsSync(claudeFile + ".cv-maker-backup") && mcp.claudeState().current;
-    fileSteps.codexConfigWritten = /model = "x"/.test(toml) && /\[mcp_servers\.other\]/.test(toml) && /\[profiles\.p\]/.test(toml) && !/old\/place|OLD = /.test(toml) && (toml.match(/\[mcp_servers\.cv-maker\]/g) || []).length === 1 && /ELECTRON_RUN_AS_NODE = "1"/.test(toml) && mcp.codexState().current;
+    fileSteps.claudeConfigWritten = cj.theme === "dark" && !!cj.mcpServers.other && cj.mcpServers.itera.env.ELECTRON_RUN_AS_NODE === "1" && !cj.mcpServers["cv-maker"] && fs.existsSync(claudeFile + ".itera-backup") && mcp.claudeState().current;
+    fileSteps.codexConfigWritten = /model = "x"/.test(toml) && /\[mcp_servers\.other\]/.test(toml) && /\[profiles\.p\]/.test(toml) && !/old\/place|OLD = /.test(toml) && (toml.match(/\[mcp_servers\.itera\]/g) || []).length === 1 && !/mcp_servers\.cv-maker/.test(toml) && /ELECTRON_RUN_AS_NODE = "1"/.test(toml) && mcp.codexState().current;
     mcp.disconnectClaude(); mcp.disconnectCodex();
-    fileSteps.configsCleanedUp = !JSON.parse(fs.readFileSync(claudeFile, "utf8")).mcpServers["cv-maker"] && !/cv-maker/.test(fs.readFileSync(path.join(codexHome, "config.toml"), "utf8"));
+    fileSteps.configsCleanedUp = !JSON.parse(fs.readFileSync(claudeFile, "utf8")).mcpServers.itera && !/mcp_servers\.(itera|cv-maker)/.test(fs.readFileSync(path.join(codexHome, "config.toml"), "utf8"));
     fs.writeFileSync(path.join(SMOKE_DIR, "codex-config.toml"), toml);
 
     /* the welcome sheet: it loads, and its primary button dismisses it */
     showWelcome(win);
     const sheet = welcome;
-    await until("the welcome sheet", () => !!sheet && !sheet.webContents.isLoading() && sheet.webContents.getTitle() === "Welcome to CV Maker");
+    await until("the welcome sheet", () => !!sheet && !sheet.webContents.isLoading() && sheet.webContents.getTitle() === "Welcome to Itera");
     fileSteps.welcomeLoaded = true;
     sheet.webContents.loadURL(ORIGIN + "/__welcome/start").catch(() => {});   // what the primary button links to (a hidden window takes no clicks)
     await until("the welcome sheet to close", () => sheet.isDestroyed(), 8000);

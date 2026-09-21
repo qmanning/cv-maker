@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// server.mjs — optional local export server for CV Maker.
+// server.mjs — optional local export server for Itera.
 //
 // Renders the editor's export HTML in headless Chrome (via puppeteer) to produce a real-text,
 // selectable PDF or a PNG screenshot. Point config.js's `exportServer` at this (e.g.
-// "http://localhost:7332/export") for one-click exports; without it, CV Maker still works — PDF falls
+// "http://localhost:7332/export") for one-click exports; without it, Itera still works — PDF falls
 // back to the browser's print dialog and PNG to an in-browser render.
 //
 // Usage:  node server.mjs [port]      (default 7332)
@@ -122,7 +122,7 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === "GET" && url.pathname === "/") {
         res.writeHead(200, { "content-type": "application/json" });
-        res.end(JSON.stringify({ ok: true, service: "cv-maker export server", port: PORT }));
+        res.end(JSON.stringify({ ok: true, service: "itera export server", port: PORT }));
         return;
     }
 
@@ -156,5 +156,5 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, "127.0.0.1", () => {
-    console.log(`cv-maker export server: http://127.0.0.1:${PORT}/`);
+    console.log(`itera export server: http://127.0.0.1:${PORT}/`);
 });

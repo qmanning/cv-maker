@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-  <!-- CV Maker app icon — the Labs tile's motif: a sheet on the dotted canvas, the caret mid-edit. macOS grid: 824 body, 100 margin. -->
+  <!-- Itera app icon — the Labs tile's motif: a sheet on the dotted canvas, the caret mid-edit. macOS grid: 824 body, 100 margin. -->
   <defs>
     <pattern id="g" width="40" height="40" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="2" fill="rgba(255,255,255,.13)"/></pattern>
     <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1a1e28"/><stop offset="1" stop-color="#0c0e13"/></linearGradient>

@@ -1,6 +1,6 @@
-// src/components/labs/cv-maker/CvMaker.tsx
-// CV Maker: a sheet of paper on an Infospector-style canvas. The résumé is a source HTML file
-// (public/cv-maker/templates/…) whose [data-cv-edit] regions each become a TipTap editor mounted
+// src/components/labs/itera/CvMaker.tsx
+// Itera: a sheet of paper on an Infospector-style canvas. The résumé is a source HTML file
+// (public/itera/templates/…) whose [data-cv-edit] regions each become a TipTap editor mounted
 // directly ON the template's own element — so what you edit is exactly what gets exported.
 
 "use client";
@@ -114,7 +114,7 @@ function normalizeGaps(page: HTMLElement, pageWPt: number): void {
 /* ---------------- component ---------------- */
 
 // Framework-agnostic on purpose (no router, no server assumptions): the same component runs inside this
-// site and as the standalone drop-in (github.com/qmanning/cv-maker), configured only by these props.
+// site and as the standalone drop-in (github.com/qmanning/itera), configured only by these props.
 export interface CvMakerProps {
     /** the source HTML the editor starts from (Start-up → Page in the menu overrides it per browser) */
     templateUrl: string;
@@ -725,8 +725,8 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
                     <button className="pt-menu-item cvm-row" onClick={(e) => { setMenu(null); setCtx({ x: e.clientX - 240, y: e.clientY }); }}><Sun />Background · colors · appearance…</button>
                     <div className="pt-menu-div" />
                     {/* credit: the tool says who made it and where it lives — never the exported résumé, which is the user's */}
-                    <a className="pt-menu-item cvm-row cvm-credit" href="https://qmanning.com/labs/cv-maker" target="_blank" rel="noopener" onClick={() => setMenu(null)}>
-                        <span>CV Maker <span className="cvm-hint" style={{ marginLeft: 4 }}>by Q Manning</span></span><span className="cvm-hint">qmanning.com ↗</span>
+                    <a className="pt-menu-item cvm-row cvm-credit" href="https://qmanning.com/labs/itera" target="_blank" rel="noopener" onClick={() => setMenu(null)}>
+                        <span>Itera <span className="cvm-hint" style={{ marginLeft: 4 }}>by Q Manning</span></span><span className="cvm-hint">qmanning.com ↗</span>
                     </a>
                 </div>
             )}
@@ -766,7 +766,7 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
                 sizes: [{ value: "last", label: "Last used" }, ...(Object.keys(PAPERS) as PaperId[]).map((id) => ({ value: id, label: `${PAPERS[id].label} · ${PAPERS[id].name}` }))],
                 setSize: (v) => { setStartSize(v); store(START_SIZE_KEY, v === "last" ? "" : v); },
                 setPage: (v) => { setHome(v); store(HOME_KEY, v); },
-                snippet: () => [home && `window.CV_MAKER_HOME = ${JSON.stringify(home)};`, startSize !== "last" && `window.CV_MAKER_START_SIZE = ${JSON.stringify(startSize)};`].filter(Boolean).join("\n"),
+                snippet: () => [home && `window.ITERA_HOME = ${JSON.stringify(home)};`, startSize !== "last" && `window.ITERA_START_SIZE = ${JSON.stringify(startSize)};`].filter(Boolean).join("\n"),
             }} />}
 
             {/* canvas — Infospector's #pt-stagewrap + background patterns */}

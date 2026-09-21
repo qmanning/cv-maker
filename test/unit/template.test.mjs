@@ -1,6 +1,6 @@
 // Checks that templates/sample-resume.html still follows the conventions documented in its own header
 // comment ([data-cv-edit], .cv-flow, [data-cv-block], etc.) — a regression test for the template file
-// itself, not for CV Maker's code. Also guards against the fictional sample leaking any of the real
+// itself, not for Itera's code. Also guards against the fictional sample leaking any of the real
 // author's identifying info.
 import { test } from "node:test";
 import assert from "node:assert/strict";

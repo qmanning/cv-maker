@@ -12,17 +12,18 @@ import { renderExport } from "./export.mjs";
 import { normalize } from "./assistant/prompt.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const SERVER_NAME = "cv-maker";
+const SERVER_NAME = "itera";
+const LEGACY_NAMES = ["cv-maker"];   // what this app called itself until September 2026 — cleaned up whenever we write a config
 
 export function setupMcp({ editorWindow, currentFile, socketPath = "" }) {
-    const SOCKET = socketPath || (process.platform === "win32" ? `\\\\.\\pipe\\cv-maker-mcp-${os.userInfo().username}` : path.join(app.getPath("userData"), "mcp.sock"));
+    const SOCKET = socketPath || (process.platform === "win32" ? `\\\\.\\pipe\\itera-mcp-${os.userInfo().username}` : path.join(app.getPath("userData"), "mcp.sock"));
     let seq = 0, clients = 0, lastSeen = 0; const pending = new Map(), listeners = new Set();
     const changed = () => listeners.forEach((fn) => fn());
 
     /* ---- ask the editor (its handlers are CvRemoteHandlers in ../src/cv-assistant.ts, wired up in preload.cjs) ---- */
     ipcMain.on("remote:result", (e, m) => { if (e.sender !== editorWindow()?.webContents) return; const w = pending.get(m?.id); if (!w) return; pending.delete(m.id); m.ok ? w.resolve(m.value) : w.reject(new Error(m.error || "The editor couldn't do that.")); });
     const editor = (method, args = []) => new Promise((resolve, reject) => {
-        const win = editorWindow(); if (!win || win.isDestroyed()) return reject(new Error("CV Maker has no résumé window open."));
+        const win = editorWindow(); if (!win || win.isDestroyed()) return reject(new Error("Itera has no résumé window open."));
         const id = ++seq; pending.set(id, { resolve, reject });
         win.webContents.send("remote:call", { id, method, args });
         setTimeout(() => { if (pending.delete(id)) reject(new Error("The editor didn't answer (is a résumé open?).")); }, 30000);
@@ -69,7 +70,7 @@ export function setupMcp({ editorWindow, currentFile, socketPath = "" }) {
     // macOS runs a quarantined app that hasn't been moved by the person from a random, temporary, read-only path
     // ("App Translocation"), and a disk image goes away when ejected — neither is a path to hand to another app
     const temporaryHome = () => app.isPackaged && (/\/AppTranslocation\//.test(process.execPath) || process.execPath.startsWith("/Volumes/"));
-    const needsMove = "Install CV Maker in your Applications folder first. Right now it is running from the disk image, so your AI app would lose track of it after a restart.";
+    const needsMove = "Install Itera in your Applications folder first. Right now it is running from the disk image, so your AI app would lose track of it after a restart.";
     const entry = () => ({ command: process.execPath, args: [serverScript], env: { ELECTRON_RUN_AS_NODE: "1" } });
 
     const claudeConfigPath = () => process.env.CVM_CLAUDE_CONFIG ? process.env.CVM_CLAUDE_CONFIG : process.platform === "darwin" ? path.join(os.homedir(), "Library", "Application Support", "Claude", "claude_desktop_config.json")
@@ -88,17 +89,18 @@ export function setupMcp({ editorWindow, currentFile, socketPath = "" }) {
         let config = {};
         if (fs.existsSync(file)) {
             const raw = fs.readFileSync(file, "utf8");
-            try { config = raw.trim() ? JSON.parse(raw) : {}; } catch { throw new Error("Claude's settings file isn't valid JSON, so CV Maker left it alone. Use “Copy the settings” instead."); }
-            fs.writeFileSync(file + ".cv-maker-backup", raw);
+            try { config = raw.trim() ? JSON.parse(raw) : {}; } catch { throw new Error("Claude's settings file isn't valid JSON, so Itera left it alone. Use “Copy the settings” instead."); }
+            fs.writeFileSync(file + ".itera-backup", raw);
         }
         if (!config || typeof config !== "object" || Array.isArray(config)) config = {};
         config.mcpServers = { ...(config.mcpServers || {}), [SERVER_NAME]: entry() };
+        for (const old of LEGACY_NAMES) delete config.mcpServers[old];
         fs.writeFileSync(file, JSON.stringify(config, null, 2) + "\n");
         return claudeState();
     }
     function disconnectClaude() {
         const config = readClaude(); if (!config?.mcpServers?.[SERVER_NAME]) return claudeState();
-        delete config.mcpServers[SERVER_NAME];
+        delete config.mcpServers[SERVER_NAME]; for (const old of LEGACY_NAMES) delete config.mcpServers[old];
         fs.writeFileSync(claudeConfigPath(), JSON.stringify(config, null, 2) + "\n");
         return claudeState();
     }
@@ -107,7 +109,7 @@ export function setupMcp({ editorWindow, currentFile, socketPath = "" }) {
     const codexConfigPath = () => path.join(process.env.CODEX_HOME || path.join(os.homedir(), ".codex"), "config.toml");
     const codexBlock = () => { const e = entry(); return `[mcp_servers.${SERVER_NAME}]\ncommand = ${JSON.stringify(e.command)}\nargs = ${JSON.stringify(e.args)}\n\n[mcp_servers.${SERVER_NAME}.env]\nELECTRON_RUN_AS_NODE = "1"\n`; };
     // drop our tables: from each of our headers up to the next table header that isn't ours (no TOML parser needed)
-    const stripOurs = (raw) => { let skipping = false; return raw.split("\n").filter((line) => { if (/^\s*\[/.test(line)) skipping = new RegExp(`^\\s*\\[mcp_servers\\.${SERVER_NAME}(\\.[^\\]]+)?\\]`).test(line); return !skipping; }).join("\n").replace(/\n{3,}/g, "\n\n").trimEnd(); };
+    const stripOurs = (raw) => { let skipping = false; return raw.split("\n").filter((line) => { if (/^\s*\[/.test(line)) skipping = [SERVER_NAME, ...LEGACY_NAMES].some((n) => new RegExp(`^\\s*\\[mcp_servers\\.${n}(\\.[^\\]]+)?\\]`).test(line)); return !skipping; }).join("\n").replace(/\n{3,}/g, "\n\n").trimEnd(); };
     const readCodex = () => { try { return fs.readFileSync(codexConfigPath(), "utf8"); } catch { return null; } };
     function codexState() {
         const raw = readCodex(), installed = fs.existsSync(path.dirname(codexConfigPath())), connected = !!raw && new RegExp(`^\\[mcp_servers\\.${SERVER_NAME}\\]`, "m").test(raw);
@@ -118,7 +120,7 @@ export function setupMcp({ editorWindow, currentFile, socketPath = "" }) {
         const file = codexConfigPath();
         if (!fs.existsSync(path.dirname(file))) throw new Error("ChatGPT / Codex doesn't seem to be set up on this computer yet.");
         const raw = readCodex() ?? "";
-        if (raw) fs.writeFileSync(file + ".cv-maker-backup", raw);
+        if (raw) fs.writeFileSync(file + ".itera-backup", raw);
         const rest = stripOurs(raw);
         fs.writeFileSync(file, (rest ? rest + "\n\n" : "") + codexBlock());
         return codexState();
