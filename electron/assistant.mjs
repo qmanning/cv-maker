@@ -98,6 +98,8 @@ export function setupAssistant({ origin, editorWindow, mcp, moveToApplications =
     ipcMain.handle("assistant-settings:mcp-disconnect-codex", (e) => { if (!fromSettings(e)) throw new Error("not allowed"); mcp.disconnectCodex(); return mcp.state(); });
     ipcMain.handle("assistant-settings:move-to-applications", (e) => { if (!fromSettings(e)) throw new Error("not allowed"); return moveToApplications(); });
     ipcMain.handle("assistant-settings:mcp-copy", (e, what) => { if (!fromSettings(e)) return false; const m = mcp.state(); clipboard.writeText(what === "claude-code" ? m.claudeCode : what === "codex" ? m.codexCommand : m.snippet); return true; });
+    ipcMain.handle("assistant-settings:notes-get", (e) => (fromSettings(e) ? mcp.getNotes() : ""));
+    ipcMain.handle("assistant-settings:notes-set", (e, text) => { if (!fromSettings(e)) throw new Error("not allowed"); return mcp.setNotes(text); });
     mcp.onChange(() => { if (win && !win.isDestroyed()) win.webContents.send("assistant-settings:mcp-changed", mcp.state()); });
     // Updates live in the same Settings window
     const updateState = () => ({ available: !!updates, auto: !!updates?.auto(), version: app.getVersion() });

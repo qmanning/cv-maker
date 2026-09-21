@@ -39,8 +39,8 @@ export interface CvRemoteHandlers {
     apply(ops: AiOp[], message: string, by: string): Promise<{ applied: number; skipped: string[]; pagesBefore: number; pagesAfter: number; fitScale: number }>;
     /** take back the most recent remote edit; false when there is nothing to undo */
     undo(): boolean;
-    /** what the export pipeline needs to render this document (PDF / PNG happen in the shell) */
-    exportPayload(): { html: string; widthPt: number; heightPt: number; name: string };
+    /** what the export pipeline needs to render this document (PDF / PNG happen in the shell); settles the layout first */
+    exportPayload(): Promise<{ html: string; widthPt: number; heightPt: number; name: string }>;
     /** the formats the editor renders itself: Word and the re-loadable Source HTML (docx travels as base64) */
     exportFile(kind: "docx" | "html"): Promise<{ name: string; data: string; base64: boolean }>;
     /** the toolbar's size menu, as data: paper, fit-to-one-page, pagination, zoom — and what they currently produce */

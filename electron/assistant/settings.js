@@ -72,6 +72,14 @@
     }
     const flash = (t) => { $("copied").textContent = t; setTimeout(() => { $("copied").textContent = ""; }, 1800); };
     paintMcp(await api.mcp.state()); api.mcp.onChange(paintMcp);
+
+    // Notes to your AI: house rules folded into the MCP instructions for every connection
+    const notes = $("ai-notes");
+    if (notes && api.notes) {
+        notes.value = await api.notes.get();
+        let notesTimer;
+        notes.addEventListener("input", () => { clearTimeout(notesTimer); notesTimer = setTimeout(async () => { await api.notes.set(notes.value); const el = $("notes-saved"); if (el) { el.textContent = "Saved"; setTimeout(() => (el.textContent = ""), 1200); } }, 500); });
+    }
     $("move-now").addEventListener("click", () => api.mcp.moveToApplications());
     $("claude-connect").addEventListener("click", async () => { try { paintMcp(await api.mcp.connectClaude()); } catch (e) { $("claude-sub").textContent = clean(e); } });
     $("claude-disconnect").addEventListener("click", async () => paintMcp(await api.mcp.disconnectClaude()));

@@ -40,6 +40,8 @@
   button { font: inherit; font-weight: 600; white-space: nowrap; padding: 8px 16px; border-radius: 10px; border: 0; color: var(--ink); background: rgba(255,255,255,.08); box-shadow: inset 0 0 0 1px var(--line); cursor: pointer; }
   button:hover { background: rgba(255,255,255,.13); } button:disabled { opacity: .5; cursor: default; }
   button.primary { background: var(--blue); box-shadow: none; color: #fff; } button.quiet { background: none; box-shadow: none; color: var(--dim); padding-left: 0; margin-right: auto; }
+textarea { width: 100%; box-sizing: border-box; min-height: 76px; resize: vertical; padding: 9px 11px; border-radius: 10px; border: 1px solid var(--brd, #33384a); background: var(--field, #1b1e28); color: inherit; font: inherit; line-height: 1.5; }
+textarea:focus { outline: none; border-color: var(--accent, #004DFF); }
 </style>
 </head>
 <body>
@@ -78,6 +80,12 @@
       <div class="cardhead"><b>Claude Code, Cursor, VS Code, LM Studio…</b><span class="pill" id="live-pill"></span></div>
       <p class="sub">Any app that supports MCP servers can connect. Paste this into its MCP settings, or run the Claude Code command.</p>
       <div class="actions"><button id="copy-json">Copy the settings</button><button id="copy-cc">Copy the Claude Code command</button><span class="copied" id="copied"></span></div>
+    </section>
+
+    <section class="card">
+      <div class="cardhead"><b>Notes to your AI</b><span class="copied" id="notes-saved"></span></div>
+      <p class="sub">House rules any connected AI is told before it touches your résumé — “always save a copy before tailoring, never the master,” “keep it to one page,” “active voice, results first.” Your words, sent with every connection.</p>
+      <textarea id="ai-notes" rows="4" spellcheck="true" placeholder="e.g. Always branch a copy off my master before tailoring. Prefer active voice and results-first bullets. Keep it to one page."></textarea>
     </section>
 
     <details id="advanced">

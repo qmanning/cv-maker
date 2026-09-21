@@ -1,7 +1,7 @@
 {
     "name": "itera-desktop",
     "productName": "Itera",
-    "version": "0.2.1",
+    "version": "0.2.2",
     "description": "Itera as a desktop app — the same prebuilt folder, wrapped in Electron. One-click PDF/PNG, no export server.",
     "author": "Q Manning (https://qmanning.com)",
     "homepage": "https://qmanning.com/labs/itera",

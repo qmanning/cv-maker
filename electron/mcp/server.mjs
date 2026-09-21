@@ -54,8 +54,9 @@ const send = (msg) => process.stdout.write(JSON.stringify(msg) + "\n");
 // The running app is the authority on what tools exist (see catalog.mjs); this process may be hours older than the app.
 let offered = "";                                                       // what we last told the client, to notice a change
 const remember = (tools) => { offered = JSON.stringify(tools.map((t) => [t.name, t.inputSchema])); return tools; };
+let liveInstructions = INSTRUCTIONS;
 async function currentTools({ launch = false } = {}) {
-    try { const hello = await app("mcp:hello", {}, { launch }); if (Array.isArray(hello?.tools) && hello.tools.length) return hello.tools; } catch { /* not running, or an Itera from before the relay */ }
+    try { const hello = await app("mcp:hello", {}, { launch }); if (hello?.instructions) liveInstructions = hello.instructions; if (Array.isArray(hello?.tools) && hello.tools.length) return hello.tools; } catch { /* not running, or an Itera from before the relay */ }
     return TOOLS;
 }
 async function runTool(name, args) {
@@ -71,7 +72,7 @@ readline.createInterface({ input: process.stdin }).on("line", async (line) => {
     const reply = (result) => send({ jsonrpc: "2.0", id: msg.id, result });
     try {
         if (msg.method === "initialize") { const n = String(msg.params?.clientInfo?.title || msg.params?.clientInfo?.name || ""); if (n) client = /claude/i.test(n) ? (/code/i.test(n) ? "Claude Code" : "Claude") : n.slice(0, 40); }
-        if (msg.method === "initialize") return reply({ protocolVersion: VERSIONS.includes(msg.params?.protocolVersion) ? msg.params.protocolVersion : VERSIONS[0], capabilities: { tools: { listChanged: true } }, serverInfo: { name: "itera", title: "Itera", version: "0.3.0" }, instructions: INSTRUCTIONS });
+        if (msg.method === "initialize") { await currentTools().catch(() => {}); return reply({ protocolVersion: VERSIONS.includes(msg.params?.protocolVersion) ? msg.params.protocolVersion : VERSIONS[0], capabilities: { tools: { listChanged: true } }, serverInfo: { name: "itera", title: "Itera", version: "0.3.0" }, instructions: liveInstructions }); }
         if (msg.method === "ping") return reply({});
         if (msg.method === "tools/list") return reply({ tools: remember(await currentTools()) });
         if (msg.method === "tools/call") { try { return reply(await runTool(msg.params?.name, msg.params?.arguments || {})); } catch (e) { return reply(text(String(e?.message || e), true)); } }

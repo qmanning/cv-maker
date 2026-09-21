@@ -28,7 +28,7 @@ import { applyOps, describeDocument, type CvAssistant, type CvRemote, type CvRem
 import { coverage, findRanges, normalizeKeywords, pageText, type KeywordUse } from "./cv-keywords";
 import { FOOTER_PT, GAP_PT, MIN_FIT, PAPERS, PT, type DocKind, type PaperId, type Source, docKind, fullHtml, letterCss, mirrorHeader, pageBoxCss, parseSource, slugify, stepZoom } from "./cv-source";
 
-const LOCAL_KEY = "cvm:doc", LETTER_KEY = "cvm:letter", KW_KEY = "cvm:keywords", KW_POS_KEY = "cvm:kw-pos", START_SIZE_KEY = "cvm:startsize", HOME_KEY = "cvm:home";
+const LOCAL_KEY = "cvm:doc", LETTER_KEY = "cvm:letter", KW_KEY = "cvm:keywords", KW_POS_KEY = "cvm:kw-pos", KW_SIZE_KEY = "cvm:kw-size", START_SIZE_KEY = "cvm:startsize", HOME_KEY = "cvm:home";
 const stored = (k: string) => { try { return localStorage.getItem(k) || ""; } catch { return ""; } };
 const store = (k: string, v: string) => { try { if (v) localStorage.setItem(k, v); else localStorage.removeItem(k); } catch { /* ignore */ } };
 const ZOOMS = [1, 1.25, 1.5, 2];
@@ -208,6 +208,8 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
     const [kw, setKw] = useState<{ job: string; keywords: string[] }>(() => { try { const v = JSON.parse(stored(KW_KEY) || "null"); return { job: typeof v?.job === "string" ? v.job : "", keywords: normalizeKeywords(v?.keywords) }; } catch { return { job: "", keywords: [] }; } });
     const [kwOpen, setKwOpen] = useState(false), [kwActive, setKwActive] = useState<string | null>(null), [kwDraft, setKwDraft] = useState("");
     const [kwPos, setKwPos] = useState<{ x: number; y: number } | null>(() => { try { const v = JSON.parse(stored(KW_POS_KEY) || "null"); return v && Number.isFinite(v.x) && Number.isFinite(v.y) ? v : null; } catch { return null; } });
+    const [kwSize, setKwSize] = useState<{ w: number; h: number } | null>(() => { try { const v = JSON.parse(stored(KW_SIZE_KEY) || "null"); return v && Number.isFinite(v.w) && Number.isFinite(v.h) ? v : null; } catch { return null; } });
+    const kwRef = useRef<HTMLDivElement>(null);
     const [kwUses, setKwUses] = useState<KeywordUse[]>([]), [kwRev, setKwRev] = useState(0);
     const kwCount = useRef(0); kwCount.current = kw.keywords.length;
     // desktop only: the recent-documents typeahead that lives in the omni bar
@@ -281,6 +283,16 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
     }, []);
     // a timer, not rAF: rAF never fires while the tab is hidden, which would leave the page count stale
     const schedule = useCallback(() => { window.clearTimeout(rafRef.current); rafRef.current = window.setTimeout(paginate, 30); }, [paginate]);
+    // run pagination to a fixed point before an export — fit-to-one-page needs a pass to set the scale and another to
+    // paginate at it, so a render/export right after an edit could otherwise bake in scale 1 + 2 pages before it settles
+    const settleLayout = useCallback(async () => {
+        for (let i = 0; i < 10; i++) {
+            const p0 = stateRef.current.pages, s0 = stateRef.current.scale;
+            paginate();
+            await new Promise((r) => window.setTimeout(r, 50));   // let setScale/setPages apply and the sheet re-lay-out
+            if (stateRef.current.pages === p0 && Math.abs(stateRef.current.scale - s0) < 0.001) return;
+        }
+    }, [paginate]);
 
     /* ---- local autosave ---- */
     const touch = useCallback(() => {
@@ -433,7 +445,7 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
 
     // one document → one file, named after it (a letter that doesn't say so gets "-cover-letter", so the pair never collide)
     const exportActive = useCallback(async (kind: "pdf" | "png" | "docx" | "html") => {
-        paginate();
+        await settleLayout();
         const st = stateRef.current, base = slugify(st.fileName || st.name), file = st.tab === "letter" && !/cover|letter/.test(base) ? base + "-cover-letter" : base;
         // in a desktop shell the file isn't "exported" until its Save panel is done — and that panel can be slow to appear
         const dl = (blob: Blob, filename: string) => { if (files?.onDownload) shellSaving.current++; download(blob, filename); };
@@ -452,7 +464,7 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
         if (r && ![404, 405, 501].includes(r.status)) throw new Error((await r.json().catch(() => ({}))).error || "Export failed");
         if (kind === "pdf") { say("Choose “Save as PDF” in the print dialog"); return printFallback(payload.html); }
         dl(await rasterize(payload.html, payload.widthPt, payload.heightPt, rasterizerUrl), `${file}.png`);
-    }, [exportHtml, exportUrl, paginate, printFallback, rasterizerUrl, say, serialize, files]);
+    }, [exportHtml, exportUrl, settleLayout, printFallback, rasterizerUrl, say, serialize, files]);
 
     // Export → a format → Résumé / Cover Letter / All. A document is rendered from the live sheet, so exporting the one
     // that isn't showing means showing it for a moment; the person ends up back on the tab they were on.
@@ -471,18 +483,27 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
             }
         } catch (e) { say(e instanceof Error ? e.message : "Export failed"); }
         finally {
+            exporting.current = false;   // release the guard BEFORE the (async) switch back, so a Save/Cancel that lands now can stop the scan
             if (stateRef.current.tab !== home) await switchTabRef.current(home);
-            exporting.current = false;
-            // the scan stays up at least one sweep — and, in a shell, until its Save panels have come and gone (a minute at most)
-            if (shellSaving.current > 0) { window.clearTimeout(shellSavingTimer.current); shellSavingTimer.current = window.setTimeout(() => { shellSaving.current = 0; setBusy(""); }, 60000); }
+            // the scan stays up at least one sweep — and, in a shell, until its Save panel is done (files:download) or a short cap
+            if (shellSaving.current > 0) { window.clearTimeout(shellSavingTimer.current); shellSavingTimer.current = window.setTimeout(() => { shellSaving.current = 0; setBusy(""); }, 15000); }
             else window.setTimeout(() => setBusy(""), Math.max(0, 900 - (Date.now() - began)));
         }
     }, [exportActive, say]);
-    useEffect(() => files?.onDownload?.(() => {
+    const stopShellScan = useCallback(() => { if (shellSaving.current <= 0 || exporting.current) return; shellSaving.current = 0; window.clearTimeout(shellSavingTimer.current); setBusy(""); }, []);
+    // the shell reports every download's end — completed OR cancelled — so a cancelled Save panel stops the scan at once
+    useEffect(() => files?.onDownload?.((state) => {
         if (shellSaving.current <= 0) return;
+        if (state === "cancelled" || state === "interrupted") { shellSaving.current = 0; if (!exporting.current) { window.clearTimeout(shellSavingTimer.current); setBusy(""); } return; }
         if (--shellSaving.current > 0 || exporting.current) return;
         window.clearTimeout(shellSavingTimer.current); setBusy("");
     }), [files]);
+    // backstop: when the window regains focus after a Save/print panel closes, drop any lingering scan
+    useEffect(() => {
+        if (!files?.onDownload) return;
+        window.addEventListener("focus", stopShellScan);
+        return () => window.removeEventListener("focus", stopShellScan);
+    }, [files, stopShellScan]);
 
     /* ---- two documents, one sheet: the résumé and its cover letter ---- */
     const letterUrl = letterTemplateUrl || templateUrl.replace(/[^/]*$/, "sample-cover-letter.html");
@@ -576,6 +597,11 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
         const first = findRanges(page, term, { skipMirror: stateRef.current.tab === "letter" })[0];
         (first?.startContainer.parentElement as HTMLElement | null)?.scrollIntoView({ block: "center", behavior: "smooth" });
     }, []);
+    useEffect(() => {
+        const el = kwRef.current; if (!el || !kwOpen || typeof ResizeObserver === "undefined") return;
+        const ro = new ResizeObserver(() => { const w = Math.round(el.offsetWidth), h = Math.round(el.offsetHeight); setKwSize((cur) => (cur && cur.w === w && cur.h === h ? cur : (store(KW_SIZE_KEY, JSON.stringify({ w, h })), { w, h }))); });
+        ro.observe(el); return () => ro.disconnect();
+    }, [kwOpen]);
     const dragKw = (e: React.PointerEvent) => {
         if ((e.target as HTMLElement).closest("button, input")) return;
         const box = (e.currentTarget.parentElement as HTMLElement).getBoundingClientRect(), dx = e.clientX - box.left, dy = e.clientY - box.top;
@@ -655,6 +681,9 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
     /* ---- brand menu (the Itera mark, far left): quick shell actions ---- */
     const BRAND_HOME = "https://qmanning.com/labs/itera";
     const [appVersion, setAppVersion] = useState("");
+    // the hosted web build has no shell — the AI, real files and updates live only in the desktop app; offer it here instead of hiding it
+    const isWebBuild = !files && !assistant && !remote;
+    const [getApp, setGetApp] = useState(false);
     useEffect(() => { let dead = false; void files?.version?.().then((v) => { if (!dead) setAppVersion(v); }).catch(() => {}); return () => { dead = true; }; }, [files]);
     const visitHomepage = () => { setMenu(null); if (files?.openExternal) files.openExternal(BRAND_HOME); else window.open(BRAND_HOME, "_blank", "noopener"); };
     const checkUpdates = () => { setMenu(null); files?.checkUpdates?.(); };
@@ -744,7 +773,7 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
             return { applied: out.applied, skipped: out.skipped, pagesBefore, pagesAfter, fitScale: Math.round(stateRef.current.scale * 100) / 100 };
         },
         undo: () => { const last = remoteUndo.current.pop(); if (!last) return false; setSource(last); setDirty(true); touch(); setAiReply(null); say("Undone"); return true; },
-        exportPayload: () => ({ ...exportHtml(), name: slugify(stateRef.current.fileName || stateRef.current.name) }),
+        exportPayload: async () => { await settleLayout(); return { ...exportHtml(), name: slugify(stateRef.current.fileName || stateRef.current.name) }; },
         exportFile: async (kind) => {
             const { name: n, fileName: f, source: src, settings: st } = stateRef.current, base = slugify(f || n);
             if (!src) throw new Error("No document is open.");
@@ -980,6 +1009,34 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
         const rule = (e.target as HTMLElement).closest<HTMLElement>(".cv-divider");
         if (rule && hostRef.current?.contains(rule)) { (document.activeElement as HTMLElement | null)?.blur?.(); setActive(null); setPicked(rule); }
     }, [files, say, pickObject]);
+    // the selected image's live rect, so its resize box follows scrolling / zoom / re-layout
+    const [imgRect, setImgRect] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
+    useEffect(() => {
+        if (!imgPop) { setImgRect(null); return; }
+        let raf = 0, last = "";
+        const tick = () => {
+            if (!imgPop.img.isConnected) { setImgPop(null); return; }
+            const r = imgPop.img.getBoundingClientRect(), key = [r.left, r.top, r.width, r.height].map((n) => n.toFixed(1)).join();
+            if (key !== last) { last = key; setImgRect({ left: r.left, top: r.top, width: r.width, height: r.height }); }
+            raf = requestAnimationFrame(tick);
+        };
+        tick(); return () => cancelAnimationFrame(raf);
+    }, [imgPop]);
+    // drag a corner to resize: width is stored in pt (zoom-independent, so it exports at the same size), height stays auto
+    const resizeImg = (e: React.PointerEvent, corner: string) => {
+        const img = imgPop?.img, page = hostRef.current?.querySelector<HTMLElement>(".cv-page"); if (!img || !page) return;
+        e.preventDefault(); e.stopPropagation();
+        const start = img.getBoundingClientRect(), west = corner.includes("w");
+        const k = page.getBoundingClientRect().width / PAPERS[stateRef.current.settings.paper].w;   // screen px per pt (includes zoom)
+        const x0 = e.clientX;
+        const move = (ev: PointerEvent) => {
+            const w = Math.max(16, start.width + (ev.clientX - x0) * (west ? -1 : 1));   // screen px
+            img.style.width = (w / k).toFixed(1) + "pt"; img.style.height = "auto"; img.removeAttribute("width"); img.removeAttribute("height");
+            document.body.style.cursor = corner.length === 2 ? corner + "-resize" : corner + "-resize";
+        };
+        const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); document.body.style.cursor = ""; touch(); };
+        window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
+    };
     const onImgFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const f = e.target.files?.[0], img = imgPop?.img; e.target.value = ""; if (!f || !img) return;
         const reader = new FileReader();
@@ -1219,6 +1276,7 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
                     <button className="pt-menu-item cvm-row pt-danger" onClick={() => { setMenu(null); resetSource(); }}><RotateCcw />Reset to original source</button>
                     <div className="pt-menu-div" />
                     {files?.checkUpdates && <button className="pt-menu-item cvm-row" onClick={checkUpdates}><RefreshCw />Check for Updates…{appVersion && <span className="cvm-hint">{appVersion}</span>}</button>}
+                    {isWebBuild && <button className="pt-menu-item cvm-row" onClick={() => { setMenu(null); setGetApp(true); }}><Download />Get the Mac app<span className="cvm-hint">free</span></button>}
                     {/* credit: the tool says who made it and where it lives — never the exported résumé, which is the user's */}
                     <button className="pt-menu-item cvm-row cvm-credit" onClick={visitHomepage}><span>Itera <span className="cvm-hint" style={{ marginLeft: 4 }}>by Q Manning</span></span><span className="cvm-hint">qmanning.com ↗</span></button>
                 </div>
@@ -1227,15 +1285,19 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
                 const used = kwUses.filter((u) => u[tab] > 0).length, other: DocKind = tab === "resume" ? "letter" : "resume";
                 const add = () => { const next = normalizeKeywords([...kw.keywords, ...kwDraft.split(",")]); if (next.length !== kw.keywords.length) applyKeywords(next); setKwDraft(""); };
                 return (
-                    <div className="pt-menu-pop pt-open cvm-kw" role="dialog" aria-label="ATS keywords" style={kwPos ? { left: kwPos.x, top: kwPos.y } : { right: 20, top: 92 }} onMouseDown={(e) => { if (!(e.target as HTMLElement).closest("input")) keep(e); }}>
+                    <div ref={kwRef} className="pt-menu-pop pt-open cvm-kw" role="dialog" aria-label="ATS keywords" style={{ ...(kwPos ? { left: kwPos.x, top: kwPos.y } : { right: 20, top: 92 }), ...(kwSize ? { width: kwSize.w, height: kwSize.h } : {}) }} onMouseDown={(e) => { if (!(e.target as HTMLElement).closest("input")) keep(e); }}>
                         <div className="cvm-kw-head" onPointerDown={dragKw}>
                             <ScanSearch /><b>ATS keywords</b>
                             {kw.keywords.length > 0 && <span className="cvm-kw-tally" data-tip={`Used in the ${KIND_LABEL[tab].toLowerCase()}`}>{used}/{kw.keywords.length}</span>}
                             <button className="cvm-kw-x" aria-label="Close" data-tip="Close · reopen from the Itera menu" onClick={() => { setKwOpen(false); setKwActive(null); }}><X /></button>
                         </div>
                         {kw.job && <div className="cvm-kw-job">{kw.job}</div>}
+                        <div className="cvm-kw-add">
+                            <input type="text" value={kwDraft} spellCheck={false} placeholder="Add a keyword…" aria-label="Add a keyword" onChange={(e) => setKwDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }} />
+                            {kw.keywords.length > 0 && <button className="cvm-kw-clear" onClick={() => applyKeywords([], "")}>Clear</button>}
+                        </div>
                         {kw.keywords.length === 0 ? (
-                            <p className="cvm-kw-empty">{remote || assistant ? "Give your AI a job ad and ask it for the keywords an ATS will screen for — they land here. Or add your own below." : "Add the words a job ad is screened for, and see where your documents already use them."}</p>
+                            <p className="cvm-kw-empty">{remote || assistant ? "Give your AI a job ad and ask it for the keywords an ATS will screen for — they land here. Or add your own above." : "Add the words a job ad is screened for, and see where your documents already use them."}</p>
                         ) : (
                             <div className="cvm-kw-list" role="listbox" aria-label="Keywords">
                                 {kw.keywords.map((term) => {
@@ -1252,10 +1314,6 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
                                 })}
                             </div>
                         )}
-                        <div className="cvm-kw-add">
-                            <input type="text" value={kwDraft} spellCheck={false} placeholder="Add a keyword…" aria-label="Add a keyword" onChange={(e) => setKwDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }} />
-                            {kw.keywords.length > 0 && <button className="cvm-kw-clear" onClick={() => applyKeywords([], "")}>Clear</button>}
-                        </div>
                     </div>
                 );
             })()}
@@ -1293,9 +1351,15 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
                     )}
                 </>
             )}
+            {imgPop && imgRect && (
+                <div className="cvm-imgbox" style={{ left: imgRect.left, top: imgRect.top, width: imgRect.width, height: imgRect.height }} aria-hidden="true">
+                    {["nw", "ne", "se", "sw"].map((c) => <i key={c} className={"cvm-h cvm-h-" + c} style={{ pointerEvents: "auto", cursor: c + "-resize" }} onPointerDown={(e) => resizeImg(e, c)} />)}
+                </div>
+            )}
             {imgPop && (
                 <div className="pt-menu-pop pt-open cvm-imgpop" style={{ left: imgPop.left, top: imgPop.top }}>
                     <button className="pt-menu-item cvm-row" onClick={() => imgFileRef.current?.click()}><ImageUp />Change image…</button>
+                    <button className="pt-menu-item cvm-row" onClick={() => { const img = imgPop.img; img.style.removeProperty("width"); img.style.removeProperty("height"); touch(); setImgPop(null); }}><RotateCcw />Reset size</button>
                 </div>
             )}
             {ctx && <LookMenu look={look} at={ctx} say={say} onClose={() => setCtx(null)} startup={{
@@ -1333,11 +1397,32 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
             <div className="cvm-status">{scale < 1 ? `fit to one page · ${Math.round(scale * 100)}% · ` : ""}{settings.paginate ? `${pages} page${pages > 1 ? "s" : ""}` : `continuous · ${(contentPt / paper.h).toFixed(2)} pages long`} · {paper.name}</div>
             <div id="pt-tip" ref={tipRef} role="tooltip" hidden />
             <div id="pt-toast" className={toast ? "pt-show" : undefined}>{toast}</div>
+            {getApp && (
+                <div className="pt-confirm cvm-getapp" onMouseDown={(e) => { if (e.target === e.currentTarget) setGetApp(false); }}>
+                    <div className="pt-confirm-card cvm-getapp-card" role="dialog" aria-label="Get Itera for Mac">
+                        <div className="cvm-getapp-mark"><IteraGlyph className="cvm-brand-glyph" /></div>
+                        <h3>Itera for Mac</h3>
+                        <p className="cvm-getapp-free">Free · open source</p>
+                        <p className="cvm-getapp-body">Everything here, plus what the browser leaves out: your own AI editing the page as you ask (Claude, ChatGPT — no API key), your résumé as a real file you open and save, a cover letter that shares your header, and updates that arrive on their own.</p>
+                        <div className="cvm-getapp-actions">
+                            <button className="pt-mini" onClick={() => setGetApp(false)}>Not now</button>
+                            <button className="pt-mini pt-primary" onClick={() => { setGetApp(false); if (files?.openExternal) files.openExternal(BRAND_HOME); else window.open(BRAND_HOME, "_blank", "noopener"); }}><Download />Download for Mac</button>
+                        </div>
+                    </div>
+                </div>
+            )}
             {confirm && (
                 <div id="pt-confirm" role="alertdialog" aria-modal="true">
                     <div className="pt-confirm-card"><p style={{ whiteSpace: "pre-line", overflowWrap: "anywhere" }}>{confirm.msg}</p>
                         <div className="pt-ctx-actions"><button className="pt-mini" onClick={() => setConfirm(null)}>Cancel</button><button className="pt-mini pt-danger" onClick={() => { const run = confirm.run; setConfirm(null); run(); }}>{confirm.ok}</button></div>
                     </div>
+                </div>
+            )}
+            {isWebBuild && (
+                <div className="cvm-ask-wrap">
+                    <button type="button" className="cvm-getapp-cta" onClick={() => setGetApp(true)}>
+                        <Sparkles /><b>Edit by asking your AI</b><span>Claude, ChatGPT and others drive Itera — in the free Mac app</span>
+                    </button>
                 </div>
             )}
             {(assistant || remote) && (

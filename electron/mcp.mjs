@@ -20,6 +20,11 @@ const SERVER_NAME = "itera";
 const LEGACY_NAMES = ["cv-maker"];   // what this app called itself until September 2026 — cleaned up whenever we write a config
 
 export function setupMcp({ editorWindow, currentFile, files = () => null, socketPath = "" }) {
+    // the person's own house rules for any AI that connects — folded into the MCP instructions Itera hands out
+    const notesPath = path.join(app.getPath("userData"), "ai-notes.txt");
+    const readNotes = () => { try { return fs.readFileSync(notesPath, "utf8").trim(); } catch { return ""; } };
+    const writeNotes = (text) => { const t = String(text || "").slice(0, 4000).trim(); try { t ? fs.writeFileSync(notesPath, t + "\n") : fs.rmSync(notesPath, { force: true }); } catch { /* not worth a dialog */ } return t; };
+    const instructionsNow = () => { const n = readNotes(); return n ? INSTRUCTIONS + "\n\nHouse rules from the person who owns this résumé — follow them unless they tell you otherwise in the moment:\n" + n : INSTRUCTIONS; };
     const SOCKET = socketPath || (process.platform === "win32" ? `\\\\.\\pipe\\itera-mcp-${os.userInfo().username}` : path.join(app.getPath("userData"), "mcp.sock"));
     let seq = 0, clients = 0, lastSeen = 0; const pending = new Map(), listeners = new Set();
     const changed = () => listeners.forEach((fn) => fn());
@@ -36,7 +41,7 @@ export function setupMcp({ editorWindow, currentFile, files = () => null, socket
     async function handle(method, params, clientName) {
         lastSeen = Date.now(); changed();
         // the catalogue comes from THIS app, not from the stdio process an AI app started hours ago (see mcp/catalog.mjs)
-        if (method === "mcp:hello") return { app: "Itera", version: app.getVersion(), tools: TOOLS, instructions: INSTRUCTIONS };
+        if (method === "mcp:hello") return { app: "Itera", version: app.getVersion(), tools: TOOLS, instructions: instructionsNow() };
         if (method === "mcp:call") return callTool(String(params?.name || ""), params?.args || {}, (inner, p) => handle(inner, p, clientName));
         const shellFiles = () => { const f = files(); if (!f) throw new Error("Itera is still starting. Try again in a moment."); return f; };
         const want = params?.document == null || params.document === "" ? null : (/letter/i.test(String(params.document)) ? "letter" : "resume");
@@ -201,7 +206,7 @@ export function setupMcp({ editorWindow, currentFile, files = () => null, socket
 
     return {
         codexState, connectCodex: andTell(connectCodex), disconnectCodex: andTell(disconnectCodex),
-        socket: SOCKET, entry, claudeState, connectClaude: andTell(connectClaude), disconnectClaude: andTell(disconnectClaude), editorStatus,
+        socket: SOCKET, entry, claudeState, getNotes: readNotes, setNotes: writeNotes, connectClaude: andTell(connectClaude), disconnectClaude: andTell(disconnectClaude), editorStatus,
         state: () => ({ needsMove: temporaryHome() ? needsMove : "", claude: claudeState(), codex: codexState(), codexCommand: `codex mcp add ${SERVER_NAME} --env ELECTRON_RUN_AS_NODE=1 -- ${JSON.stringify(entry().command)} ${JSON.stringify(entry().args[0])}`, clients, lastSeen, snippet: JSON.stringify({ mcpServers: { [SERVER_NAME]: entry() } }, null, 2), claudeCode: `claude mcp add ${SERVER_NAME} --env ELECTRON_RUN_AS_NODE=1 -- ${JSON.stringify(entry().command)} ${JSON.stringify(entry().args[0])}` }),
         onChange: (fn) => { listeners.add(fn); return () => listeners.delete(fn); },
         revealClaudeConfig: () => shell.showItemInFolder(claudeConfigPath()),
