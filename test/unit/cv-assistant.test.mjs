@@ -43,6 +43,15 @@ test("hostile HTML from a model is reduced to harmless formatting", () => {
     assert.match(clean, /<a>bad<\/a>/);
 });
 
+test("model HTML is parsed in an inert document, never on an element of the live page", () => {
+    // a live-page element would start loading <img src=x> and fire onerror before the allowlist ran (seen for real in Electron)
+    const made = [], real = document.createElement.bind(document);
+    document.createElement = (tag) => { made.push(tag); return real(tag); };
+    try { assert.equal(cleanHtml(`<p>ok <img src=x onerror="window.__pwned = 1"></p>`), "<p>ok </p>"); } finally { document.createElement = real; }
+    assert.deepEqual(made, []);
+    assert.equal(window.__pwned, undefined);
+});
+
 test("a list region stays one list: prose is turned into bullets, never dropped in raw", () => {
     const doc = describeDocument(sample, meta), list = doc.blocks.flatMap((b) => b.regions).find((r) => r.list);
     const out = applyOps(sample, [op({ target: list.id, html: "<p>Shipped the rider app redesign.</p><p>Cut support tickets 30%.</p>" })]);

@@ -24,7 +24,7 @@ import { BlockLineHeight, ColumnBreak, LetterSpacing } from "./cv-extensions";
 import { BLOCK_KINDS, UNIT, insertBlock, topBlocks, type BlockKind } from "./cv-blocks";
 import { attachColorPicker, toHex, useInfospectorLook } from "./use-infospector-look";
 import { LookMenu } from "./LookMenu";
-import { applyOps, describeDocument, type CvAssistant } from "./cv-assistant";
+import { applyOps, describeDocument, type CvAssistant, type CvRemote, type CvRemoteHandlers } from "./cv-assistant";
 import { FOOTER_PT, GAP_PT, MIN_FIT, PAPERS, PT, type PaperId, type Source, fullHtml, pageBoxCss, parseSource, slugify } from "./cv-source";
 
 const LOCAL_KEY = "cvm:doc", START_SIZE_KEY = "cvm:startsize", HOME_KEY = "cvm:home";
@@ -130,9 +130,11 @@ export interface CvMakerProps {
     files?: CvFiles;
     /** a desktop shell's bridge to the person's own AI (see cv-assistant.ts); omitted on the web — no prompt bar */
     assistant?: CvAssistant;
+    /** a desktop shell that lets an outside AI app drive the editor (its MCP server); omitted on the web */
+    remote?: CvRemote;
 }
 
-export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl = "/labs/infospector/host.css", rasterizerUrl = "/labs/infospector/vendor/html-to-image.js", files, assistant }: CvMakerProps) {
+export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl = "/labs/infospector/host.css", rasterizerUrl = "/labs/infospector/vendor/html-to-image.js", files, assistant, remote }: CvMakerProps) {
     const look = useInfospectorLook(glassCssUrl);
     const [source, setSource] = useState<Source | null>(null);
     const [name, setName] = useState("Résumé");
@@ -433,7 +435,40 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
         } catch (e) { setAiReply({ message: e instanceof Error ? e.message : "Your AI could not be reached.", undo: null, note: "" }); setAsk(prompt); }
         finally { setAiBusy(""); }
     }, [assistant, aiBusy, aiStatus, serialize, touch]);
-    const undoAssistant = useCallback(() => { if (aiReply?.undo) { setSource(aiReply.undo); setDirty(true); touch(); say("Undone"); } setAiReply(null); }, [aiReply, say, touch]);
+    const remoteUndo = useRef<Source[]>([]);   // edits made from outside (see the remote handlers below)
+    const undoAssistant = useCallback(() => { if (aiReply?.undo) { setSource(aiReply.undo); setDirty(true); touch(); say("Undone"); remoteUndo.current.pop(); } setAiReply(null); }, [aiReply, say, touch]);
+
+    /* ---- an outside AI app drives the editor (the shell's MCP server): same operations, same one-step undo, no key anywhere ---- */
+    const remoteRef = useRef<CvRemoteHandlers | null>(null);
+    const describeNow = useCallback(() => {
+        const { settings: st, name: n, scale: sc, pages: pg } = stateRef.current;
+        return describeDocument(serialize(), { name: n, paper: PAPERS[st.paper].name, pages: st.paginate ? pg : 1, fitScale: Math.round(sc * 100) / 100 });
+    }, [serialize]);
+    remoteRef.current = {
+        describe: describeNow,
+        apply: async (ops, message, by) => {
+            const src = stateRef.current.source; if (!src) throw new Error("No document is open.");
+            const before: Source = { css: src.css, html: serialize() }, pagesBefore = stateRef.current.pages;
+            const out = applyOps(before.html, ops);
+            if (out.applied) {
+                remoteUndo.current.push(before); if (remoteUndo.current.length > 30) remoteUndo.current.shift();
+                setSource({ css: src.css, html: out.html }); setDirty(true);
+                await new Promise((r) => window.setTimeout(r, 700));   // remount + paginate, so the caller learns whether it still fits
+                touch();
+            }
+            const pagesAfter = stateRef.current.pages;
+            setAiReply({ message: message || (out.applied ? `${by} made a change.` : `${by} asked for a change the editor couldn't make.`), undo: out.applied ? before : null, note: [by, out.applied ? `${out.applied} change${out.applied > 1 ? "s" : ""}` : "", pagesAfter > pagesBefore ? `now ${pagesAfter} pages` : "", out.skipped.length ? `${out.skipped.length} skipped` : ""].filter(Boolean).join(" · ") });
+            return { applied: out.applied, skipped: out.skipped, pagesBefore, pagesAfter, fitScale: Math.round(stateRef.current.scale * 100) / 100 };
+        },
+        undo: () => { const last = remoteUndo.current.pop(); if (!last) return false; setSource(last); setDirty(true); touch(); setAiReply(null); say("Undone"); return true; },
+        exportPayload: () => ({ ...exportHtml(), name: slugify(stateRef.current.name) }),
+    };
+    useEffect(() => remote?.serve({
+        describe: () => remoteRef.current!.describe(),
+        apply: (ops, message, by) => remoteRef.current!.apply(ops, message, by),
+        undo: () => remoteRef.current!.undo(),
+        exportPayload: () => remoteRef.current!.exportPayload(),
+    }), [remote]);
 
     /* ---- rows: move / duplicate / delete whichever block holds the caret (a job, the summary, a dual list…) ---- */
     // a block with no text (a divider) is picked by clicking it; otherwise the row is wherever the caret is
@@ -769,15 +804,19 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
                             ))}
                         </div>
                     )}
+{aiStatus?.ready ? (
                     <form className={"cvm-ask" + (aiBusy ? " cvm-ask-busy" : "")} onSubmit={(e) => { e.preventDefault(); runAssistant(ask); }}>
-                        <button type="button" className="pt-rbtn" aria-label="AI settings" data-tip={aiStatus?.ready ? `Your AI: ${aiStatus.label} · change…` : "Connect your AI"} onClick={() => assistant.configure()}>{aiStatus?.ready ? <Sparkles /> : <Settings2 />}</button>
-                        <textarea ref={askRef} rows={1} value={aiBusy || ask} readOnly={!!aiBusy} aria-label="Ask your AI to change this résumé"
-                            placeholder={aiStatus?.ready ? "Ask your AI to change this résumé…  ⌘K" : "Connect your own AI to edit by asking — your key stays on this computer"}
-                            onFocus={() => { setAskFocus(true); if (aiStatus && !aiStatus.ready) { askRef.current?.blur(); assistant.configure(); } }} onBlur={() => setAskFocus(false)}
-                            onChange={(e) => setAsk(e.target.value)}
-                            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); runAssistant(ask); } if (e.key === "Escape") askRef.current?.blur(); }} />
-                        <button type="submit" className="pt-rbtn cvm-ask-send" aria-label="Send" disabled={!!aiBusy || !ask.trim()}><SendHorizontal /></button>
-                    </form>
+                            <button type="button" className="pt-rbtn" aria-label="AI settings" data-tip={aiStatus?.ready ? `Your AI: ${aiStatus.label} · change…` : "Connect your AI"} onClick={() => assistant.configure()}>{aiStatus?.ready ? <Sparkles /> : <Settings2 />}</button>
+                            <textarea ref={askRef} rows={1} value={aiBusy || ask} readOnly={!!aiBusy} aria-label="Ask your AI to change this résumé"
+                                placeholder={aiStatus?.ready ? "Ask your AI to change this résumé…  ⌘K" : "Connect your own AI to edit by asking — your key stays on this computer"}
+                                onFocus={() => { setAskFocus(true); if (aiStatus && !aiStatus.ready) { askRef.current?.blur(); assistant.configure(); } }} onBlur={() => setAskFocus(false)}
+                                onChange={(e) => setAsk(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); runAssistant(ask); } if (e.key === "Escape") askRef.current?.blur(); }} />
+                            <button type="submit" className="pt-rbtn cvm-ask-send" aria-label="Send" disabled={!!aiBusy || !ask.trim()}><SendHorizontal /></button>
+                        </form>
+                    ) : (
+                        <button type="button" className="cvm-ask-connect" onClick={() => assistant.configure()}><Sparkles /><b>Connect your AI</b><span>Claude Desktop and others · no API key needed</span></button>
+                    )}
                 </div>
             )}
             <input ref={fileRef} type="file" accept=".html,.htm,text/html" hidden onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) loadSourceText(await f.text(), f.name.replace(/\.html?$/i, "")); }} />

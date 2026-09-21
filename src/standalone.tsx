@@ -4,7 +4,7 @@
 // wherever), and mounts CvMaker into #cv-maker.
 import { createRoot } from "react-dom/client";
 import CvMaker, { type CvFiles } from "./CvMaker";
-import type { CvAssistant } from "./cv-assistant";
+import type { CvAssistant, CvRemote } from "./cv-assistant";
 import "./cv-maker.css";
 
 type Config = { home?: string; exportServer?: string; backHref?: string };
@@ -16,6 +16,8 @@ declare global {
         cvMakerFiles?: CvFiles;
         /** set by the same preload: the person's own AI (their key never reaches this page) */
         cvMakerAssistant?: CvAssistant;
+        /** and: an outside AI app (through the shell's MCP server) may drive the editor */
+        cvMakerRemote?: CvRemote;
     }
 }
 
@@ -33,6 +35,7 @@ if (el) {
             rasterizerUrl={resolve("./vendor/html-to-image.js")}
             files={window.cvMakerFiles}
             assistant={window.cvMakerAssistant}
+            remote={window.cvMakerRemote}
         />,
     );
 }
