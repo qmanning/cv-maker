@@ -112,7 +112,13 @@ export function setupFiles({ templatePath, smokeDir = "", onWelcome = () => {}, 
             ] },
             { role: "editMenu" },
             { label: "AI", submenu: [{ label: "Connect Your AI…", click: () => onAssistant() }] },
-            { label: "View", submenu: [{ role: "togglefullscreen" }, ...(app.isPackaged ? [] : [{ type: "separator" }, { role: "reload" }, { role: "toggleDevTools" }])] },
+            { label: "View", submenu: [
+                // shown with their shortcuts but NOT registered: the key presses go to the page, which zooms the sheet (the % in the toolbar)
+                { label: "Zoom In", accelerator: "CmdOrCtrl+Plus", registerAccelerator: false, click: () => send("view:zoom", "in") },
+                { label: "Zoom Out", accelerator: "CmdOrCtrl+-", registerAccelerator: false, click: () => send("view:zoom", "out") },
+                { label: "Fit Width", accelerator: "CmdOrCtrl+0", registerAccelerator: false, click: () => send("view:zoom", "fit") },
+                { type: "separator" },
+                { role: "togglefullscreen" }, ...(app.isPackaged ? [] : [{ type: "separator" }, { role: "reload" }, { role: "toggleDevTools" }])] },
             { role: "windowMenu" },
             { role: "help", submenu: [{ label: "Welcome to CV Maker", click: () => onWelcome() }, { type: "separator" }, { label: "CV Maker on the Web", click: () => shell.openExternal("https://qmanning.com/labs/cv-maker") }, { label: "Source on GitHub", click: () => shell.openExternal("https://github.com/qmanning/cv-maker") }] },
         ]));

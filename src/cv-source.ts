@@ -38,3 +38,7 @@ export const fullHtml = (name: string, css: string, body: string, extraCss = "")
 
 // accents fold to their base letter first ("Résumé" → "resume", not "r-sum")
 export const slugify = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "resume";
+
+// ⌘+ / ⌘− walk this ladder from wherever the sheet is now (a live fit like 151% included); ⌘0 goes back to fit-width
+const ZOOM_STEPS = [0.25, 0.33, 0.5, 0.67, 0.75, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3];
+export const stepZoom = (from: number, dir: 1 | -1): number => (dir > 0 ? ZOOM_STEPS.find((z) => z > from + 0.005) ?? ZOOM_STEPS[ZOOM_STEPS.length - 1] : [...ZOOM_STEPS].reverse().find((z) => z < from - 0.005) ?? ZOOM_STEPS[0]);

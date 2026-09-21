@@ -25,7 +25,7 @@ import { BLOCK_KINDS, UNIT, insertBlock, topBlocks, type BlockKind } from "./cv-
 import { attachColorPicker, toHex, useInfospectorLook } from "./use-infospector-look";
 import { LookMenu } from "./LookMenu";
 import { applyOps, describeDocument, type CvAssistant, type CvRemote, type CvRemoteHandlers } from "./cv-assistant";
-import { FOOTER_PT, GAP_PT, MIN_FIT, PAPERS, PT, type PaperId, type Source, fullHtml, pageBoxCss, parseSource, slugify } from "./cv-source";
+import { FOOTER_PT, GAP_PT, MIN_FIT, PAPERS, PT, type PaperId, type Source, fullHtml, pageBoxCss, parseSource, slugify, stepZoom } from "./cv-source";
 
 const LOCAL_KEY = "cvm:doc", START_SIZE_KEY = "cvm:startsize", HOME_KEY = "cvm:home";
 const stored = (k: string) => { try { return localStorage.getItem(k) || ""; } catch { return ""; } };
@@ -166,6 +166,7 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
     const paper = PAPERS[settings.paper];
     const zoomMode = typeof settings.zoom === "number" ? "fixed" : settings.zoom === "height" || settings.zoom === "browser" ? "height" : "width";
     const zoom = typeof settings.zoom === "number" ? settings.zoom : fits[zoomMode === "height" ? "height" : "width"];
+    const zoomRef = useRef(zoom); zoomRef.current = zoom;
     const say = useCallback((msg: string) => { setToast(msg); clearTimeout(toastTimer.current); toastTimer.current = setTimeout(() => setToast(""), 2600); }, []);
 
     /* ---- serialize: the clean document, straight from the editors ---- */
@@ -301,6 +302,11 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
     }, [settings.paper, look.ready]);
     const patch = useCallback((p: Partial<Settings>) => { setSettings((s) => ({ ...s, ...p })); setDirty(true); }, []);
 
+    const zoomBy = useCallback((dir: 1 | -1 | 0) => {
+        if (dir === 0) { patch({ zoom: "width" }); return say("Fit width"); }
+        const next = stepZoom(zoomRef.current, dir); patch({ zoom: next }); say(`${Math.round(next * 100)}%`);
+    }, [patch, say]);
+
     /* ---- save (⌘S) ---- */
     const save = useCallback(async (as = false) => {
         const { name: n, settings: s, source: src } = stateRef.current; if (!src) return;
@@ -324,9 +330,17 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
         const key = (e: KeyboardEvent) => {
             if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") { e.preventDefault(); save(!!files && e.shiftKey); }
             if (e.key === "Escape") { setMenu(null); setImgPop(null); setLinkOpen(false); }
+            // ⌘+ / ⌘− / ⌘0 zoom the SHEET (the % in the toolbar), not the whole interface the way a browser's zoom would
+            if ((e.metaKey || e.ctrlKey) && !e.altKey && ["=", "+", "-", "_", "0"].includes(e.key)) { e.preventDefault(); zoomBy(e.key === "0" ? 0 : e.key === "-" || e.key === "_" ? -1 : 1); }
         };
         window.addEventListener("keydown", key); return () => window.removeEventListener("keydown", key);
-    }, [save, files]);
+    }, [save, files, zoomBy]);
+    // a desktop shell's View menu asks for the same thing (its accelerators never reach the page as key presses)
+    useEffect(() => {
+        const on = { "cvm:zoom-in": () => zoomBy(1), "cvm:zoom-out": () => zoomBy(-1), "cvm:zoom-fit": () => zoomBy(0) } as const;
+        (Object.keys(on) as (keyof typeof on)[]).forEach((n) => window.addEventListener(n, on[n]));
+        return () => (Object.keys(on) as (keyof typeof on)[]).forEach((n) => window.removeEventListener(n, on[n]));
+    }, [zoomBy]);
     useEffect(() => files?.onCommand((command) => save(command === "saveAs")), [files, save]);
 
     /* ---- export ---- */

@@ -6,7 +6,7 @@ import { installJsdom, importTransformed } from "./_helpers.mjs";
 
 installJsdom();
 
-const { slugify, fullHtml, parseSource, pageBoxCss, PAPERS, MIN_FIT } = await importTransformed("src/cv-source.ts");
+const { slugify, fullHtml, parseSource, pageBoxCss, PAPERS, MIN_FIT, stepZoom } = await importTransformed("src/cv-source.ts");
 
 /* ---------------- parseSource ---------------- */
 
@@ -124,4 +124,13 @@ test("PAPERS: letter is 612x792pt, a4 is 595x842pt", () => {
 
 test("MIN_FIT is 0.8 (fit-to-one-page never shrinks below 80%)", () => {
     assert.equal(MIN_FIT, 0.8);
+});
+
+test("⌘+ and ⌘− step from wherever the sheet is, including a live fit like 151%", () => {
+    assert.equal(stepZoom(1.51, 1), 1.75);
+    assert.equal(stepZoom(1.51, -1), 1.5);
+    assert.equal(stepZoom(1, 1), 1.1);
+    assert.equal(stepZoom(1, -1), 0.9);
+    assert.equal(stepZoom(3, 1), 3);
+    assert.equal(stepZoom(0.25, -1), 0.25);
 });
