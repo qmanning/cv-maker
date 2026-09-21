@@ -107,7 +107,7 @@ test("fullHtml includes an extra <style> block only when provided", () => {
 /* ---------------- slugify ---------------- */
 
 test("slugify", () => {
-    assert.equal(slugify("Alex Rivera — Résumé"), "alex-rivera-r-sum");
+    assert.equal(slugify("Alex Rivera — Résumé"), "alex-rivera-resume");   // accents fold to their base letter
     assert.equal(slugify(""), "resume");
     assert.equal(slugify("   "), "resume");
     assert.equal(slugify("---"), "resume");

@@ -33,7 +33,25 @@ const ZOOMS = [1, 1.25, 1.5, 2];
 // zoom: a fixed number, or a LIVE fit that tracks the window — "width" (the sheet fills the canvas width; null is the
 // legacy spelling) or "height" (one sheet fills the canvas height; "browser" is its legacy spelling)
 interface Settings { paper: PaperId; paginate: boolean; spellcheck: boolean; zoom: number | "width" | "height" | "browser" | null; fit: boolean }
-interface SavedDoc extends Source { name: string; settings: Settings; savedAt: string }
+interface SavedDoc extends Source { name: string; settings: Settings; savedAt: string; unsaved?: boolean }
+
+/** A desktop shell's file system, when there is one: the document is then a real Source HTML file on disk.
+ *  Without it (every web build) the document lives in this browser — autosave + Import / Export → Source HTML. */
+export interface CvFiles {
+    /** the file that is open right now, read fresh from disk — null when there is none */
+    current(): Promise<{ text: string; name: string } | null>;
+    /** write the Source HTML to the open file; asks where when there is none, or when `as` is set.
+     *  Resolves to the file's name, or null if the person cancelled. */
+    save(html: string, opts: { as?: boolean; suggested: string }): Promise<string | null>;
+    /** show the shell's Open dialog — the chosen file arrives through onOpen */
+    open(): void;
+    /** the shell hands over a document: File → Open, a recent or dropped file, a reload after it changed on disk */
+    onOpen(handler: (doc: { text: string; name: string; note?: string }) => void): () => void;
+    /** the shell's own File menu asks for a save (its ⌘S / ⇧⌘S never reach the page as key presses) */
+    onCommand(handler: (command: "save" | "saveAs") => void): () => void;
+    /** unsaved edits? — the shell's title bar and close guard */
+    setDirty(dirty: boolean): void;
+}
 const DEFAULT_SETTINGS: Settings = { paper: "letter", paginate: true, spellcheck: true, zoom: null, fit: true };
 
 function download(blob: Blob, filename: string) {
@@ -106,9 +124,11 @@ export interface CvMakerProps {
     /** Infospector's stylesheet (the glass chrome) and its html-to-image build (the in-browser PNG fallback) */
     glassCssUrl?: string;
     rasterizerUrl?: string;
+    /** a desktop shell's real files (see CvFiles); omitted on the web */
+    files?: CvFiles;
 }
 
-export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl = "/labs/infospector/host.css", rasterizerUrl = "/labs/infospector/vendor/html-to-image.js" }: CvMakerProps) {
+export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl = "/labs/infospector/host.css", rasterizerUrl = "/labs/infospector/vendor/html-to-image.js", files }: CvMakerProps) {
     const look = useInfospectorLook(glassCssUrl);
     const [source, setSource] = useState<Source | null>(null);
     const [name, setName] = useState("Résumé");
@@ -200,7 +220,7 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
         clearTimeout(saveTimer.current);
         saveTimer.current = setTimeout(() => {
             const { name: n, settings: s, source: src } = stateRef.current; if (!src) return;
-            const doc: SavedDoc = { name: n, css: src.css, html: serialize(), settings: s, savedAt: new Date().toISOString() };
+            const doc: SavedDoc = { name: n, css: src.css, html: serialize(), settings: s, savedAt: new Date().toISOString(), unsaved: true };
             try { localStorage.setItem(LOCAL_KEY, JSON.stringify(doc)); } catch { /* ignore */ }
         }, 600);
     }, [schedule, serialize]);
@@ -211,6 +231,14 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
         (async () => {
             let local: SavedDoc | null = null; try { local = JSON.parse(localStorage.getItem(LOCAL_KEY) || "null"); } catch { /* ignore */ }
             const startPaper = stored(START_SIZE_KEY), paperPatch = startPaper in PAPERS ? { paper: startPaper as PaperId } : {};
+            // with real files, the file on disk is the document — unless this browser still holds edits that never reached it
+            const onDisk = files && !(local?.html && local.unsaved) ? await files.current().catch(() => null) : null;
+            if (dead) return;
+            if (onDisk) {
+                const parsed = parseSource(onDisk.text);
+                setName(parsed.name || onDisk.name); setSettings({ ...DEFAULT_SETTINGS, ...(local?.settings || {}), ...paperPatch }); setSource({ css: parsed.css, html: parsed.html }); return;
+            }
+            if (files && local?.html && local.unsaved) { setDirty(true); say("Restored edits that were never saved to a file"); }
             if (local?.html) { setName(local.name || "Résumé"); setSettings({ ...DEFAULT_SETTINGS, ...(local.settings || {}), ...paperPatch }); setSource({ css: local.css, html: local.html }); return; }
             setSettings((st) => ({ ...st, ...paperPatch }));
             const parsed = parseSource(await fetchSource(templateUrl));
@@ -218,7 +246,7 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
             setName(parsed.name || "Résumé"); setSource({ css: parsed.css, html: parsed.html });
         })().catch(() => say("Could not load the source file"));
         return () => { dead = true; };
-    }, [say, templateUrl]);
+    }, [say, templateUrl, files]);
 
     /* ---- mount the document: one editor per [data-cv-edit], ON the template's element ---- */
     useEffect(() => {
@@ -268,19 +296,32 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
     const patch = useCallback((p: Partial<Settings>) => { setSettings((s) => ({ ...s, ...p })); setDirty(true); }, []);
 
     /* ---- save (⌘S) ---- */
-    const save = useCallback(async () => {
+    const save = useCallback(async (as = false) => {
         const { name: n, settings: s, source: src } = stateRef.current; if (!src) return;
         const doc = { name: n, css: src.css, html: serialize(), settings: s };
+        if (files) {
+            // a real file: the Source HTML goes to disk; this browser keeps a copy only as a safety net
+            try {
+                const file = await files.save(fullHtml(n, src.css, doc.html), { as, suggested: slugify(n) + ".html" });
+                if (!file) return;
+                clearTimeout(saveTimer.current);
+                try { localStorage.setItem(LOCAL_KEY, JSON.stringify({ ...doc, savedAt: new Date().toISOString(), unsaved: false })); } catch { /* ignore */ }
+                setDirty(false); say(`Saved — ${file}`);
+            } catch (e) { say(e instanceof Error ? e.message : "Could not save the file"); }
+            return;
+        }
         try { localStorage.setItem(LOCAL_KEY, JSON.stringify({ ...doc, savedAt: new Date().toISOString() })); setDirty(false); say("Saved in this browser · Export → Source HTML for a portable copy"); }
         catch { say("Could not save in this browser — export the Source HTML instead"); }
-    }, [serialize, say]);
+    }, [serialize, say, files]);
+    useEffect(() => { files?.setDirty(dirty); }, [files, dirty]);
     useEffect(() => {
         const key = (e: KeyboardEvent) => {
-            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") { e.preventDefault(); save(); }
+            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") { e.preventDefault(); save(!!files && e.shiftKey); }
             if (e.key === "Escape") { setMenu(null); setImgPop(null); setLinkOpen(false); }
         };
         window.addEventListener("keydown", key); return () => window.removeEventListener("keydown", key);
-    }, [save]);
+    }, [save, files]);
+    useEffect(() => files?.onCommand((command) => save(command === "saveAs")), [files, save]);
 
     /* ---- export ---- */
     const exportHtml = useCallback(() => {
@@ -327,11 +368,17 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
     }, [exportHtml, exportUrl, paginate, printFallback, rasterizerUrl, say, serialize]);
 
     /* ---- source file: load / reset ---- */
-    const loadSourceText = useCallback((text: string, fallbackName: string) => {
+    const loadSourceText = useCallback((text: string, fallbackName: string, opened?: { note?: string }) => {
         const parsed = parseSource(text);
-        setName(parsed.name || fallbackName); setSource({ css: parsed.css, html: parsed.html }); setDirty(true);
+        setName(parsed.name || fallbackName); setSource({ css: parsed.css, html: parsed.html }); setDirty(!opened);
+        if (opened) {   // it IS the file on disk: nothing unsaved, and the safety-net copy must not outvote it on the next start
+            clearTimeout(saveTimer.current);
+            try { localStorage.setItem(LOCAL_KEY, JSON.stringify({ name: parsed.name || fallbackName, css: parsed.css, html: parsed.html, settings: stateRef.current.settings, savedAt: new Date().toISOString(), unsaved: false })); } catch { /* ignore */ }
+        }
+        if (opened?.note) return say(opened.note);
         say(parsed.regions ? `Loaded — ${parsed.regions} editable regions` : "Loaded, but it has no [data-cv-edit] regions — nothing is editable");
     }, [say]);
+    useEffect(() => files?.onOpen((doc) => loadSourceText(doc.text, doc.name.replace(/\.html?$/i, ""), { note: doc.note })), [files, loadSourceText]);
     const resetSource = useCallback(() => setConfirm({
         msg: "Replace the document with the original source file? Your edits to this document will be lost.", ok: "Replace",
         run: async () => loadSourceText(await fetchSource(templateUrl), "Résumé"),
@@ -500,12 +547,12 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
                 <div className="pt-omni">
                     <span className="pt-omni-icon"><FileText /></span>
                     <input type="text" value={name} spellCheck={false} aria-label="Document name" placeholder="Document name" onChange={(e) => { setName(e.target.value); setDirty(true); }} />
-                    <button className="pt-omni-clear cvm-import" aria-label="Import a source HTML file" data-tip="Import a source HTML file" onClick={() => fileRef.current?.click()}><Upload /></button>
+                    <button className="pt-omni-clear cvm-import" aria-label={files ? "Open a résumé file" : "Import a source HTML file"} data-tip={files ? "Open a résumé file · ⌘O" : "Import a source HTML file"} onClick={() => (files ? files.open() : fileRef.current?.click())}><Upload /></button>
                 </div>
                 <button className="pt-rbtn" {...pill(settings.paginate)} aria-label="Pagination" data-tip={settings.paginate ? "Pagination on · pages + page numbers" : "Pagination off · one continuous page"} onClick={() => patch({ paginate: !settings.paginate })}><BookOpen /></button>
                 <button className="pt-rbtn cvm-secondary" {...pill(settings.spellcheck)} aria-label="Spellcheck" data-tip={settings.spellcheck ? "Spellcheck on" : "Spellcheck off"} onClick={() => patch({ spellcheck: !settings.spellcheck })}><SpellCheck /></button>
                 <button className="pt-rbtn cvm-secondary" aria-label="Toggle theme" data-tip={look.theme === "light" ? "Switch to dark mode" : "Switch to light mode"} onClick={() => look.setTheme(look.theme === "light" ? "dark" : "light")}>{look.theme === "light" ? <Sun /> : <Moon />}</button>
-                <button className="pt-rbtn pt-badge-btn" aria-label="Save" data-tip="Save in this browser · ⌘S" onClick={save}><Save />{dirty && <span className="cvm-dirty" />}</button>
+                <button className="pt-rbtn pt-badge-btn" aria-label="Save" data-tip={files ? "Save · ⌘S   Save As · ⇧⌘S" : "Save in this browser · ⌘S"} onClick={() => save()}><Save />{dirty && <span className="cvm-dirty" />}</button>
                 <button className="pt-rbtn pt-badge-btn" aria-haspopup="true" data-tip="Export" onClick={(e) => openMenu("export", e, "right")}><Download /><span className="cvm-label">{busy ? `${busy}…` : "Export"}</span><ChevronDown style={{ width: 13, height: 13 }} /></button>
                 <button className="pt-rbtn" aria-label="More" aria-haspopup="true" data-tip="Source file · more" onClick={(e) => openMenu("more", e, "right")}><Ellipsis /></button>
             </div>
