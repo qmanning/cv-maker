@@ -121,6 +121,24 @@ Without puppeteer installed, the server still starts and answers every `/export`
 and it renders your document with JavaScript disabled and all network requests blocked except
 `data:`/`about:`/`blob:` — so nothing in your résumé can phone home during export.
 
+## Desktop app (early)
+
+`electron/` runs this same folder as a desktop app. Nothing in the editor knows it's there: the shell
+serves the folder on its own `app://` origin and answers the editor's existing export-server option
+itself, so **PDF and PNG are one click — no `server.mjs`, no puppeteer, no print dialog.**
+
+```bash
+cd electron
+npm install
+npm start
+```
+
+Exports render in a throwaway window with JavaScript off and every network request refused, the same
+posture as `server.mjs`. `npm run smoke` launches the app hidden, exports a PDF and a PNG through the
+real UI, and — if puppeteer is resolvable (or `CVM_PUPPETEER_FROM=/path/with/node_modules`) — compares
+the PDF with puppeteer's, text run by text run. It isn't packaged, signed, or auto-updating yet, and
+your document still lives in the app's own browser storage; opening and saving real files is next.
+
 ## Configuration
 
 Edit `config.js` (loaded as a classic script before the editor's own bundle):

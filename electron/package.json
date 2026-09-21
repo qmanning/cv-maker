@@ -1,0 +1,20 @@
+{
+    "name": "cv-maker-desktop",
+    "productName": "CV Maker",
+    "version": "0.1.0",
+    "description": "CV Maker as a desktop app — the same prebuilt folder, wrapped in Electron. One-click PDF/PNG, no export server.",
+    "author": "Q Manning (https://qmanning.com)",
+    "homepage": "https://qmanning.com/labs/cv-maker",
+    "private": true,
+    "license": "MIT",
+    "type": "module",
+    "main": "main.mjs",
+    "scripts": {
+        "start": "electron .",
+        "smoke": "node smoke.mjs"
+    },
+    "devDependencies": {
+        "electron": "^44.4.3",
+        "pdfjs-dist": "^6.3.289"
+    }
+}
