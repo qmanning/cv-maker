@@ -1,7 +1,7 @@
 {
     "name": "itera-desktop",
     "productName": "Itera",
-    "version": "0.2.0",
+    "version": "0.2.1",
     "description": "Itera as a desktop app — the same prebuilt folder, wrapped in Electron. One-click PDF/PNG, no export server.",
     "author": "Q Manning (https://qmanning.com)",
     "homepage": "https://qmanning.com/labs/itera",
@@ -13,10 +13,10 @@
         "start": "electron .",
         "smoke": "node smoke.mjs",
         "icon": "electron build/make-icon.mjs",
-        "dist": "node build/stamp.mjs && electron-builder --mac",
-        "dist:win": "node build/stamp.mjs && electron-builder --win",
+        "dist": "node build/dist.mjs --mac",
+        "dist:win": "node build/dist.mjs --win",
         "leaks": "node leaks.mjs",
-        "dist:test": "node build/stamp.mjs && electron-builder --mac --arm64"
+        "dist:test": "node build/dist.mjs --mac --arm64"
     },
     "devDependencies": {
         "electron": "^44.4.3",
@@ -99,7 +99,7 @@
             "identity": "-",
             "hardenedRuntime": false,
             "gatekeeperAssess": false,
-            "artifactName": "Itera-${version}-mac-${arch}.${ext}"
+            "artifactName": "Itera-${version}-${env.ITERA_BUILD}-${arch}.${ext}"
         },
         "dmg": {
             "title": "Itera ${version}",
