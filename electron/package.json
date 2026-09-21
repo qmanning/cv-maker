@@ -1,7 +1,7 @@
 {
     "name": "itera-desktop",
     "productName": "Itera",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "description": "Itera as a desktop app — the same prebuilt folder, wrapped in Electron. One-click PDF/PNG, no export server.",
     "author": "Q Manning (https://qmanning.com)",
     "homepage": "https://qmanning.com/labs/itera",
@@ -13,9 +13,10 @@
         "start": "electron .",
         "smoke": "node smoke.mjs",
         "icon": "electron build/make-icon.mjs",
-        "dist": "electron-builder --mac",
-        "dist:win": "electron-builder --win",
-        "leaks": "node leaks.mjs"
+        "dist": "node build/stamp.mjs && electron-builder --mac",
+        "dist:win": "node build/stamp.mjs && electron-builder --win",
+        "leaks": "node leaks.mjs",
+        "dist:test": "node build/stamp.mjs && electron-builder --mac --arm64"
     },
     "devDependencies": {
         "electron": "^44.4.3",
@@ -38,10 +39,12 @@
             "welcome.html",
             "assistant.mjs",
             "mcp.mjs",
+            "mcp/catalog.mjs",
             "updater.mjs",
             "updater-core.mjs",
             "assistant/**",
             "package.json",
+            "build-info.json",
             {
                 "from": "..",
                 "to": "web",
@@ -59,6 +62,10 @@
             {
                 "from": "mcp/server.mjs",
                 "to": "mcp/server.mjs"
+            },
+            {
+                "from": "mcp/catalog.mjs",
+                "to": "mcp/catalog.mjs"
             }
         ],
         "fileAssociations": [

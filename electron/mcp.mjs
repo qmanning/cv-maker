@@ -10,6 +10,7 @@ import readline from "node:readline";
 import { fileURLToPath } from "node:url";
 import { renderExport } from "./export.mjs";
 import { normalize } from "./assistant/prompt.mjs";
+import { INSTRUCTIONS, TOOLS, callTool } from "./mcp/catalog.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const SERVER_NAME = "itera";
@@ -31,6 +32,9 @@ export function setupMcp({ editorWindow, currentFile, files = () => null, socket
 
     async function handle(method, params, clientName) {
         lastSeen = Date.now(); changed();
+        // the catalogue comes from THIS app, not from the stdio process an AI app started hours ago (see mcp/catalog.mjs)
+        if (method === "mcp:hello") return { app: "Itera", version: app.getVersion(), tools: TOOLS, instructions: INSTRUCTIONS };
+        if (method === "mcp:call") return callTool(String(params?.name || ""), params?.args || {}, (inner, p) => handle(inner, p, clientName));
         const shellFiles = () => { const f = files(); if (!f) throw new Error("Itera is still starting. Try again in a moment."); return f; };
         const want = params?.document == null || params.document === "" ? null : (/letter/i.test(String(params.document)) ? "letter" : "resume");
         const named = (k) => (k === "letter" ? "cover_letter" : "resume");
@@ -104,7 +108,11 @@ export function setupMcp({ editorWindow, currentFile, files = () => null, socket
         clients++; changed();
         readline.createInterface({ input: sock }).on("line", async (line) => {
             let m; try { m = JSON.parse(line); } catch { return; }
-            try { sock.write(JSON.stringify({ id: m.id, result: await handle(m.method, m.params, String(m.client || "Your AI").slice(0, 40)) }) + "\n"); }
+            try { let result = await handle(m.method, m.params, String(m.client || "Your AI").slice(0, 40));
+                // a stdio server from BEFORE the relay (its AI app hasn't been restarted since Itera was updated) can't learn about new
+                // tools — so say it where the model will read it, and the model can tell the person
+                if (!m.relay && m.method === "describe" && result && typeof result === "object") result = { itera_notice: `Itera was updated to ${app.getVersion()} and has tools this connection cannot see yet (cover letter, documents, page setup, images, ATS keywords). Tell the person: quit and reopen this AI app once (not just reconnect) to get them.`, ...result };
+                sock.write(JSON.stringify({ id: m.id, result }) + "\n"); }
             catch (e) { sock.write(JSON.stringify({ id: m.id, error: String(e?.message || e) }) + "\n"); }
         });
         const gone = () => { clients = Math.max(0, clients - 1); changed(); };

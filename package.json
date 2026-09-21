@@ -1,6 +1,6 @@
 {
     "name": "itera",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "description": "Edit-in-place résumé editor: your résumé is one HTML file. Flowing columns, fit-to-one-page, PDF/DOCX/PNG export. One prebuilt folder, no build.",
     "author": "Q Manning (https://qmanning.com)",
     "homepage": "https://qmanning.com/labs/itera",

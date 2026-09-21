@@ -6,6 +6,7 @@ import { app, dialog, ipcMain, Menu, shell } from "electron";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const MAX_FILE = 25 * 1024 * 1024;
 const FILTERS = [{ name: "Résumé (HTML)", extensions: ["html", "htm"] }];
@@ -164,6 +165,11 @@ export function setupFiles({ templatePath, letterTemplatePath = "", smokeDir = "
         d.pinned = on ? p : (d.pinned === p ? "" : d.pinned);   // one master per kind; unpin only clears its own
         persist(); buildMenu(); emitRecent(k);
     });
+    // which build is this? — the Itera menu, the About box and the MCP server all say (build-info.json is written by build/stamp.mjs)
+    const buildInfo = (() => { try { return JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "build-info.json"), "utf8")); } catch { return {}; } })();
+    const versionLabel = `${app.getVersion()}${buildInfo.build ? ` · build ${buildInfo.build}` : " · dev"}`;
+    app.setAboutPanelOptions?.({ applicationName: "Itera", applicationVersion: app.getVersion(), version: buildInfo.build ? `build ${buildInfo.build} · ${buildInfo.commit || ""}` : "dev", copyright: "Q Manning · MIT" });
+    ipcMain.handle("shell:version", () => versionLabel);
     // the brand menu's quick actions
     ipcMain.on("shell:check-updates", () => updates?.check());
     ipcMain.on("shell:open-external", (_e, url) => { if (typeof url === "string" && /^(https?:\/\/|mailto:)/i.test(url)) shell.openExternal(url); });   // web pages and mail only — never file: or an app scheme

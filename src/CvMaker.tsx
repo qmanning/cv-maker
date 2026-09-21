@@ -72,8 +72,9 @@ export interface CvFiles {
     onRecent?(handler: (list: RecentDoc[]) => void): () => void;
     /** the shell's own Save panel for an export finished (saved or cancelled) — the scan runs until then */
     onDownload?(handler: (state: string) => void): () => void;
-    /** shell chrome the brand menu drives: check for updates, open a URL outside the app */
+    /** shell chrome the brand menu drives: check for updates, open a URL outside the app, name this build */
     checkUpdates?(): void;
+    version?(): Promise<string>;
     openExternal?(url: string): void;
 }
 
@@ -653,6 +654,8 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
 
     /* ---- brand menu (the Itera mark, far left): quick shell actions ---- */
     const BRAND_HOME = "https://qmanning.com/labs/itera";
+    const [appVersion, setAppVersion] = useState("");
+    useEffect(() => { let dead = false; void files?.version?.().then((v) => { if (!dead) setAppVersion(v); }).catch(() => {}); return () => { dead = true; }; }, [files]);
     const visitHomepage = () => { setMenu(null); if (files?.openExternal) files.openExternal(BRAND_HOME); else window.open(BRAND_HOME, "_blank", "noopener"); };
     const checkUpdates = () => { setMenu(null); files?.checkUpdates?.(); };
 
@@ -1215,7 +1218,7 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
                     <div className="pt-ctx-title">Document</div>
                     <button className="pt-menu-item cvm-row pt-danger" onClick={() => { setMenu(null); resetSource(); }}><RotateCcw />Reset to original source</button>
                     <div className="pt-menu-div" />
-                    {files?.checkUpdates && <button className="pt-menu-item cvm-row" onClick={checkUpdates}><RefreshCw />Check for Updates…</button>}
+                    {files?.checkUpdates && <button className="pt-menu-item cvm-row" onClick={checkUpdates}><RefreshCw />Check for Updates…{appVersion && <span className="cvm-hint">{appVersion}</span>}</button>}
                     {/* credit: the tool says who made it and where it lives — never the exported résumé, which is the user's */}
                     <button className="pt-menu-item cvm-row cvm-credit" onClick={visitHomepage}><span>Itera <span className="cvm-hint" style={{ marginLeft: 4 }}>by Q Manning</span></span><span className="cvm-hint">qmanning.com ↗</span></button>
                 </div>
