@@ -1,10 +1,10 @@
 {
-    "name": "cv-maker-desktop",
-    "productName": "CV Maker",
+    "name": "itera-desktop",
+    "productName": "Itera",
     "version": "0.1.0",
-    "description": "CV Maker as a desktop app — the same prebuilt folder, wrapped in Electron. One-click PDF/PNG, no export server.",
+    "description": "Itera as a desktop app — the same prebuilt folder, wrapped in Electron. One-click PDF/PNG, no export server.",
     "author": "Q Manning (https://qmanning.com)",
-    "homepage": "https://qmanning.com/labs/cv-maker",
+    "homepage": "https://qmanning.com/labs/itera",
     "private": true,
     "license": "MIT",
     "type": "module",
@@ -22,8 +22,8 @@
         "pdfjs-dist": "^6.3.289"
     },
     "build": {
-        "appId": "com.qmanning.cvmaker",
-        "productName": "CV Maker",
+        "appId": "com.qmanning.itera",
+        "productName": "Itera",
         "copyright": "MIT © 2026 Q Manning",
         "directories": {
             "output": "out",
@@ -82,10 +82,10 @@
             "identity": "-",
             "hardenedRuntime": false,
             "gatekeeperAssess": false,
-            "artifactName": "CV-Maker-${version}-mac-${arch}.${ext}"
+            "artifactName": "Itera-${version}-mac-${arch}.${ext}"
         },
         "dmg": {
-            "title": "CV Maker ${version}",
+            "title": "Itera ${version}",
             "background": "build/background.png",
             "iconSize": 92,
             "iconTextSize": 12,
@@ -116,7 +116,7 @@
                     ]
                 }
             ],
-            "artifactName": "CV-Maker-${version}-win-${arch}.${ext}"
+            "artifactName": "Itera-${version}-win-${arch}.${ext}"
         },
         "nsis": {
             "oneClick": false,

@@ -1,5 +1,5 @@
-// src/components/labs/cv-maker/cv-extensions.ts
-// CV Maker's TipTap additions. Font size / weight come from the shared extensions in
+// src/components/labs/itera/cv-extensions.ts
+// Itera's TipTap additions. Font size / weight come from the shared extensions in
 // components/ui; these cover what those don't: letter-spacing, paragraph line-height, column breaks.
 
 import { Extension } from "@tiptap/core";

@@ -119,7 +119,7 @@ export function setupAssistant({ origin, editorWindow, mcp, moveToApplications =
 
     return {
         openSettings, status,
-        /** app://cv-maker/__assistant/* — the settings page's own files */
+        /** app://itera/__assistant/* — the settings page's own files */
         serve(pathname) {
             const name = { "/__assistant/settings.html": "settings.html", "/__assistant/settings.js": "settings.js" }[pathname];
             if (!name) return null;

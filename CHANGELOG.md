@@ -1,29 +1,32 @@
 # Changelog
 
-All notable changes to CV Maker. Format: [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
+All notable changes to Itera. Format: [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 Pull requests add their entry under **Unreleased**; a release moves it under a version.
 
 ## [Unreleased]
+
+### Changed
+- **CV Maker is now Itera** — Latin for "do it again": another pass, another version for another job. The repo is `qmanning/itera` (GitHub redirects the old address), the page is qmanning.com/labs/itera (the old one redirects), the built files are `dist/itera.js` / `dist/itera.css`, the config global is `window.ITERA` and the mount point `#itera` — **`window.CV_MAKER` and `#cv-maker` still work**, so an existing install keeps running after you copy the new files in. The desktop app is *Itera.app*; its MCP server is `itera`, and connecting removes the old `cv-maker` entry from Claude's and ChatGPT's settings. Nothing about your résumé files changes: templates still use `data-cv-*`.
 
 ### Added
 - **⌘+ / ⌘− / ⌘0** (Ctrl on Windows) zoom the sheet by its %, stepping from wherever it is now; ⌘0 returns to fit-width. In every build; the desktop app also lists them under **View**.
 - **A desktop app (early).** `electron/` wraps this same prebuilt folder in Electron — nothing in the editor changes. **PDF** and **PNG** become one click with no export server and no print dialog: the app's own Chromium renders them (real, selectable text; exact page size), with JavaScript off and the network refused, exactly like `server.mjs`. `npm run smoke` drives both exports and, when puppeteer is around, checks the PDF against puppeteer's run by run. Not packaged or signed yet — run it from source: `cd electron && npm install && npm start`.
 - **Desktop: installers.** `npm run dist` builds macOS `.dmg`s (Apple Silicon and Intel, ad-hoc signed), `npm run dist:win` a Windows installer; a `v*` tag builds both on GitHub into a draft release. The builds are unsigned — the README's *First launch* section walks through the one-time approval. The app has its own icon and offers itself under *Open With* for `.html` files (it never takes over as the default).
-- **Desktop: connect the AI app you already use — no API key.** CV Maker runs a local MCP server (`get_resume`, `edit_resume`, `undo_last_edit`, `export_resume`). **AI ▸ Connect Your AI…** connects **Claude Desktop** or **the ChatGPT desktop app / Codex** in one click (it writes the one settings entry, with a backup, and can remove it), and offers copy-paste settings for Claude Code, Cursor, VS Code, LM Studio. Edits arrive on the sheet as one undoable step, labelled with the app that made them; the model is told when an edit spills onto another page. Nothing leaves the computer on CV Maker's account: the AI app talks to it over a socket only your user can open.
+- **Desktop: connect the AI app you already use — no API key.** Itera runs a local MCP server (`get_resume`, `edit_resume`, `undo_last_edit`, `export_resume`). **AI ▸ Connect Your AI…** connects **Claude Desktop** or **the ChatGPT desktop app / Codex** in one click (it writes the one settings entry, with a backup, and can remove it), and offers copy-paste settings for Claude Code, Cursor, VS Code, LM Studio. Edits arrive on the sheet as one undoable step, labelled with the app that made them; the model is told when an edit spills onto another page. Nothing leaves the computer on Itera's account: the AI app talks to it over a socket only your user can open.
 - **Security:** model-written HTML is now parsed in an inert document before the allowlist runs (an `<img onerror>` could otherwise fire first).
-- **Desktop: a prompt bar inside the app (Advanced).** For people who would rather type in CV Maker: a prompt bar under the page (⌘K) sends your words and the résumé to the model **you** connect — Claude (Anthropic API key), or any OpenAI-compatible service: OpenAI, Gemini, OpenRouter, or a local model via Ollama / LM Studio — and applies what comes back as **one undoable step**. The model answers with operations on blocks and text regions, never raw markup, so the design can't break; its HTML passes an allowlist; and if an edit spills onto another page the editor has it tighten up. Keys are encrypted with the OS keychain, stay in the app's main process, and go only to the provider you chose. For embedders: `CvMaker` takes an optional `assistant` prop (`CvAssistant`); without it there is no prompt bar.
-- **Desktop: a welcome sheet** on first launch (and under **Help ▸ Welcome to CV Maker**): what the app is for — your résumé as a real page with your own AI beside it — then *Connect my AI…* (no API key) or *Look around first*. The macOS installer window now carries the first-launch steps and a shortcut straight to **Privacy & Security**.
+- **Desktop: a prompt bar inside the app (Advanced).** For people who would rather type in Itera: a prompt bar under the page (⌘K) sends your words and the résumé to the model **you** connect — Claude (Anthropic API key), or any OpenAI-compatible service: OpenAI, Gemini, OpenRouter, or a local model via Ollama / LM Studio — and applies what comes back as **one undoable step**. The model answers with operations on blocks and text regions, never raw markup, so the design can't break; its HTML passes an allowlist; and if an edit spills onto another page the editor has it tighten up. Keys are encrypted with the OS keychain, stay in the app's main process, and go only to the provider you chose. For embedders: `CvMaker` takes an optional `assistant` prop (`CvAssistant`); without it there is no prompt bar.
+- **Desktop: a welcome sheet** on first launch (and under **Help ▸ Welcome to Itera**): what the app is for — your résumé as a real page with your own AI beside it — then *Connect my AI…* (no API key) or *Look around first*. The macOS installer window now carries the first-launch steps and a shortcut straight to **Privacy & Security**.
 - **Desktop: your résumé is a real file.** Open / Open Recent / drop a file on the window, **Save** and **Save As**, an edited dot in the title bar, a prompt before closing with unsaved work, and the last file re-opens on launch. The app **watches the open file**: when another program edits it (an AI assistant, another editor) the sheet reloads on its own — or asks, if you have unsaved edits. For embedders: `CvMaker` takes an optional `files` prop (the `CvFiles` contract); without it, nothing changes — the document lives in the browser as before.
 - **Add a row anywhere.** Hover the gap between two blocks and a **+** appears on a hairline showing where the new block will land. Click it and choose **Content block** (a paragraph, like the summary), **Experience block** (title, dates, bullets that flow across two columns), **Dual list** (two lists side by side) or **Divider** (a rule between sections — click it to select it, then move or delete it). The new block copies the shape of the matching block already in your document — so it works with any template — arrives with placeholder copy, and takes the caret with that copy selected, ready to type over. Templates can name their prototypes with `data-cv-kind="content|experience|dual"`.
 - Inserted blocks always get **consistent breathing room**: the editor keeps at least 12pt between a new block and its neighbours (re-checked whenever rows move), so a list dropped above a paragraph never ends up butted against it. Two jobs in a row keep the template's own rhythm.
 - The move / duplicate / delete tools now work on **any** block that holds the caret (the summary, a dual list…), not only on jobs.
-- The **⋯** menu now ends with a credit: **CV Maker by Q Manning**, linking to qmanning.com/labs/cv-maker. (The credit lives in the tool only — never in an exported résumé, which is yours.)
+- The **⋯** menu now ends with a credit: **Itera by Q Manning**, linking to qmanning.com/labs/itera. (The credit lives in the tool only — never in an exported résumé, which is yours.)
 
 ### Fixed
 - Export file names keep accented letters' base letter: "Mara Quill — Résumé" now exports as `mara-quill-resume.pdf`, not `mara-quill-r-sum.pdf`.
 
 ### Changed
-- CV Maker's glass now defaults to **Blur 44px** and **Backing 56%** (Infospector's own defaults are 8px / 35%): the chrome floats over a white sheet of small type, so it needs the heavier glass to stay legible. The defaults only apply while those dials are untouched — a look you've set, in either tool, still wins.
+- Itera's glass now defaults to **Blur 44px** and **Backing 56%** (Infospector's own defaults are 8px / 35%): the chrome floats over a white sheet of small type, so it needs the heavier glass to stay legible. The defaults only apply while those dials are untouched — a look you've set, in either tool, still wins.
 
 ## [0.1.0] — 2026-09-18
 
@@ -63,9 +66,9 @@ Pull requests add their entry under **Unreleased**; a release moves it under a v
 - Ships prebuilt (`dist/` is committed) as one folder of static files — no build step for users, any
   URL depth, no framework requirement.
 
-[Unreleased]: https://github.com/qmanning/cv-maker/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/qmanning/cv-maker/releases/tag/v0.1.0
+[Unreleased]: https://github.com/qmanning/itera/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/qmanning/itera/releases/tag/v0.1.0
 
 ---
 
-Made by [Q Manning](https://qmanning.com) · [Source on GitHub](https://github.com/qmanning/cv-maker) · [See it live in the Labs](https://qmanning.com/labs/cv-maker)
+Made by [Q Manning](https://qmanning.com) · [Source on GitHub](https://github.com/qmanning/itera) · [See it live in the Labs](https://qmanning.com/labs/itera)

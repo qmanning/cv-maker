@@ -1,4 +1,4 @@
-// src/components/labs/cv-maker/cv-blocks.ts
+// src/components/labs/itera/cv-blocks.ts
 // New rows for the "+" between blocks. A new block is CLONED from the matching block already in the
 // document (so it wears that template's own markup and classes, whatever they are) and filled with
 // placeholder copy; only when the document has no block of that kind does a plain built-in one step in.

@@ -1,4 +1,4 @@
-// Unit tests for CV Maker's TipTap extensions (src/cv-extensions.ts): letter-spacing, per-paragraph
+// Unit tests for Itera's TipTap extensions (src/cv-extensions.ts): letter-spacing, per-paragraph
 // line-height, and column breaks, plus the shared font-size/font-weight extensions build.mjs remaps in
 // from src/shared/. Builds a headless TipTap Editor with the SAME StarterKit configuration
 // src/CvMaker.tsx uses (read there: trailingNode: false, plus TextStyle/Color/FontSize/FontWeight/
@@ -95,7 +95,7 @@ test("setBlockLineHeight / unsetBlockLineHeight", () => {
     ed.destroy();
 });
 
-test("setFontSize / unsetFontSize (shared extension, sanity check against the cv-maker extension list)", () => {
+test("setFontSize / unsetFontSize (shared extension, sanity check against the editor's extension list)", () => {
     const ed = makeEditor("<p>x</p>");
     ed.commands.setTextSelection({ from: 1, to: 2 });
     ed.commands.setFontSize("12pt");

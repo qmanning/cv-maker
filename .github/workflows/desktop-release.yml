@@ -36,5 +36,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --draft --title "CV Maker ${GITHUB_REF_NAME#v}" --notes "See CHANGELOG.md. Unsigned builds — README → Desktop app → First launch."
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --draft --title "Itera ${GITHUB_REF_NAME#v}" --notes "See CHANGELOG.md. Unsigned builds — README → Desktop app → First launch."
           for f in *.dmg *.exe; do [ -e "$f" ] && gh release upload "$GITHUB_REF_NAME" "$f" --clobber; done

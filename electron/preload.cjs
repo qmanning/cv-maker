@@ -27,7 +27,7 @@ contextBridge.exposeInMainWorld("cvMakerAssistant", {
         .catch((e) => { throw new Error(String(e && e.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, "")); }),
 });
 
-// an AI app outside CV Maker (through the shell's MCP server) drives the editor: the shell calls, the editor's handlers answer
+// an AI app outside Itera (through the shell's MCP server) drives the editor: the shell calls, the editor's handlers answer
 let remoteHandlers = null;
 contextBridge.exposeInMainWorld("cvMakerRemote", { serve: (handlers) => { remoteHandlers = handlers; return () => { if (remoteHandlers === handlers) remoteHandlers = null; }; } });
 ipcRenderer.on("remote:call", async (_e, { id, method, args }) => {

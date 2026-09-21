@@ -1,4 +1,4 @@
-/* CV Maker — only what Infospector's host.css (loaded at runtime) doesn't already give us.
+/* Itera — only what Infospector's host.css (loaded at runtime) doesn't already give us.
    Everything here leans on its --pt-* / glass tokens, so the two tools always look alike. */
 
 .cvm-root {

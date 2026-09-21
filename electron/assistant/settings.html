@@ -43,11 +43,11 @@
 <body>
   <header>
     <h1>Connect your AI</h1>
-    <p>Use the AI app you already have. It reads the résumé that's open here and changes it while you watch. No API key, no account, nothing to pay CV Maker.</p>
+    <p>Use the AI app you already have. It reads the résumé that's open here and changes it while you watch. No API key, no account, nothing to pay Itera.</p>
   </header>
   <main>
     <section class="card warn" id="needs-move" hidden>
-      <div class="cardhead"><b>First, install CV Maker in Applications</b></div>
+      <div class="cardhead"><b>First, install Itera in Applications</b></div>
       <p class="sub" id="needs-move-text"></p>
       <div class="actions"><button class="primary" id="move-now">Install in Applications and reopen</button></div>
     </section>
@@ -56,8 +56,8 @@
       <p class="sub" id="claude-sub"></p>
       <div class="actions"><button class="primary" id="claude-connect">Connect Claude Desktop</button><button class="quiet2" id="claude-disconnect" hidden>Disconnect</button></div>
       <ol class="steps" id="claude-steps" hidden>
-        <li><b>Quit Claude and open it again</b> so it notices CV Maker.</li>
-        <li>In a Claude chat, ask: <i>“Tailor my résumé to this job description”</i> and paste it in. Claude will ask permission to use CV Maker the first time.</li>
+        <li><b>Quit Claude and open it again</b> so it notices Itera.</li>
+        <li>In a Claude chat, ask: <i>“Tailor my résumé to this job description”</i> and paste it in. Claude will ask permission to use Itera the first time.</li>
         <li>Watch the page here. Every change comes with an <b>Undo</b>.</li>
       </ol>
     </section>
@@ -68,7 +68,7 @@
       <div class="actions"><button class="primary" id="codex-connect">Connect ChatGPT / Codex</button><button class="quiet2" id="codex-disconnect" hidden>Disconnect</button></div>
       <ol class="steps" id="codex-steps" hidden>
         <li><b>Quit and reopen</b> the ChatGPT app (or start a new Codex session).</li>
-        <li>Ask it: <i>“Use CV Maker to tighten my résumé to one page.”</i></li>
+        <li>Ask it: <i>“Use Itera to tighten my résumé to one page.”</i></li>
       </ol>
     </section>
 
@@ -79,7 +79,7 @@
     </section>
 
     <details id="advanced">
-      <summary>Advanced: type requests inside CV Maker with an API key</summary>
+      <summary>Advanced: type requests inside Itera with an API key</summary>
       <p class="sub" style="margin-top:10px">This adds a prompt bar under the page. It needs a pay-as-you-go API key, or a model running on this computer.</p>
     <div class="seg" role="radiogroup" aria-label="Provider">
       <label><input type="radio" name="provider" value="anthropic" /><b>Claude</b><span>Anthropic API key</span></label>
@@ -92,14 +92,14 @@
     <div class="row" id="row-model-text" hidden><label for="modelText">Model name</label><input id="modelText" type="text" spellcheck="false" placeholder="exactly as your provider spells it" /><p class="hint" id="model-hint"></p></div>
     <div class="row" id="row-key" hidden><label for="key">API key</label><input id="key" type="password" spellcheck="false" autocomplete="off" /><p class="hint" id="key-hint"></p></div>
 
-    <div class="note"><b>Where your key goes:</b> it is encrypted by your computer's keychain and kept on this computer. When you ask for a change, CV Maker sends your request and the résumé's text directly to the provider you chose above, and nowhere else. Nothing goes to qmanning.com. With a model on this computer, nothing leaves it at all.</div>
+    <div class="note"><b>Where your key goes:</b> it is encrypted by your computer's keychain and kept on this computer. When you ask for a change, Itera sends your request and the résumé's text directly to the provider you chose above, and nowhere else. Nothing goes to qmanning.com. With a model on this computer, nothing leaves it at all.</div>
       <div class="note"><b>Where a key goes:</b> it is encrypted by this computer's keychain and kept here. Requests go from this computer directly to the provider you chose. Nothing goes to qmanning.com.</div>
       <div id="result" role="status"></div>
       <div class="actions" style="margin-top:12px"><button class="quiet" id="forget" hidden>Disconnect</button><button id="test">Test</button><button class="primary" id="save">Save</button></div>
     </details>
   </main>
   <footer>
-    <span class="hint" style="margin-right:auto">CV Maker only listens on this computer, and only to your user account.</span>
+    <span class="hint" style="margin-right:auto">Itera only listens on this computer, and only to your user account.</span>
     <button id="cancel">Done</button>
   </footer>
   <script src="./settings.js"></script>

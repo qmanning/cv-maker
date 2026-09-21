@@ -1,4 +1,4 @@
-// src/components/labs/cv-maker/LookMenu.tsx
+// src/components/labs/itera/LookMenu.tsx
 // The right-click menu — Infospector's #pt-ctx and its "Material & Light" flyout (#pt-ap-pop): same
 // markup, classes and order (styled by its host.css), same glass color picker on every swatch,
 // driven by the shared look state. If Infospector's index.html changes this menu, mirror it here.
@@ -108,13 +108,13 @@ export function LookMenu({ look, at, startup, say, onClose }: { look: Look; at: 
                 <ColorRow label="Accent" value={fx.accent} fmt={fmt} alpha={false} tip="Highlights: focus rings, selection, buttons" onPick={(c) => setBg({ accent: toHex(c) })} />
                 <div className="pt-menu-div" />
                 <div className="pt-ctx-title">Start-up</div>
-                <label className="pt-ctx-color" data-tip="The paper CV Maker opens with">
+                <label className="pt-ctx-color" data-tip="The paper Itera opens with">
                     <span>Size</span>
                     <select className="pt-fmt pt-start-select" aria-label="Start-up size" value={startup.size} onChange={(e) => { startup.setSize(e.target.value); say("Start-up size saved"); }}>
                         {startup.sizes.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                     </select>
                 </label>
-                <label className="pt-ctx-color" data-tip="The source HTML file CV Maker starts from (a path on this site, or a full URL)">
+                <label className="pt-ctx-color" data-tip="The source HTML file Itera starts from (a path on this site, or a full URL)">
                     <span>Page</span>
                     <input type="text" spellCheck={false} placeholder={startup.defaultPage} aria-label="Start-up source file" value={page} onChange={(e) => setPage(e.target.value)}
                         onBlur={() => { const v = page.trim(); if (v !== startup.page) { startup.setPage(v); say(v ? "Start-up source saved" : "Start-up source cleared"); } }}

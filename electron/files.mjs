@@ -19,7 +19,7 @@ export function setupFiles({ templatePath, smokeDir = "", onWelcome = () => {}, 
     const persist = () => { try { fs.writeFileSync(statePath(), JSON.stringify({ current, recent }, null, 2)); } catch { /* not worth a dialog */ } };
     const title = () => {
         if (!win || win.isDestroyed()) return;
-        win.setTitle((current ? path.basename(current) : "Untitled") + (dirty && process.platform !== "darwin" ? " •" : "") + " — CV Maker");
+        win.setTitle((current ? path.basename(current) : "Untitled") + (dirty && process.platform !== "darwin" ? " •" : "") + " — Itera");
         win.setRepresentedFilename(current || ""); win.setDocumentEdited(dirty);   // macOS: the proxy icon and the dot in the close button
     };
     const send = (channel, payload) => { if (win && !win.isDestroyed()) win.webContents.send(channel, payload); };
@@ -120,7 +120,7 @@ export function setupFiles({ templatePath, smokeDir = "", onWelcome = () => {}, 
                 { type: "separator" },
                 { role: "togglefullscreen" }, ...(app.isPackaged ? [] : [{ type: "separator" }, { role: "reload" }, { role: "toggleDevTools" }])] },
             { role: "windowMenu" },
-            { role: "help", submenu: [{ label: "Welcome to CV Maker", click: () => onWelcome() }, { type: "separator" }, { label: "CV Maker on the Web", click: () => shell.openExternal("https://qmanning.com/labs/cv-maker") }, { label: "Source on GitHub", click: () => shell.openExternal("https://github.com/qmanning/cv-maker") }] },
+            { role: "help", submenu: [{ label: "Welcome to Itera", click: () => onWelcome() }, { type: "separator" }, { label: "Itera on the Web", click: () => shell.openExternal("https://qmanning.com/labs/itera") }, { label: "Source on GitHub", click: () => shell.openExternal("https://github.com/qmanning/itera") }] },
         ]));
     }
 
