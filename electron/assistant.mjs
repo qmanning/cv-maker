@@ -11,7 +11,7 @@ import { PRESETS, checkBaseUrl, runOpenAiCompatible } from "./assistant/openai-c
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
-export function setupAssistant({ origin, editorWindow, mcp, moveToApplications = () => false }) {
+export function setupAssistant({ origin, editorWindow, mcp, moveToApplications = () => false, updates = null }) {
     const file = () => path.join(app.getPath("userData"), "assistant.json");
     let settings = { provider: "", preset: "", baseUrl: "", model: "", key: "" }, sessionKey = "", win = null;
     try { settings = { ...settings, ...JSON.parse(fs.readFileSync(file(), "utf8")) }; } catch { /* not set up yet */ }
@@ -99,14 +99,19 @@ export function setupAssistant({ origin, editorWindow, mcp, moveToApplications =
     ipcMain.handle("assistant-settings:move-to-applications", (e) => { if (!fromSettings(e)) throw new Error("not allowed"); return moveToApplications(); });
     ipcMain.handle("assistant-settings:mcp-copy", (e, what) => { if (!fromSettings(e)) return false; const m = mcp.state(); clipboard.writeText(what === "claude-code" ? m.claudeCode : what === "codex" ? m.codexCommand : m.snippet); return true; });
     mcp.onChange(() => { if (win && !win.isDestroyed()) win.webContents.send("assistant-settings:mcp-changed", mcp.state()); });
+    // Updates live in the same Settings window
+    const updateState = () => ({ available: !!updates, auto: !!updates?.auto(), version: app.getVersion() });
+    ipcMain.handle("assistant-settings:updates-get", (e) => (fromSettings(e) ? updateState() : null));
+    ipcMain.handle("assistant-settings:updates-set", (e, on) => { if (!fromSettings(e)) throw new Error("not allowed"); updates?.setAuto(!!on); return updateState(); });
+    ipcMain.on("assistant-settings:updates-check", (e) => { if (fromSettings(e)) updates?.check(); });
     ipcMain.on("assistant-settings:close", (e) => { if (fromSettings(e)) win?.close(); });
 
-    function openSettings() {
+    function openSettings(section = "") {
         const parent = editorWindow(); if (!parent || parent.isDestroyed()) return;
-        if (win && !win.isDestroyed()) return win.focus();
+        if (win && !win.isDestroyed()) { if (section) win.webContents.send("assistant-settings:show", section); return win.focus(); }
         win = new BrowserWindow({
-            parent, modal: true, show: false, width: 580, height: 640, useContentSize: true, resizable: false, minimizable: false, maximizable: false, fullscreenable: false,
-            backgroundColor: "#14161c", title: "Connect Your AI",
+            parent, modal: true, show: false, width: 580, height: 740, useContentSize: true, resizable: false, minimizable: false, maximizable: false, fullscreenable: false,
+            backgroundColor: "#14161c", title: "Settings",
             webPreferences: { preload: path.join(here, "assistant", "settings-preload.cjs"), contextIsolation: true, nodeIntegration: false, sandbox: true },
         });
         win.setMenuBarVisibility(false);
@@ -114,7 +119,7 @@ export function setupAssistant({ origin, editorWindow, mcp, moveToApplications =
         win.webContents.setWindowOpenHandler(({ url }) => { if (/^https:\/\//i.test(url)) shell.openExternal(url); return { action: "deny" }; });
         win.once("ready-to-show", () => win?.show());
         win.on("closed", () => { win = null; });
-        win.loadURL(origin + "/__assistant/settings.html");
+        win.loadURL(origin + "/__assistant/settings.html" + (section ? "#" + encodeURIComponent(section) : ""));
     }
 
     return {

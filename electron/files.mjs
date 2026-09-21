@@ -102,6 +102,8 @@ export function setupFiles({ templatePath, smokeDir = "", onWelcome = () => {}, 
             ...(mac ? [{ label: app.name, submenu: [
                 { role: "about" },
                 ...updateItems,
+                { type: "separator" },
+                { label: "Settings…", accelerator: "CmdOrCtrl+,", click: () => onAssistant() },
                 { type: "separator" }, { role: "services" }, { type: "separator" }, { role: "hide" }, { role: "hideOthers" }, { role: "unhide" }, { type: "separator" }, { role: "quit" },
             ] }] : []),
             { label: "File", submenu: [
@@ -113,10 +115,13 @@ export function setupFiles({ templatePath, smokeDir = "", onWelcome = () => {}, 
                 { label: "Save As…", accelerator: "Shift+CmdOrCtrl+S", click: () => send("files:command", "saveAs") },
                 { type: "separator" },
                 { label: mac ? "Show in Finder" : "Show in Folder", enabled: !!current, click: () => current && shell.showItemInFolder(current) },
+                { type: "separator" },
+                { label: "Settings…", accelerator: mac ? undefined : "CmdOrCtrl+,", click: () => onAssistant() },   // on a Mac ⌘, belongs to the app menu's copy
+                ...(updates ? [{ label: "Check for Updates…", click: () => updates.check() }] : []),
                 ...(mac ? [] : [{ type: "separator" }, { role: "quit" }]),
             ] },
             { role: "editMenu" },
-            { label: "AI", submenu: [{ label: "Connect Your AI…", click: () => onAssistant() }] },
+            { label: "AI", submenu: [{ label: "Connect Your AI…", click: () => onAssistant() }, { label: "API Key (Advanced)…", click: () => onAssistant("advanced") }] },
             { label: "View", submenu: [
                 // shown with their shortcuts but NOT registered: the key presses go to the page, which zooms the sheet (the % in the toolbar)
                 { label: "Zoom In", accelerator: "CmdOrCtrl+Plus", registerAccelerator: false, click: () => send("view:zoom", "in") },
