@@ -27,6 +27,16 @@ contextBridge.exposeInMainWorld("cvMakerAssistant", {
         .catch((e) => { throw new Error(String(e && e.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, "")); }),
 });
 
+// an AI app outside CV Maker (through the shell's MCP server) drives the editor: the shell calls, the editor's handlers answer
+let remoteHandlers = null;
+contextBridge.exposeInMainWorld("cvMakerRemote", { serve: (handlers) => { remoteHandlers = handlers; return () => { if (remoteHandlers === handlers) remoteHandlers = null; }; } });
+ipcRenderer.on("remote:call", async (_e, { id, method, args }) => {
+    try {
+        if (!remoteHandlers || typeof remoteHandlers[method] !== "function") throw new Error("The editor isn't ready yet.");
+        ipcRenderer.send("remote:result", { id, ok: true, value: await remoteHandlers[method](...(args || [])) });
+    } catch (e) { ipcRenderer.send("remote:result", { id, ok: false, error: String(e && e.message || e) }); }
+});
+
 // AI ▸ Ask Your AI… (⌘K): the menu's accelerator swallows the key press, so the shell asks us to focus the prompt bar
 ipcRenderer.on("assistant:focus", () => { const box = document.querySelector(".cvm-ask textarea"); if (box) box.focus(); });
 

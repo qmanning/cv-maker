@@ -157,24 +157,30 @@ posture as `server.mjs`. `npm run smoke` launches the app hidden, exports a PDF 
 real UI, and — if puppeteer is resolvable (or `CVM_PUPPETEER_FROM=/path/with/node_modules`) — compares
 the PDF with puppeteer's, text run by text run. It isn't signed or auto-updating yet.
 
-**Ask your own AI to change it.** This is what the desktop app is for. A prompt bar sits under the
-page (⌘K): *"Tailor this to the job description I'm pasting." "Tighten it to one page." "Make these
-bullets lead with results."* The change lands on the sheet as one step, with **Undo** beside it.
+**Connect the AI app you already use — no API key.** This is what the desktop app is for. CV Maker runs a
+small [MCP](https://modelcontextprotocol.io) server, so your own AI app can read the résumé that's open and
+change it while you watch: *"Tailor my résumé to this job description." "Tighten it to one page."* Every
+change lands on the sheet as one step with **Undo** beside it.
 
-- **Bring your own model** (AI ▸ AI Settings…): Claude with an Anthropic API key, or anything that speaks
-  the OpenAI chat API — OpenAI, Gemini, OpenRouter, or a model on your own computer through Ollama or
-  LM Studio. There is a **Test** button.
-- **Your key stays yours.** It is encrypted with the operating system's keychain (`safeStorage`), lives only
-  in the app's main process, and is sent to exactly one place: the provider you chose. The editor window
-  never sees it and its CSP can't reach the network anyway. Nothing goes to qmanning.com. With a local
-  model, nothing leaves the computer.
+- **One click to connect** (AI ▸ Connect Your AI…): **Claude Desktop**, and **the ChatGPT desktop app / Codex
+  CLI / Codex IDE extension** (they share `~/.codex/config.toml`). CV Maker adds one entry to the app's
+  settings file, keeps a backup next to it, and can remove it again. For **Claude Code, Cursor, VS Code,
+  LM Studio** and anything else that speaks MCP there is a *Copy the settings* button.
+- **No keys, no account, no network.** The AI app starts `electron/mcp/server.mjs` (dependency-free, run by
+  CV Maker's own binary, so nobody needs Node) and that talks to the running app over a local socket only
+  your user account can open. CV Maker itself never calls an AI service in this mode.
+- **Four tools:** `get_resume`, `edit_resume`, `undo_last_edit`, `export_resume` (PDF / PNG to Downloads).
 - **The design can't break.** The model never rewrites the file. It sees the résumé as addressable blocks
   and regions and answers with operations (set this text, add / duplicate / move / delete that block);
-  the editor applies them, and every scrap of model-written HTML goes through an allowlist first
-  (`src/cv-assistant.ts`). New blocks are cloned from your template's own.
-- **It can see the page; the model can't.** If an edit spills onto another page, the editor notices and
-  asks the model to tighten what it just wrote — up to twice — before showing you the result.
+  the editor applies them, and every scrap of model-written HTML is parsed inertly and passed through an
+  allowlist first (`src/cv-assistant.ts`). New blocks are cloned from your template's own.
+- **It can see the page; the model can't.** `edit_resume` reports pages before and after, and tells the
+  model to tighten up when an edit spills onto another page.
 - It is told not to invent facts: if it needs something it doesn't have ("add my last job"), it asks.
+- **Advanced — a prompt bar inside CV Maker.** If you'd rather type requests in the app, the same window
+  lets you add a pay-as-you-go API key (Claude, OpenAI, Gemini, OpenRouter) or a local model (Ollama,
+  LM Studio). The key is encrypted with the OS keychain, stays in the main process, and goes only to the
+  provider you chose.
 
 The web and drop-in builds don't show the prompt bar: there, point your own assistant at the `.html` file.
 

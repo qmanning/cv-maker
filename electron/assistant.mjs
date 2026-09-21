@@ -2,7 +2,7 @@
 // encrypted with the operating system's keychain (safeStorage), lives only in this main process, and is sent
 // to exactly one place: the provider they chose. The editor window never sees it — it sends words and the
 // document over IPC and gets operations back (the contract is `CvAssistant` in ../src/cv-assistant.ts).
-import { BrowserWindow, ipcMain, safeStorage, app, shell } from "electron";
+import { BrowserWindow, ipcMain, safeStorage, app, shell, clipboard } from "electron";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,7 +11,7 @@ import { PRESETS, checkBaseUrl, runOpenAiCompatible } from "./assistant/openai-c
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
-export function setupAssistant({ origin, editorWindow }) {
+export function setupAssistant({ origin, editorWindow, mcp }) {
     const file = () => path.join(app.getPath("userData"), "assistant.json");
     let settings = { provider: "", preset: "", baseUrl: "", model: "", key: "" }, sessionKey = "", win = null;
     try { settings = { ...settings, ...JSON.parse(fs.readFileSync(file(), "utf8")) }; } catch { /* not set up yet */ }
@@ -86,14 +86,22 @@ export function setupAssistant({ origin, editorWindow }) {
         fs.rmSync(file(), { force: true }); broadcast();
         return publicSettings();
     });
+    // the no-key way (see mcp.mjs): this window is also where "Connect Claude Desktop" lives
+    ipcMain.handle("assistant-settings:mcp-state", (e) => (fromSettings(e) ? mcp.state() : null));
+    ipcMain.handle("assistant-settings:mcp-connect-claude", (e) => { if (!fromSettings(e)) throw new Error("not allowed"); mcp.connectClaude(); return mcp.state(); });
+    ipcMain.handle("assistant-settings:mcp-disconnect-claude", (e) => { if (!fromSettings(e)) throw new Error("not allowed"); mcp.disconnectClaude(); return mcp.state(); });
+    ipcMain.handle("assistant-settings:mcp-connect-codex", (e) => { if (!fromSettings(e)) throw new Error("not allowed"); mcp.connectCodex(); return mcp.state(); });
+    ipcMain.handle("assistant-settings:mcp-disconnect-codex", (e) => { if (!fromSettings(e)) throw new Error("not allowed"); mcp.disconnectCodex(); return mcp.state(); });
+    ipcMain.handle("assistant-settings:mcp-copy", (e, what) => { if (!fromSettings(e)) return false; const m = mcp.state(); clipboard.writeText(what === "claude-code" ? m.claudeCode : what === "codex" ? m.codexCommand : m.snippet); return true; });
+    mcp.onChange(() => { if (win && !win.isDestroyed()) win.webContents.send("assistant-settings:mcp-changed", mcp.state()); });
     ipcMain.on("assistant-settings:close", (e) => { if (fromSettings(e)) win?.close(); });
 
     function openSettings() {
         const parent = editorWindow(); if (!parent || parent.isDestroyed()) return;
         if (win && !win.isDestroyed()) return win.focus();
         win = new BrowserWindow({
-            parent, modal: true, show: false, width: 560, height: 700, useContentSize: true, resizable: false, minimizable: false, maximizable: false, fullscreenable: false,
-            backgroundColor: "#14161c", title: "AI Settings",
+            parent, modal: true, show: false, width: 580, height: 640, useContentSize: true, resizable: false, minimizable: false, maximizable: false, fullscreenable: false,
+            backgroundColor: "#14161c", title: "Connect Your AI",
             webPreferences: { preload: path.join(here, "assistant", "settings-preload.cjs"), contextIsolation: true, nodeIntegration: false, sandbox: true },
         });
         win.setMenuBarVisibility(false);

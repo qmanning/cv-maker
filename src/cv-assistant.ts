@@ -27,6 +27,23 @@ export interface CvAssistant {
     run(request: { prompt: string; document: AiDocument }): Promise<{ message: string; ops: AiOp[] }>;
 }
 
+/** The other direction: an AI app OUTSIDE the editor drives it (the desktop shell runs an MCP server for Claude
+ *  Desktop and friends — no key involved at all). The shell calls in; the editor answers with these. */
+export interface CvRemoteHandlers {
+    /** the document as a model should see it, right now */
+    describe(): AiDocument;
+    /** apply operations as one undoable step; resolves once the page has re-laid itself out, so the caller learns whether it still fits */
+    apply(ops: AiOp[], message: string, by: string): Promise<{ applied: number; skipped: string[]; pagesBefore: number; pagesAfter: number; fitScale: number }>;
+    /** take back the most recent remote edit; false when there is nothing to undo */
+    undo(): boolean;
+    /** what the export pipeline needs to render this document (PDF / PNG happen in the shell) */
+    exportPayload(): { html: string; widthPt: number; heightPt: number; name: string };
+}
+export interface CvRemote {
+    /** the editor hands the shell its handlers; returns a function that withdraws them */
+    serve(handlers: CvRemoteHandlers): () => void;
+}
+
 const KINDS: BlockKind[] = ["content", "experience", "dual", "divider"];
 
 const pageOf = (pageHtml: string): { holder: HTMLElement; page: HTMLElement | null } => {
@@ -55,7 +72,9 @@ export function describeDocument(pageHtml: string, meta: { name: string; paper: 
 /* ---------------- model-written HTML: an allowlist, nothing else survives ---------------- */
 const TAGS = new Set(["P", "UL", "OL", "LI", "STRONG", "B", "EM", "I", "U", "S", "A", "BR", "SPAN"]);
 export function cleanHtml(html: string): string {
-    const box = document.createElement("div"); box.innerHTML = String(html ?? "");
+    // parsed in an INERT document: assigning untrusted markup to innerHTML of an element that belongs to the live
+    // page starts loading its <img>s, and `<img src=x onerror=…>` then runs before anything here could strip it
+    const box = new DOMParser().parseFromString(`<!doctype html><body>${String(html ?? "")}`, "text/html").body;
     const walk = (node: Element) => {
         for (const child of Array.from(node.children)) {
             if (!TAGS.has(child.tagName)) {   // unknown element: keep its text only when it is harmless prose

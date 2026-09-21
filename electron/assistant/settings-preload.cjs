@@ -7,4 +7,13 @@ contextBridge.exposeInMainWorld("cvAssistantSettings", {
     test: (next) => ipcRenderer.invoke("assistant-settings:test", next),
     forget: () => ipcRenderer.invoke("assistant-settings:forget"),
     close: () => ipcRenderer.send("assistant-settings:close"),
+    mcp: {
+        state: () => ipcRenderer.invoke("assistant-settings:mcp-state"),
+        connectClaude: () => ipcRenderer.invoke("assistant-settings:mcp-connect-claude"),
+        disconnectClaude: () => ipcRenderer.invoke("assistant-settings:mcp-disconnect-claude"),
+        connectCodex: () => ipcRenderer.invoke("assistant-settings:mcp-connect-codex"),
+        disconnectCodex: () => ipcRenderer.invoke("assistant-settings:mcp-disconnect-codex"),
+        copy: (what) => ipcRenderer.invoke("assistant-settings:mcp-copy", what),
+        onChange: (handler) => { ipcRenderer.on("assistant-settings:mcp-changed", (_e, state) => handler(state)); },
+    },
 });

@@ -144,3 +144,9 @@ body > .pt-cpick { z-index: 2100; }
 .cvm-root:has(.cvm-ask-wrap) .cvm-status { bottom: 10px; }
 .cvm-root:has(.cvm-ask-wrap) #pt-toast { bottom: 100px; }   /* toasts rise clear of the prompt bar */
 .cvm-root:has(.cvm-ask-wrap) #pt-stagewrap.cvm-wrap { padding-bottom: 128px; }   /* the last lines of the sheet can scroll clear of the bar */
+.cvm-ask-connect { align-self: center; display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 18px 0 14px; border-radius: 999px; cursor: pointer; color: var(--pt-text); font: 13px var(--pt-font);
+  background: linear-gradient(var(--cvm-ask-tint), var(--cvm-ask-tint)), var(--pt-glass); -webkit-backdrop-filter: var(--pt-blur-webkit); backdrop-filter: var(--pt-blur); border: 1px solid var(--pt-glass-brd); box-shadow: var(--pt-shadow); }
+.cvm-ask-connect:hover { border-color: var(--pt-accent, #3666f8); }
+.cvm-ask-connect svg { width: 17px; height: 17px; stroke-width: 2; color: var(--pt-accent, #3666f8); }
+.cvm-ask-connect b { font-weight: 650; } .cvm-ask-connect span { color: var(--pt-text-faint); font-size: 12px; }
+@media (max-width: 560px) { .cvm-ask-connect span { display: none; } }

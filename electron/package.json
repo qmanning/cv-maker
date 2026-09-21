@@ -36,6 +36,7 @@
             "preload.cjs",
             "welcome.html",
             "assistant.mjs",
+            "mcp.mjs",
             "assistant/**",
             "package.json",
             {
@@ -48,6 +49,12 @@
                     "templates/**",
                     "LICENSE"
                 ]
+            }
+        ],
+        "extraResources": [
+            {
+                "from": "mcp/server.mjs",
+                "to": "mcp/server.mjs"
             }
         ],
         "fileAssociations": [

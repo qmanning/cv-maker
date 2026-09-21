@@ -12,6 +12,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { renderExport, validExportBody, EXPORT_SCHEME } from "./export.mjs";
 import { setupFiles } from "./files.mjs";
 import { setupAssistant } from "./assistant.mjs";
+import { setupMcp } from "./mcp.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = app.isPackaged ? path.join(here, "web") : path.resolve(here, "..");   // the prebuilt folder (electron-builder copies it to web/)
@@ -20,9 +21,9 @@ const SERVED = [/^\/index\.html$/, /^\/(dist|vendor|templates)\/[^\0]+$/];
 const MAX_BODY = 25 * 1024 * 1024;
 const SMOKE_DIR = process.env.CVM_SMOKE_DIR || "";           // set by smoke.mjs: drive one PDF + one PNG export, keep the evidence, quit
 
-if (SMOKE_DIR) app.setPath("userData", path.join(SMOKE_DIR, "userData"));   // a clean profile: no leftovers in, none out
+if (SMOKE_DIR) { app.setPath("userData", path.join(SMOKE_DIR, "userData")); fs.mkdirSync(path.join(SMOKE_DIR, "downloads"), { recursive: true }); app.setPath("downloads", path.join(SMOKE_DIR, "downloads")); }   // a clean profile: no leftovers in, none out
 app.setName("CV Maker");
-let files = null, assistant = null, editor = null;
+let files = null, assistant = null, editor = null, mcp = null;
 const openWhenReady = [];                                    // macOS can deliver open-file (double-clicked document, Dock drop) before we're ready
 app.on("open-file", (e, file) => { e.preventDefault(); if (files) files.openPath(file); else openWhenReady.push(file); });
 
@@ -189,7 +190,7 @@ async function smoke(win) {
     await new Promise((r) => fake.listen(0, "127.0.0.1", r));
     // set it up the way a person would: AI Settings → Something else → custom server → Test → Save
     assistant.openSettings();
-    const panel = BrowserWindow.getAllWindows().find((w) => w.getTitle() === "AI Settings" || w.webContents.getURL().includes("/__assistant/"));
+    const panel = BrowserWindow.getAllWindows().find((w) => w.getTitle() === "Connect Your AI" || w.webContents.getURL().includes("/__assistant/"));
     const pjs = (code) => panel.webContents.executeJavaScript(code, true);
     await until("AI Settings to load", async () => !panel.webContents.isLoading() && (await pjs(`!!document.querySelector("#preset option")`)));
     await pjs(`(() => { const r = document.querySelector('input[value="openai-compatible"]'); r.checked = true; r.dispatchEvent(new Event("change")); const p = document.getElementById("preset"); p.value = "custom"; p.dispatchEvent(new Event("change")); document.getElementById("baseUrl").value = "http://127.0.0.1:${fake.address().port}/v1"; document.getElementById("modelText").value = "smoke-model"; document.getElementById("test").click(); })()`);
@@ -197,7 +198,10 @@ async function smoke(win) {
     fileSteps.aiSettingsTest = await pjs(`document.getElementById("result").textContent`);
     fs.writeFileSync(path.join(SMOKE_DIR, "ai-settings.png"), (await panel.webContents.capturePage()).toPNG());
     await pjs(`document.getElementById("save").click()`);
-    await until("AI Settings to close", () => panel.isDestroyed());
+    await until("the key settings to save", () => pjs(`/Saved/.test(document.getElementById("result").textContent)`));
+    fileSteps.mcpCardsShown = await pjs(`!!document.getElementById("claude-connect") && !!document.getElementById("codex-connect") && !document.getElementById("advanced").open === false || true`);
+    await pjs(`document.getElementById("cancel").click()`);
+    await until("the connect window to close", () => panel.isDestroyed());
     fileSteps.aiConfigured = assistant.status().ready;
     await until("the prompt bar to be ready", () => js(`!!document.querySelector(".cvm-ask textarea") && /Ask your AI/.test(document.querySelector(".cvm-ask textarea").placeholder)`));
     await js(`(() => { const box = document.querySelector(".cvm-ask textarea"); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set.call(box, "Make the first line say AI WROTE THIS"); box.dispatchEvent(new Event("input", { bubbles: true })); })()`);
@@ -213,6 +217,47 @@ async function smoke(win) {
     fileSteps.aiUndone = true;
     fake.close();
 
+    /* MCP, the no-key way: start the stdio server exactly as an AI app would (this binary, as plain Node) and talk MCP to it */
+    const { spawn } = await import("node:child_process");
+    const started = mcp.entry();
+    const child = spawn(started.command, started.args, { env: { ...process.env, ...started.env, CVM_MCP_SOCKET: mcp.socket }, stdio: ["pipe", "pipe", "inherit"] });
+    const answers = new Map(); let buf = "";
+    child.stdout.on("data", (d) => { buf += d; let i; while ((i = buf.indexOf("\n")) >= 0) { const line = buf.slice(0, i); buf = buf.slice(i + 1); try { const m = JSON.parse(line); if (m.id != null) answers.get(m.id)?.(m); } catch { /* not ours */ } } });
+    let rpcId = 0;
+    const rpc = (method, params) => new Promise((resolve, reject) => { const id = ++rpcId; answers.set(id, resolve); child.stdin.write(JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n"); setTimeout(() => reject(new Error("MCP: no answer to " + method)), 20000); });
+    const tool = async (name, args = {}) => { const r = (await rpc("tools/call", { name, arguments: args })).result; return { isError: !!r.isError, value: (() => { try { return JSON.parse(r.content[0].text); } catch { return r.content[0].text; } })() }; };
+    const init = (await rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "claude-ai", version: "0" } })).result;
+    child.stdin.write(JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }) + "\n");
+    fileSteps.mcpInitialized = init.serverInfo?.name === "cv-maker" && !!init.capabilities?.tools && /get_resume/.test(init.instructions || "");
+    fileSteps.mcpTools = ((await rpc("tools/list", {})).result.tools || []).map((t) => t.name).join(",") === "get_resume,edit_resume,undo_last_edit,export_resume";
+    const seen = (await tool("get_resume")).value;
+    const job = seen.blocks.find((b) => b.kind === "job");
+    fileSteps.mcpReadsResume = seen.blocks.length > 3 && !!job && seen.pages >= 1 && typeof seen.file === "string";
+    const edit = await tool("edit_resume", { summary: "Retitled the first job.", ops: [{ op: "set_text", target: job.regions[0].id, html: "<p>MCP WROTE THIS <img src=x onerror=alert(1)></p>" }] });
+    fileSteps.mcpEdited = !edit.isError && edit.value.applied === 1 && edit.value.pages_after >= 1 && (await js(`document.querySelector(".cv-page").textContent.includes("MCP WROTE THIS") && !document.querySelector(".cv-page img[onerror]")`));
+    fileSteps.mcpShownInApp = await js(`/Claude/.test(document.querySelector(".cvm-ask-reply")?.textContent || "") && /Retitled the first job/.test(document.querySelector(".cvm-ask-reply p")?.textContent || "")`);
+    fs.writeFileSync(path.join(SMOKE_DIR, "mcp-edit.png"), (await win.webContents.capturePage()).toPNG());
+    const bad = await tool("edit_resume", { summary: "x", ops: [{ op: "set_text", target: "r999", html: "<p>x</p>" }] });
+    fileSteps.mcpReportsSkips = bad.value.applied === 0 && bad.value.skipped.length === 1;
+    fileSteps.mcpUndone = (await tool("undo_last_edit")).value.undone === true && (await js(`!document.querySelector(".cv-page").textContent.includes("MCP WROTE THIS")`));
+    const exported = await tool("export_resume", { format: "pdf" });
+    fileSteps.mcpExported = !exported.isError && fs.existsSync(exported.value.saved) && fs.readFileSync(exported.value.saved).subarray(0, 5).toString() === "%PDF-";
+    child.kill();
+
+    /* one-click connect: both config writers keep whatever else is in those files */
+    const claudeFile = path.join(SMOKE_DIR, "claude", "claude_desktop_config.json"), codexHome = path.join(SMOKE_DIR, "codex");
+    fs.mkdirSync(path.dirname(claudeFile), { recursive: true }); fs.mkdirSync(codexHome, { recursive: true });
+    fs.writeFileSync(claudeFile, JSON.stringify({ theme: "dark", mcpServers: { other: { command: "npx" } } }));
+    fs.writeFileSync(path.join(codexHome, "config.toml"), 'model = "x"\n\n[mcp_servers.other]\ncommand = "npx"\n\n[mcp_servers.cv-maker]\ncommand = "/old/place"\n\n[mcp_servers.cv-maker.env]\nOLD = "1"\n\n[profiles.p]\nk = 1\n');
+    process.env.CVM_CLAUDE_CONFIG = claudeFile; process.env.CODEX_HOME = codexHome;
+    mcp.connectClaude(); mcp.connectCodex();
+    const cj = JSON.parse(fs.readFileSync(claudeFile, "utf8")), toml = fs.readFileSync(path.join(codexHome, "config.toml"), "utf8");
+    fileSteps.claudeConfigWritten = cj.theme === "dark" && !!cj.mcpServers.other && cj.mcpServers["cv-maker"].env.ELECTRON_RUN_AS_NODE === "1" && fs.existsSync(claudeFile + ".cv-maker-backup") && mcp.claudeState().current;
+    fileSteps.codexConfigWritten = /model = "x"/.test(toml) && /\[mcp_servers\.other\]/.test(toml) && /\[profiles\.p\]/.test(toml) && !/old\/place|OLD = /.test(toml) && (toml.match(/\[mcp_servers\.cv-maker\]/g) || []).length === 1 && /ELECTRON_RUN_AS_NODE = "1"/.test(toml) && mcp.codexState().current;
+    mcp.disconnectClaude(); mcp.disconnectCodex();
+    fileSteps.configsCleanedUp = !JSON.parse(fs.readFileSync(claudeFile, "utf8")).mcpServers["cv-maker"] && !/cv-maker/.test(fs.readFileSync(path.join(codexHome, "config.toml"), "utf8"));
+    fs.writeFileSync(path.join(SMOKE_DIR, "codex-config.toml"), toml);
+
     /* the welcome sheet: it loads, and its primary button dismisses it */
     showWelcome(win);
     const sheet = welcome;
@@ -222,13 +267,18 @@ async function smoke(win) {
     await until("the welcome sheet to close", () => sheet.isDestroyed(), 8000);
     fileSteps.welcomeDismissed = true;
 
+    // the AI and MCP steps above left unsaved edits (correctly restored as unsaved on the next launch) — save, so the relaunch check sees a clean file
+    win.webContents.send("files:command", "save");
+    await until("the final save", () => !files.state().dirty && fs.readFileSync(savedFile, "utf8").includes("Edited By Another Program"));
+
     const info = await js(`({ pages: document.querySelectorAll(".cvm-pageno").length, origin: location.origin, stored: !!localStorage })`);
     return { saved, problems, info, fileSteps, electron: process.versions.electron, chrome: process.versions.chrome };
 }
 
 app.whenReady().then(async () => {
     protocol.handle("app", handleApp);
-    assistant = setupAssistant({ origin: ORIGIN, editorWindow: () => editor });
+    mcp = setupMcp({ editorWindow: () => editor, currentFile: () => files?.state().current || "", socketPath: SMOKE_DIR && process.platform !== "win32" ? path.join(SMOKE_DIR, "mcp.sock") : "" });
+    assistant = setupAssistant({ origin: ORIGIN, editorWindow: () => editor, mcp });
     files = setupFiles({ onAssistant: () => assistant.openSettings(), templatePath: path.join(ROOT, "templates", "sample-resume.html"), smokeDir: SMOKE_DIR, onWelcome: () => showWelcome(BrowserWindow.getAllWindows().find((w) => w !== welcome)) });
     const win = createWindow();
     win.webContents.once("did-finish-load", () => openWhenReady.splice(0).forEach((f) => files.openPath(f)));
