@@ -16,6 +16,7 @@ import {
     AlignCenter, AlignLeft, AlignRight, ArrowDown, ArrowLeft, ArrowUp, Bold, BookOpen, BriefcaseBusiness, Plus, Text, ChevronDown, Columns2, Copy, Download,
     Ellipsis, Eraser, FileCode2, FileImage, FileText, FileType2, ImageUp, Italic, Link2, List, Minus, Moon, RotateCcw,
     Save, SpellCheck, Sun, Upload, Trash2, Underline as UnderlineIcon, ALargeSmall, MoveVertical, MoveHorizontal,
+    Sparkles, SendHorizontal, Undo2, Check, Settings2,
 } from "lucide-react";
 import { FontSize } from "@/components/ui/font-size-extension";
 import { FontWeight } from "@/components/ui/font-weight-extension";
@@ -23,6 +24,7 @@ import { BlockLineHeight, ColumnBreak, LetterSpacing } from "./cv-extensions";
 import { BLOCK_KINDS, UNIT, insertBlock, topBlocks, type BlockKind } from "./cv-blocks";
 import { attachColorPicker, toHex, useInfospectorLook } from "./use-infospector-look";
 import { LookMenu } from "./LookMenu";
+import { applyOps, describeDocument, type CvAssistant } from "./cv-assistant";
 import { FOOTER_PT, GAP_PT, MIN_FIT, PAPERS, PT, type PaperId, type Source, fullHtml, pageBoxCss, parseSource, slugify } from "./cv-source";
 
 const LOCAL_KEY = "cvm:doc", START_SIZE_KEY = "cvm:startsize", HOME_KEY = "cvm:home";
@@ -126,9 +128,11 @@ export interface CvMakerProps {
     rasterizerUrl?: string;
     /** a desktop shell's real files (see CvFiles); omitted on the web */
     files?: CvFiles;
+    /** a desktop shell's bridge to the person's own AI (see cv-assistant.ts); omitted on the web — no prompt bar */
+    assistant?: CvAssistant;
 }
 
-export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl = "/labs/infospector/host.css", rasterizerUrl = "/labs/infospector/vendor/html-to-image.js", files }: CvMakerProps) {
+export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl = "/labs/infospector/host.css", rasterizerUrl = "/labs/infospector/vendor/html-to-image.js", files, assistant }: CvMakerProps) {
     const look = useInfospectorLook(glassCssUrl);
     const [source, setSource] = useState<Source | null>(null);
     const [name, setName] = useState("Résumé");
@@ -154,7 +158,7 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
     const wrapRef = useRef<HTMLElement>(null), hostRef = useRef<HTMLDivElement>(null), paperRef = useRef<HTMLDivElement>(null);
     const editorsRef = useRef<Editor[]>([]), tipRef = useRef<HTMLDivElement>(null);
     const fileRef = useRef<HTMLInputElement>(null), imgFileRef = useRef<HTMLInputElement>(null);
-    const stateRef = useRef({ name, settings, source, scale }); stateRef.current = { name, settings, source, scale };
+    const stateRef = useRef({ name, settings, source, scale, pages }); stateRef.current = { name, settings, source, scale, pages };
     const rafRef = useRef(0), saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined), toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
     const paper = PAPERS[settings.paper];
@@ -383,6 +387,53 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
         msg: "Replace the document with the original source file? Your edits to this document will be lost.", ok: "Replace",
         run: async () => loadSourceText(await fetchSource(templateUrl), "Résumé"),
     }), [loadSourceText, templateUrl]);
+
+    /* ---- ask your AI (desktop shells only): words in → operations out → applied as ONE undoable step ---- */
+    const [ask, setAsk] = useState(""), [askFocus, setAskFocus] = useState(false);
+    const [aiBusy, setAiBusy] = useState(""), [aiStatus, setAiStatus] = useState<{ ready: boolean; label: string } | null>(null);
+    const [aiReply, setAiReply] = useState<{ message: string; undo: Source | null; note: string } | null>(null);
+    const askRef = useRef<HTMLTextAreaElement>(null);
+    useEffect(() => {
+        if (!assistant) return;
+        assistant.status().then(setAiStatus).catch(() => setAiStatus({ ready: false, label: "" }));
+        return assistant.onStatus(setAiStatus);
+    }, [assistant]);
+    useEffect(() => {
+        if (!assistant) return;
+        const key = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); askRef.current?.focus(); } };
+        window.addEventListener("keydown", key); return () => window.removeEventListener("keydown", key);
+    }, [assistant]);
+    const runAssistant = useCallback(async (words: string) => {
+        const prompt = words.trim(); if (!assistant || !prompt || aiBusy) return;
+        if (!aiStatus?.ready) return assistant.configure();
+        const first = stateRef.current.source; if (!first) return;
+        const undo: Source = { css: first.css, html: serialize() }, pagesBefore = stateRef.current.pages;
+        setAiReply(null); setAsk("");
+        try {
+            let request = prompt, message = "", applied = 0; const skipped: string[] = [];
+            // up to two automatic follow-ups when an edit spills onto another page: the editor can SEE the layout, the model can't
+            for (let round = 0; round < 3; round++) {
+                setAiBusy(round ? "Tightening to fit the page…" : "Thinking…");
+                const { settings: st, name: n, scale: sc, pages: pg, source: src } = stateRef.current; if (!src) break;
+                const html = round ? serialize() : undo.html;
+                const res = await assistant.run({ prompt: request, document: describeDocument(html, { name: n, paper: PAPERS[st.paper].name, pages: st.paginate ? pg : 1, fitScale: Math.round(sc * 100) / 100 }) });
+                if (!round) message = res.message;
+                if (!res.ops?.length) break;
+                const out = applyOps(html, res.ops); applied += out.applied; skipped.push(...out.skipped);
+                if (!out.applied) break;
+                setSource({ css: src.css, html: out.html }); setDirty(true);
+                await new Promise((r) => window.setTimeout(r, 700));   // remount + paginate
+                const now = stateRef.current.pages;
+                if (!stateRef.current.settings.paginate || now <= pagesBefore) break;
+                request = `Your last edit made the résumé run to ${now} pages; it was ${pagesBefore}. Tighten the wording of what you just wrote — same facts, fewer words — so it fits ${pagesBefore} page${pagesBefore > 1 ? "s" : ""} again. Change nothing else.`;
+            }
+            const over = stateRef.current.settings.paginate && stateRef.current.pages > pagesBefore;
+            setAiReply({ message: message || (applied ? "Done." : "Nothing to change."), undo: applied ? undo : null, note: [applied ? `${applied} change${applied > 1 ? "s" : ""}` : "", over ? `now ${stateRef.current.pages} pages` : "", skipped.length ? `${skipped.length} skipped` : ""].filter(Boolean).join(" · ") });
+            if (applied) touch();
+        } catch (e) { setAiReply({ message: e instanceof Error ? e.message : "Your AI could not be reached.", undo: null, note: "" }); setAsk(prompt); }
+        finally { setAiBusy(""); }
+    }, [assistant, aiBusy, aiStatus, serialize, touch]);
+    const undoAssistant = useCallback(() => { if (aiReply?.undo) { setSource(aiReply.undo); setDirty(true); touch(); say("Undone"); } setAiReply(null); }, [aiReply, say, touch]);
 
     /* ---- rows: move / duplicate / delete whichever block holds the caret (a job, the summary, a dual list…) ---- */
     // a block with no text (a divider) is picked by clicking it; otherwise the row is wherever the caret is
@@ -697,6 +748,36 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
                     <div className="pt-confirm-card"><p>{confirm.msg}</p>
                         <div className="pt-ctx-actions"><button className="pt-mini" onClick={() => setConfirm(null)}>Cancel</button><button className="pt-mini pt-danger" onClick={() => { const run = confirm.run; setConfirm(null); run(); }}>{confirm.ok}</button></div>
                     </div>
+                </div>
+            )}
+            {assistant && (
+                <div className="cvm-ask-wrap">
+                    {aiReply && (
+                        <div className="cvm-ask-reply" role="status">
+                            <p>{aiReply.message}</p>
+                            <div className="cvm-ask-actions">
+                                {aiReply.note && <span className="cvm-hint">{aiReply.note}</span>}
+                                {aiReply.undo && <button className="pt-rbtn cvm-ask-btn" onClick={undoAssistant}><Undo2 />Undo</button>}
+                                <button className="pt-rbtn cvm-ask-btn" onClick={() => setAiReply(null)}><Check />{aiReply.undo ? "Keep" : "OK"}</button>
+                            </div>
+                        </div>
+                    )}
+                    {!aiReply && askFocus && !ask && aiStatus?.ready && !aiBusy && (
+                        <div className="cvm-ask-chips">
+                            {["Tighten the wording so it fits on one page", "Tailor this résumé to the job description I paste below:\n\n", "Fix typos and make every bullet start with a strong verb"].map((c) => (
+                                <button key={c} className="cvm-ask-chip" onMouseDown={(e) => { e.preventDefault(); setAsk(c); askRef.current?.focus(); }}>{c.split(":")[0].replace(" I paste below", "…")}</button>
+                            ))}
+                        </div>
+                    )}
+                    <form className={"cvm-ask" + (aiBusy ? " cvm-ask-busy" : "")} onSubmit={(e) => { e.preventDefault(); runAssistant(ask); }}>
+                        <button type="button" className="pt-rbtn" aria-label="AI settings" data-tip={aiStatus?.ready ? `Your AI: ${aiStatus.label} · change…` : "Connect your AI"} onClick={() => assistant.configure()}>{aiStatus?.ready ? <Sparkles /> : <Settings2 />}</button>
+                        <textarea ref={askRef} rows={1} value={aiBusy || ask} readOnly={!!aiBusy} aria-label="Ask your AI to change this résumé"
+                            placeholder={aiStatus?.ready ? "Ask your AI to change this résumé…  ⌘K" : "Connect your own AI to edit by asking — your key stays on this computer"}
+                            onFocus={() => { setAskFocus(true); if (aiStatus && !aiStatus.ready) { askRef.current?.blur(); assistant.configure(); } }} onBlur={() => setAskFocus(false)}
+                            onChange={(e) => setAsk(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); runAssistant(ask); } if (e.key === "Escape") askRef.current?.blur(); }} />
+                        <button type="submit" className="pt-rbtn cvm-ask-send" aria-label="Send" disabled={!!aiBusy || !ask.trim()}><SendHorizontal /></button>
+                    </form>
                 </div>
             )}
             <input ref={fileRef} type="file" accept=".html,.htm,text/html" hidden onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) loadSourceText(await f.text(), f.name.replace(/\.html?$/i, "")); }} />

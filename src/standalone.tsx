@@ -4,6 +4,7 @@
 // wherever), and mounts CvMaker into #cv-maker.
 import { createRoot } from "react-dom/client";
 import CvMaker, { type CvFiles } from "./CvMaker";
+import type { CvAssistant } from "./cv-assistant";
 import "./cv-maker.css";
 
 type Config = { home?: string; exportServer?: string; backHref?: string };
@@ -13,6 +14,8 @@ declare global {
         CV_MAKER?: Config;
         /** set by a desktop shell's preload (electron/preload.cjs): real Open / Save instead of browser storage */
         cvMakerFiles?: CvFiles;
+        /** set by the same preload: the person's own AI (their key never reaches this page) */
+        cvMakerAssistant?: CvAssistant;
     }
 }
 
@@ -29,6 +32,7 @@ if (el) {
             glassCssUrl={resolve("./vendor/infospector/host.css")}
             rasterizerUrl={resolve("./vendor/html-to-image.js")}
             files={window.cvMakerFiles}
+            assistant={window.cvMakerAssistant}
         />,
     );
 }

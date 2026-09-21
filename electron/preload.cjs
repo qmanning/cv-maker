@@ -1,5 +1,5 @@
 // electron/preload.cjs — the only bridge between the editor and the shell. It exposes CvMaker's
-// `CvFiles` contract (see src/CvMaker.tsx) as window.cvMakerFiles and nothing else: no Node, no paths,
+// `CvFiles` contract (see src/CvMaker.tsx) as window.cvMakerFiles, plus the `CvAssistant` contract as window.cvMakerAssistant, and nothing else: no Node, no paths,
 // no ipcRenderer. (CommonJS because sandboxed preloads can't be ES modules.)
 const { contextBridge, ipcRenderer, webUtils } = require("electron");
 
@@ -17,6 +17,18 @@ contextBridge.exposeInMainWorld("cvMakerFiles", {
     onCommand: subscribe("files:command"),
     setDirty: (dirty) => ipcRenderer.send("files:dirty", !!dirty),
 });
+
+// "ask your AI": words and the document go to the shell, operations come back. The key never comes near this page.
+contextBridge.exposeInMainWorld("cvMakerAssistant", {
+    status: () => ipcRenderer.invoke("assistant:status"),
+    configure: () => ipcRenderer.send("assistant:configure"),
+    onStatus: subscribe("assistant:status-changed"),
+    run: (request) => ipcRenderer.invoke("assistant:run", { prompt: String(request && request.prompt || ""), document: request && request.document })
+        .catch((e) => { throw new Error(String(e && e.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, "")); }),
+});
+
+// AI ▸ Ask Your AI… (⌘K): the menu's accelerator swallows the key press, so the shell asks us to focus the prompt bar
+ipcRenderer.on("assistant:focus", () => { const box = document.querySelector(".cvm-ask textarea"); if (box) box.focus(); });
 
 // drop a résumé file anywhere on the window to open it (the page never sees the path; the shell reads the file)
 window.addEventListener("dragover", (e) => { if (e.dataTransfer && Array.from(e.dataTransfer.types).includes("Files")) e.preventDefault(); });

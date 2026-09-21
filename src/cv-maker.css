@@ -117,3 +117,30 @@ body > .pt-cpick { z-index: 2100; }
 .cvm-status { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 120; font: 600 11px var(--pt-font); color: var(--pt-text-faint); pointer-events: none; white-space: nowrap; }
 
 @media print { .cvm-root { display: none; } }
+
+/* ---- ask your AI: a glass prompt bar docked at the bottom (desktop shells only) ---- */
+.cvm-ask-wrap { position: fixed; left: 50%; bottom: 34px; transform: translateX(-50%); z-index: 121; width: min(640px, calc(100vw - 24px)); display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
+/* prose sits on this glass (not just icons), often over the white sheet — so it gets a tint of its own under the text */
+.cvm-root { --cvm-ask-tint: rgba(14, 16, 22, .52); }
+[data-pt-theme="light"] .cvm-root { --cvm-ask-tint: rgba(255, 255, 255, .55); }
+.cvm-ask, .cvm-ask-reply { background: linear-gradient(var(--cvm-ask-tint), var(--cvm-ask-tint)), var(--pt-glass); -webkit-backdrop-filter: var(--pt-blur-webkit); backdrop-filter: var(--pt-blur); border: 1px solid var(--pt-glass-brd); box-shadow: var(--pt-shadow); border-radius: var(--glass-bar-r); padding: var(--glass-pad, 8px); }
+.cvm-ask { display: flex; align-items: flex-end; gap: 8px; }
+.cvm-ask textarea { flex: 1 1 auto; min-width: 0; min-height: 36px; max-height: 168px; field-sizing: content; resize: none; box-sizing: border-box; padding: 8px 12px; border-radius: var(--glass-item-r); border: 1px solid var(--pt-glass-brd); background: var(--pt-glass-2); color: var(--pt-text); font: 13px/1.45 var(--pt-font); outline: none; }
+.cvm-ask textarea:focus { border-color: var(--pt-accent, #3666f8); }
+.cvm-ask textarea::placeholder { color: var(--pt-text-faint); }
+.cvm-ask svg, .cvm-ask-btn svg { width: 17px; height: 17px; stroke-width: 2; }
+.cvm-ask-send:not(:disabled) { background: var(--pt-accent, #3666f8); color: #fff; border-color: transparent; }
+.cvm-ask-send:disabled { opacity: .45; cursor: default; }
+.cvm-ask-busy textarea { color: var(--pt-text-faint); font-style: italic; animation: cvm-ask-pulse 1.4s ease-in-out infinite; }
+@keyframes cvm-ask-pulse { 50% { opacity: .55; } }
+.cvm-ask-reply { display: flex; flex-direction: column; gap: 8px; padding: calc(var(--glass-pad, 8px) + 4px) calc(var(--glass-pad, 8px) + 6px) var(--glass-pad, 8px); color: var(--pt-text); font: 13px/1.5 var(--pt-font); }
+.cvm-ask-reply p { margin: 0; max-height: 132px; overflow: auto; white-space: pre-wrap; }
+.cvm-ask-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.cvm-ask-actions .cvm-hint { margin-right: auto; }
+.pt-rbtn.cvm-ask-btn { width: auto; padding: 0 14px 0 10px; display: inline-flex; gap: 6px; font: 600 12.5px var(--pt-font); }
+.cvm-ask-chips { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.cvm-ask-chip { border: 1px solid var(--pt-glass-brd); background: var(--pt-glass); -webkit-backdrop-filter: var(--pt-blur-webkit); backdrop-filter: var(--pt-blur); color: var(--pt-text); font: 600 12px var(--pt-font); padding: 6px 12px; border-radius: 999px; cursor: pointer; }
+.cvm-ask-chip:hover { border-color: var(--pt-accent, #3666f8); }
+.cvm-root:has(.cvm-ask-wrap) .cvm-status { bottom: 10px; }
+.cvm-root:has(.cvm-ask-wrap) #pt-toast { bottom: 100px; }   /* toasts rise clear of the prompt bar */
+.cvm-root:has(.cvm-ask-wrap) #pt-stagewrap.cvm-wrap { padding-bottom: 128px; }   /* the last lines of the sheet can scroll clear of the bar */
