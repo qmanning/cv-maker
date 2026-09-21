@@ -39,7 +39,10 @@ body > .pt-cpick { z-index: 2100; }
 .cvm-omni-pin svg { width: 15px; height: 15px; }
 
 /* the Itera mark, far left — a quick-menu trigger in the brand accent that animates on hover */
-.cvm-bar .cvm-brand { flex: none; color: var(--pt-accent); }
+.cvm-bar .cvm-brand { flex: none; display: grid; place-items: center; width: 34px; height: 36px; padding: 0; border: none; background: none; cursor: pointer;
+  color: var(--pt-text); border-radius: var(--cvm-ctl-r); }   /* ghost: no ring, no fill — the mark floats (white on the dark bar) */
+.cvm-bar .cvm-brand .cvm-brand-glyph { width: 27px; height: 27px; }
+.cvm-bar .cvm-brand:focus-visible { outline: 2px solid var(--pt-accent); outline-offset: 1px; }
 .cvm-brand-glyph { transition: transform .25s cubic-bezier(.2, .7, .2, 1); transform-origin: 50% 55%; }
 .cvm-bar .cvm-brand:hover .cvm-brand-glyph { transform: rotate(-8deg) scale(1.12); }
 .cvm-bar .cvm-brand:active .cvm-brand-glyph { transform: rotate(-8deg) scale(1.02); }

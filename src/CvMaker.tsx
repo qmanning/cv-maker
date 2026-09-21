@@ -13,10 +13,10 @@ import { TextStyle } from "@tiptap/extension-text-style";
 import { Color } from "@tiptap/extension-color";
 import { TextAlign } from "@tiptap/extension-text-align";
 import {
-    AlignCenter, AlignLeft, AlignRight, ArrowDown, ArrowLeft, ArrowUp, Bold, BookOpen, BriefcaseBusiness, Plus, Text, ChevronDown, Columns2, Copy, Download,
-    Ellipsis, Eraser, FileCode2, FileImage, FileText, FileType2, ImageUp, Italic, Link2, List, Minus, Moon, RotateCcw,
+    AlignCenter, AlignLeft, AlignRight, ArrowDown, ArrowLeft, ArrowUp, Bold, BookOpen, BriefcaseBusiness, Plus, Text, Columns2, Copy, Download,
+    Eraser, FileCode2, FileImage, FileText, FileType2, ImageUp, Italic, Link2, List, Minus, Moon, RotateCcw,
     Save, SpellCheck, Sun, Upload, Trash2, Underline as UnderlineIcon, ALargeSmall, MoveVertical, MoveHorizontal,
-    Sparkles, SendHorizontal, Undo2, Check, Settings2, X, Star, RefreshCw, ExternalLink,
+    Sparkles, SendHorizontal, Undo2, Check, Settings2, X, Star, RefreshCw,
 } from "lucide-react";
 import { FontSize } from "@/components/ui/font-size-extension";
 import { FontWeight } from "@/components/ui/font-weight-extension";
@@ -822,7 +822,7 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
             {/* main bar — Infospector's #pt-bar */}
             <div id="pt-bar" className="cvm-bar">
                 {backHref && <button className="pt-rbtn" aria-label="Back" data-tip="Back" onClick={() => { window.location.href = backHref; }}><ArrowLeft /></button>}
-                <button className="pt-rbtn cvm-brand" aria-label="Itera menu" aria-haspopup="menu" data-tip="Itera" onClick={(e) => openMenu("brand", e, "left")}><IteraGlyph className="cvm-brand-glyph" /></button>
+                <button className="cvm-brand" aria-label="Itera menu" aria-haspopup="menu" data-tip="Itera" onClick={(e) => openMenu("brand", e, "left")}><IteraGlyph className="cvm-brand-glyph" /></button>
                 <div className="pt-dim">
                     <div className="pt-dim-trigger">
                         <button className="pt-dim-val" aria-haspopup="true" data-tip="Paper size and zoom" onClick={(e) => openMenu("size", e, "left")}>{paper.label}<span className="pt-dim-scale" style={{ color: "var(--pt-text-faint)" }}>· {Math.round(zoom * 100)}%</span></button>
@@ -865,10 +865,8 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
                 </div>
                 <button className="pt-rbtn" {...pill(settings.paginate)} aria-label="Pagination" data-tip={settings.paginate ? "Pagination on · pages + page numbers" : "Pagination off · one continuous page"} onClick={() => patch({ paginate: !settings.paginate })}><BookOpen /></button>
                 <button className="pt-rbtn cvm-secondary" {...pill(settings.spellcheck)} aria-label="Spellcheck" data-tip={settings.spellcheck ? "Spellcheck on" : "Spellcheck off"} onClick={() => patch({ spellcheck: !settings.spellcheck })}><SpellCheck /></button>
-                <button className="pt-rbtn cvm-secondary" aria-label="Toggle theme" data-tip={look.theme === "light" ? "Switch to dark mode" : "Switch to light mode"} onClick={() => look.setTheme(look.theme === "light" ? "dark" : "light")}>{look.theme === "light" ? <Sun /> : <Moon />}</button>
                 <button className="pt-rbtn pt-badge-btn" aria-label="Save" data-tip={files ? "Save · ⌘S   Save As · ⇧⌘S" : "Save in this browser · ⌘S"} onClick={() => save()}><Save />{dirty && <span className="cvm-dirty" />}</button>
-                <button className="pt-rbtn pt-badge-btn" aria-haspopup="true" data-tip="Export" onClick={(e) => openMenu("export", e, "right")}><Download /><span className="cvm-label">{busy ? `${busy}…` : "Export"}</span><ChevronDown style={{ width: 13, height: 13 }} /></button>
-                <button className="pt-rbtn" aria-label="More" aria-haspopup="true" data-tip="Source file · more" onClick={(e) => openMenu("more", e, "right")}><Ellipsis /></button>
+                <button className="pt-rbtn pt-badge-btn" aria-haspopup="true" aria-label="Export" data-tip={busy ? `Exporting ${busy}…` : "Export"} onClick={(e) => openMenu("export", e, "right")}><Download /></button>
             </div>
 
             {/* format bar */}
@@ -927,28 +925,20 @@ export default function CvMaker({ templateUrl, exportUrl, backHref, glassCssUrl 
                     <button className="pt-menu-item cvm-row" onClick={() => runExport("html")}><FileCode2 />Source HTML<span className="cvm-hint">re-loadable</span></button>
                 </div>
             )}
-            {menu?.id === "more" && (
-                <div className="pt-menu-pop pt-open" role="menu" style={{ right: menu.right, top: menu.top, minWidth: 230 }}>
-                    <div className="pt-ctx-title">Source file</div>
-                    <button className="pt-menu-item cvm-row" onClick={() => { setMenu(null); runExport("html"); }}><Download />Download source HTML</button>
-                    <button className="pt-menu-item cvm-row pt-danger" onClick={() => { setMenu(null); resetSource(); }}><RotateCcw />Reset to original source</button>
-                    <div className="pt-menu-div" />
-                    {/* on narrow windows these two leave the bar (so nothing is ever pushed off-screen) and live here */}
-                    <button className="pt-menu-item cvm-row cvm-narrow-only" onClick={() => patch({ spellcheck: !settings.spellcheck })}><SpellCheck />Spellcheck<span className="cvm-hint">{settings.spellcheck ? "on" : "off"}</span></button>
-                    <button className="pt-menu-item cvm-row cvm-narrow-only" onClick={() => look.setTheme(look.theme === "light" ? "dark" : "light")}>{look.theme === "light" ? <Sun /> : <Moon />}Theme<span className="cvm-hint">{look.theme}</span></button>
-                    <button className="pt-menu-item cvm-row" onClick={(e) => { setMenu(null); setCtx({ x: e.clientX - 240, y: e.clientY }); }}><Sun />Background · colors · appearance…</button>
-                    <div className="pt-menu-div" />
-                    {/* credit: the tool says who made it and where it lives — never the exported résumé, which is the user's */}
-                    <a className="pt-menu-item cvm-row cvm-credit" href="https://qmanning.com/labs/itera" target="_blank" rel="noopener" onClick={() => setMenu(null)}>
-                        <span>Itera <span className="cvm-hint" style={{ marginLeft: 4 }}>by Q Manning</span></span><span className="cvm-hint">qmanning.com ↗</span>
-                    </a>
-                </div>
-            )}
             {menu?.id === "brand" && (
                 <div className="pt-menu-pop pt-open cvm-brand-menu" role="menu" style={{ left: menu.left, top: menu.top, minWidth: 220 }}>
-                    <div className="pt-ctx-title">Itera</div>
+                    <div className="pt-ctx-title">Appearance</div>
+                    <button className="pt-menu-item cvm-row" onClick={() => look.setTheme(look.theme === "light" ? "dark" : "light")}>{look.theme === "light" ? <Sun /> : <Moon />}{look.theme === "light" ? "Light mode" : "Dark mode"}<span className="cvm-hint">switch to {look.theme === "light" ? "dark" : "light"}</span></button>
+                    <button className="pt-menu-item cvm-row" onClick={(e) => { setMenu(null); setCtx({ x: e.clientX, y: e.clientY }); }}><Settings2 />Background · colors · appearance…</button>
+                    {/* on narrow windows spellcheck leaves the bar (so nothing is ever pushed off-screen) and lives here */}
+                    <button className="pt-menu-item cvm-row cvm-narrow-only" onClick={() => patch({ spellcheck: !settings.spellcheck })}><SpellCheck />Spellcheck<span className="cvm-hint">{settings.spellcheck ? "on" : "off"}</span></button>
+                    <div className="pt-menu-div" />
+                    <div className="pt-ctx-title">Document</div>
+                    <button className="pt-menu-item cvm-row pt-danger" onClick={() => { setMenu(null); resetSource(); }}><RotateCcw />Reset to original source</button>
+                    <div className="pt-menu-div" />
                     {files?.checkUpdates && <button className="pt-menu-item cvm-row" onClick={checkUpdates}><RefreshCw />Check for Updates…</button>}
-                    <button className="pt-menu-item cvm-row" onClick={visitHomepage}><ExternalLink />Visit Homepage<span className="cvm-hint">qmanning.com ↗</span></button>
+                    {/* credit: the tool says who made it and where it lives — never the exported résumé, which is the user's */}
+                    <button className="pt-menu-item cvm-row cvm-credit" onClick={visitHomepage}><span>Itera <span className="cvm-hint" style={{ marginLeft: 4 }}>by Q Manning</span></span><span className="cvm-hint">qmanning.com ↗</span></button>
                 </div>
             )}
             {activeBlock && blockRect && paperRect && (
