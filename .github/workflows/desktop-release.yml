@@ -30,6 +30,15 @@ jobs:
           npx electron-builder ${{ matrix.flag }} --publish never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - name: Sign the update archives
+        # the app only self-updates to files signed by this key (public half: electron/updater-core.mjs)
+        shell: bash
+        working-directory: electron
+        env:
+          ITERA_UPDATE_KEY: ${{ secrets.ITERA_UPDATE_KEY }}
+        run: |
+          shopt -s nullglob
+          node build/sign-update.mjs out/*.zip out/*.exe
       - name: Attach to a draft release
         shell: bash
         working-directory: electron/out
@@ -37,4 +46,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --draft --title "Itera ${GITHUB_REF_NAME#v}" --notes "See CHANGELOG.md. Unsigned builds — README → Desktop app → First launch."
-          for f in *.dmg *.exe; do [ -e "$f" ] && gh release upload "$GITHUB_REF_NAME" "$f" --clobber; done
+          for f in *.dmg *.zip *.exe *.sig; do [ -e "$f" ] && gh release upload "$GITHUB_REF_NAME" "$f" --clobber; done

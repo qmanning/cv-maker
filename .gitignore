@@ -6,3 +6,4 @@ electron/out/
 electron/.gk/
 electron/.smoke-packaged/
 electron/.install-test/
+electron/.update-test/

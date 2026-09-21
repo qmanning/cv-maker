@@ -14,6 +14,7 @@ import { renderExport, validExportBody, EXPORT_SCHEME } from "./export.mjs";
 import { setupFiles } from "./files.mjs";
 import { setupAssistant } from "./assistant.mjs";
 import { setupMcp } from "./mcp.mjs";
+import { setupUpdater } from "./updater.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = app.isPackaged ? path.join(here, "web") : path.resolve(here, "..");   // the prebuilt folder (electron-builder copies it to web/)
@@ -24,7 +25,7 @@ const SMOKE_DIR = process.env.CVM_SMOKE_DIR || "";           // set by smoke.mjs
 
 if (SMOKE_DIR) { app.setPath("userData", path.join(SMOKE_DIR, "userData")); fs.mkdirSync(path.join(SMOKE_DIR, "downloads"), { recursive: true }); app.setPath("downloads", path.join(SMOKE_DIR, "downloads")); }   // a clean profile: no leftovers in, none out
 app.setName("Itera");
-let files = null, assistant = null, editor = null, mcp = null;
+let files = null, assistant = null, editor = null, mcp = null, updater = null;
 const openWhenReady = [];                                    // macOS can deliver open-file (double-clicked document, Dock drop) before we're ready
 app.on("open-file", (e, file) => { e.preventDefault(); if (files) files.openPath(file); else openWhenReady.push(file); });
 
@@ -337,7 +338,8 @@ app.whenReady().then(async () => {
     protocol.handle("app", handleApp);
     mcp = setupMcp({ editorWindow: () => editor, currentFile: () => files?.state().current || "", socketPath: SMOKE_DIR && process.platform !== "win32" ? path.join(SMOKE_DIR, "mcp.sock") : "" });
     assistant = setupAssistant({ origin: ORIGIN, editorWindow: () => editor, mcp, moveToApplications });
-    files = setupFiles({ onAssistant: () => assistant.openSettings(), templatePath: path.join(ROOT, "templates", "sample-resume.html"), smokeDir: SMOKE_DIR, onWelcome: () => showWelcome(BrowserWindow.getAllWindows().find((w) => w !== welcome)) });
+    updater = setupUpdater({ editorWindow: () => editor, installedCopy, runningFromInstall });
+    files = setupFiles({ onAssistant: () => assistant.openSettings(), updates: { check: () => updater.check({ manual: true }), auto: () => updater.auto(), setAuto: (v) => updater.setAuto(v) }, templatePath: path.join(ROOT, "templates", "sample-resume.html"), smokeDir: SMOKE_DIR, onWelcome: () => showWelcome(BrowserWindow.getAllWindows().find((w) => w !== welcome)) });
     const win = createWindow();
     win.webContents.once("did-finish-load", () => openWhenReady.splice(0).forEach((f) => files.openPath(f)));
     if (SMOKE_DIR) {
@@ -347,7 +349,7 @@ app.whenReady().then(async () => {
         app.exit(result.ok ? 0 : 1);
         return;
     }
-    win.webContents.once("did-finish-load", () => { if (!offerMoveToApplications(win)) welcomeOnFirstRun(win); });   // installing quits; the welcome waits for the installed copy
+    win.webContents.once("did-finish-load", () => { if (!offerMoveToApplications(win)) { welcomeOnFirstRun(win); updater.start(); } });   // installing quits; the welcome waits for the installed copy
     app.on("activate", () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
 
