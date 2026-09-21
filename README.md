@@ -1,3 +1,5 @@
+<img src="brand/itera-icon.svg" width="72" height="72" alt="Itera" />
+
 # Itera
 
 **Your résumé is one HTML file. Open it, click any text, type — and export it as a real, ATS-readable document.**
