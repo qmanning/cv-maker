@@ -5,7 +5,7 @@
 //                              template or load the ES-module chunks; a real origin also keeps localStorage)
 //   app://itera/config.js   generated here: points the editor's existing `exportServer` option at ↓
 //   app://itera/__export    POST — the ../server.mjs contract, answered by Electron's own Chromium (export.mjs)
-import { app, BrowserWindow, dialog, protocol, net, shell } from "electron";
+import { app, BrowserWindow, dialog, Menu, protocol, net, shell } from "electron";
 import fs from "node:fs";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
@@ -261,12 +261,15 @@ async function smoke(win) {
     await new Promise((r) => fake.listen(0, "127.0.0.1", r));
     // set it up the way a person would: AI Settings → Something else → custom server → Test → Save
     assistant.openSettings();
-    const panel = BrowserWindow.getAllWindows().find((w) => w.getTitle() === "Connect Your AI" || w.webContents.getURL().includes("/__assistant/"));
+    const panel = BrowserWindow.getAllWindows().find((w) => w.getTitle() === "Settings" || w.webContents.getURL().includes("/__assistant/"));
     const pjs = (code) => panel.webContents.executeJavaScript(code, true);
     await until("AI Settings to load", async () => !panel.webContents.isLoading() && (await pjs(`!!document.querySelector("#preset option")`)));
     await pjs(`(() => { const r = document.querySelector('input[value="openai-compatible"]'); r.checked = true; r.dispatchEvent(new Event("change")); const p = document.getElementById("preset"); p.value = "custom"; p.dispatchEvent(new Event("change")); document.getElementById("baseUrl").value = "http://127.0.0.1:${fake.address().port}/v1"; document.getElementById("modelText").value = "smoke-model"; document.getElementById("test").click(); })()`);
     await until("the connection test", () => pjs(`document.getElementById("result").className === "ok"`));
     fileSteps.aiSettingsTest = await pjs(`document.getElementById("result").textContent`);
+    fileSteps.settingsHasUpdates = await pjs(`!document.getElementById("updates").hidden && /^Version \\d/.test(document.getElementById("version-pill").textContent) && document.title === "Settings"`);
+    const fileMenu = (Menu.getApplicationMenu()?.items.find((m) => m.label === "File")?.submenu?.items || []).map((i) => i.label);
+    fileSteps.fileMenuHasSettingsAndUpdates = fileMenu.includes("Settings…") && fileMenu.includes("Check for Updates…");
     fs.writeFileSync(path.join(SMOKE_DIR, "ai-settings.png"), (await panel.webContents.capturePage()).toPNG());
     await pjs(`document.getElementById("save").click()`);
     await until("the key settings to save", () => pjs(`/Saved/.test(document.getElementById("result").textContent)`));
@@ -337,9 +340,10 @@ async function smoke(win) {
 app.whenReady().then(async () => {
     protocol.handle("app", handleApp);
     mcp = setupMcp({ editorWindow: () => editor, currentFile: () => files?.state().current || "", socketPath: SMOKE_DIR && process.platform !== "win32" ? path.join(SMOKE_DIR, "mcp.sock") : "" });
-    assistant = setupAssistant({ origin: ORIGIN, editorWindow: () => editor, mcp, moveToApplications });
+    const updates = { check: () => updater.check({ manual: true }), auto: () => updater.auto(), setAuto: (v) => updater.setAuto(v) };   // late-bound: the updater is made just below
+    assistant = setupAssistant({ origin: ORIGIN, editorWindow: () => editor, mcp, moveToApplications, updates });
     updater = setupUpdater({ editorWindow: () => editor, installedCopy, runningFromInstall });
-    files = setupFiles({ onAssistant: () => assistant.openSettings(), updates: { check: () => updater.check({ manual: true }), auto: () => updater.auto(), setAuto: (v) => updater.setAuto(v) }, templatePath: path.join(ROOT, "templates", "sample-resume.html"), smokeDir: SMOKE_DIR, onWelcome: () => showWelcome(BrowserWindow.getAllWindows().find((w) => w !== welcome)) });
+    files = setupFiles({ onAssistant: (section) => assistant.openSettings(section), updates, templatePath: path.join(ROOT, "templates", "sample-resume.html"), smokeDir: SMOKE_DIR, onWelcome: () => showWelcome(BrowserWindow.getAllWindows().find((w) => w !== welcome)) });
     const win = createWindow();
     win.webContents.once("did-finish-load", () => openWhenReady.splice(0).forEach((f) => files.openPath(f)));
     if (SMOKE_DIR) {

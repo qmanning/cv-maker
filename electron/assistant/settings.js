@@ -78,5 +78,16 @@
     $("codex-connect").addEventListener("click", async () => { try { paintMcp(await api.mcp.connectCodex()); } catch (e) { $("codex-sub").textContent = clean(e); } });
     $("codex-disconnect").addEventListener("click", async () => paintMcp(await api.mcp.disconnectCodex()));
     $("copy-json").addEventListener("click", async () => { await api.mcp.copy("json"); flash("Copied"); });
+    /* ---- updates ---- */
+    const up = await api.updates.get();
+    if (up && up.available) {
+        $("updates").hidden = false; $("version-pill").textContent = "Version " + up.version; $("auto-update").checked = up.auto;
+        $("auto-update").addEventListener("change", (e) => api.updates.setAuto(e.target.checked));
+        $("check-now").addEventListener("click", () => api.updates.check());
+    }
+    // File ▸ Settings… opens the top; AI ▸ API Key (Advanced)… and the Updates links land on their section
+    const show = (section) => { if (section === "advanced") { $("advanced").open = true; $("advanced").scrollIntoView({ block: "start" }); } if (section === "updates") $("updates").scrollIntoView({ block: "start" }); };
+    show(decodeURIComponent(location.hash.slice(1))); api.onShow(show);
+
     $("copy-cc").addEventListener("click", async () => { await api.mcp.copy("claude-code"); flash("Copied"); });
 })();
