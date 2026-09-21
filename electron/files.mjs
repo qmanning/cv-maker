@@ -64,7 +64,10 @@ export function setupFiles({ templatePath, smokeDir = "", onWelcome = () => {}, 
         send("files:opened", { text, name: path.basename(file) });
     }
     async function openDialog() {
-        const r = await dialog.showOpenDialog(win, { properties: ["openFile"], filters: FILTERS });
+        // aim the native panel at a fast, relevant local folder — the open file's folder, else Documents —
+        // instead of letting macOS reuse its last location (which may be a slow network/SMB mount)
+        const defaultPath = current ? path.dirname(current) : app.getPath("documents");
+        const r = await dialog.showOpenDialog(win, { defaultPath, properties: ["openFile"], filters: FILTERS });
         if (!r.canceled && r.filePaths[0]) openPath(r.filePaths[0]);
     }
     function newDocument() {
