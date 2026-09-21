@@ -871,11 +871,20 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
 
     /* ---- images: click any <img> in the document to swap it ---- */
     const onHostClick = useCallback((e: React.MouseEvent) => {
+        // ⌘/Ctrl-click a link: a plain click edits its text, so opening it is a deliberate gesture — and it asks first, showing where it goes
+        const link = (e.metaKey || e.ctrlKey) ? (e.target as HTMLElement).closest<HTMLAnchorElement>("a[href]") : null;
+        if (link && hostRef.current?.contains(link)) {
+            const href = link.getAttribute("href") || "";
+            e.preventDefault();
+            if (!/^(https?:|mailto:)/i.test(href)) { say("That link doesn't go anywhere a browser can open"); return; }
+            setConfirm({ msg: `Open this link in your browser?\n${href.length > 90 ? href.slice(0, 88) + "…" : href}`, ok: "Open", run: () => { if (files?.openExternal) files.openExternal(href); else window.open(href, "_blank", "noopener"); } });
+            return;
+        }
         const img = (e.target as HTMLElement).closest("img");
         if (img && hostRef.current?.contains(img)) { const r = img.getBoundingClientRect(); setImgPop({ img, left: r.left, top: r.bottom + 8 }); }
         const rule = (e.target as HTMLElement).closest<HTMLElement>(".cv-divider");
         if (rule && hostRef.current?.contains(rule)) { (document.activeElement as HTMLElement | null)?.blur?.(); setActive(null); setPicked(rule); }
-    }, []);
+    }, [files, say]);
     const onImgFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const f = e.target.files?.[0], img = imgPop?.img; e.target.value = ""; if (!f || !img) return;
         const reader = new FileReader();
@@ -1219,7 +1228,7 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
             <div id="pt-toast" className={toast ? "pt-show" : undefined}>{toast}</div>
             {confirm && (
                 <div id="pt-confirm" role="alertdialog" aria-modal="true">
-                    <div className="pt-confirm-card"><p>{confirm.msg}</p>
+                    <div className="pt-confirm-card"><p style={{ whiteSpace: "pre-line", overflowWrap: "anywhere" }}>{confirm.msg}</p>
                         <div className="pt-ctx-actions"><button className="pt-mini" onClick={() => setConfirm(null)}>Cancel</button><button className="pt-mini pt-danger" onClick={() => { const run = confirm.run; setConfirm(null); run(); }}>{confirm.ok}</button></div>
                     </div>
                 </div>

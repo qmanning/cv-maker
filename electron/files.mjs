@@ -166,7 +166,7 @@ export function setupFiles({ templatePath, letterTemplatePath = "", smokeDir = "
     });
     // the brand menu's quick actions
     ipcMain.on("shell:check-updates", () => updates?.check());
-    ipcMain.on("shell:open-external", (_e, url) => { if (typeof url === "string" && /^https?:\/\//i.test(url)) shell.openExternal(url); });
+    ipcMain.on("shell:open-external", (_e, url) => { if (typeof url === "string" && /^(https?:\/\/|mailto:)/i.test(url)) shell.openExternal(url); });   // web pages and mail only — never file: or an app scheme
 
     function buildMenu() {
         const mac = process.platform === "darwin";
