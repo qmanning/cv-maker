@@ -26,7 +26,7 @@ import { attachColorPicker, toHex, useInfospectorLook } from "./use-infospector-
 import { LookMenu } from "./LookMenu";
 import { applyOps, describeDocument, type CvAssistant, type CvRemote, type CvRemoteHandlers, type CvRemoteStatus, type RemotePage } from "./cv-assistant";
 import { coverage, findRanges, normalizeKeywords, pageText, type KeywordUse } from "./cv-keywords";
-import { FOOTER_PT, GAP_PT, MIN_FIT, PAPERS, PT, type DocKind, type PaperId, type Source, docKind, fullHtml, letterCss, migrateCss, mirrorHeader, pageBoxCss, parseSource, slugify, stepZoom } from "./cv-source";
+import { FOOTER_PT, GAP_PT, MIN_FIT, PAPERS, PT, type DocKind, type PaperId, type Source, docKind, fullHtml, letterCss, migrateCss, mirrorHeader, scopeCss, pageBoxCss, parseSource, slugify, stepZoom } from "./cv-source";
 
 const LOCAL_KEY = "cvm:doc", LETTER_KEY = "cvm:letter", KW_KEY = "cvm:keywords", KW_POS_KEY = "cvm:kw-pos", KW_SIZE_KEY = "cvm:kw-size", START_SIZE_KEY = "cvm:startsize", HOME_KEY = "cvm:home", VIEW_ZOOM_KEY = "cvm:viewzoom";
 const stored = (k: string) => { try { return localStorage.getItem(k) || ""; } catch { return ""; } };
@@ -1288,7 +1288,7 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
                 can be dragged (the toolbar's own controls stay clickable). Transparent, so it always shows
                 the chosen background through it and never clashes. CSS activates it only under .cvm-desktop. */}
             <div className="cvm-titlebar" aria-hidden="true" />
-            {source && <style>{`${source.css}\n${pageBoxCss(paper.w, scale)}`}</style>}
+            {source && <style>{`${scopeCss(source.css)}\n${pageBoxCss(paper.w, scale)}`}</style>}
             {/* where the picked ATS keyword is used: highlighter yellow via the CSS Custom Highlight API (ranges only — no markup is touched) */}
             <style>{"::highlight(cvm-kw) { background-color: #ffe14d; color: #000; }"}</style>
 

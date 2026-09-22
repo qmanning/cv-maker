@@ -6,7 +6,7 @@ import { installJsdom, importTransformed } from "./_helpers.mjs";
 
 installJsdom();
 
-const { slugify, fullHtml, parseSource, migrateCss, pageBoxCss, PAPERS, MIN_FIT, stepZoom } = await importTransformed("src/cv-source.ts");
+const { slugify, fullHtml, parseSource, migrateCss, scopeCss, pageBoxCss, PAPERS, MIN_FIT, stepZoom } = await importTransformed("src/cv-source.ts");
 
 /* ---------------- parseSource ---------------- */
 
@@ -90,6 +90,56 @@ test("parseSource keeps the links and data: images a real resume uses", () => {
     assert.equal(doc.getElementById("anchor").getAttribute("href"), "#skills");
     assert.equal(doc.getElementById("rel").getAttribute("href"), "./other.html");
     assert.equal(doc.getElementById("pic").getAttribute("src"), png);   // the template's own images are data: URIs
+});
+
+/* ---------------- scopeCss: a document's CSS must not reach the product ---------------- */
+
+const sel = (css) => [...css.matchAll(/([^{}]+)\{/g)].map((m) => m[1].trim());
+
+test("scopeCss confines ordinary selectors to the sheet's container", () => {
+    assert.deepEqual(sel(scopeCss(".cv-page { color: red; }")), [".cvm-host .cv-page"]);
+    assert.deepEqual(sel(scopeCss(".cv-job .cv-flow li { margin: 0; }")), [".cvm-host .cv-job .cv-flow li"]);
+    assert.deepEqual(sel(scopeCss("h1, h2 { margin: 0; }")), [".cvm-host h1, .cvm-host h2"]);
+});
+
+test("scopeCss maps the document root onto the container, so variables and base type still inherit", () => {
+    assert.deepEqual(sel(scopeCss(":root { --cv-rule: #eee; }")), [".cvm-host"]);
+    assert.deepEqual(sel(scopeCss("body { font-family: Helvetica; }")), [".cvm-host"]);
+    assert.deepEqual(sel(scopeCss("html body .cv-page { color: red; }")), [".cvm-host .cv-page"]);
+    assert.deepEqual(sel(scopeCss("body.dark { color: #fff; }")), [".cvm-host.dark"]);
+    assert.deepEqual(sel(scopeCss("body > .cv-page { color: red; }")), [".cvm-host > .cv-page"]);
+});
+
+test("scopeCss stops a document restyling the app around it", () => {
+    // the whole point: a hostile or careless resume file cannot touch IcedCoffee's own chrome
+    const hostile = ".pt-menu-item { display: none; } #pt-bar { opacity: 0; } .cvm-ask { position: fixed; top: 0; }";
+    const out = scopeCss(hostile);
+    for (const s of sel(out)) assert.ok(s.startsWith(".cvm-host"), `escaped the scope: ${s}`);
+    assert.match(out, /\.cvm-host \.pt-menu-item/);   // reachable only inside the sheet, which holds no such element
+});
+
+test("scopeCss recurses into @media and leaves @font-face and @keyframes alone", () => {
+    const out = scopeCss("@media print { .cv-page { color: #000; } }");
+    assert.match(out, /@media print \{/);
+    assert.match(out, /\.cvm-host \.cv-page/);
+    const face = scopeCss('@font-face { font-family: "X"; src: url(x.woff2); }');
+    assert.match(face, /@font-face/);
+    assert.doesNotMatch(face, /\.cvm-host/);
+});
+
+test("scopeCss drops @import (it would come back unscoped, and off the network)", () => {
+    const out = scopeCss('@import url("https://fonts.example/x.css"); .cv-page { color: red; }');
+    assert.doesNotMatch(out, /@import/);
+    assert.match(out, /\.cvm-host \.cv-page/);
+});
+
+test("scopeCss survives malformed input without losing the rules around it", () => {
+    assert.equal(scopeCss(""), "");
+    assert.equal(scopeCss("@@@ not css at all @@@"), "");          // no rule in, no rule out
+    const ragged = ".cv-page { color: red; } .cv-job { /* unclosed";
+    assert.match(scopeCss(ragged), /\.cvm-host \.cv-page \{ color: red; \}/);
+    const unbalanced = ".cv-page { color: red;";                   // missing its closing brace
+    assert.match(scopeCss(unbalanced), /\.cvm-host \.cv-page \{/);
 });
 
 /* ---------------- migrateCss: documents saved before the column-alignment fix ---------------- */

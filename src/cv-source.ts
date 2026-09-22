@@ -30,6 +30,91 @@ const NAVIGABLE_OK = new Set(["", "http", "https", "mailto", "tel"]);
 /** never, on any attribute — `<a href="javascript:…">` in an opened file would run in the app's own origin */
 const ALWAYS_BAD = new Set(["javascript", "vbscript"]);
 
+/* ---------------- scoping a document's own stylesheet ----------------
+   A source file brings its own CSS and the editor puts it on the page, so the sheet looks like the file.
+   Left alone that CSS is GLOBAL: `body { font: … }` restyles the toolbar, and `.pt-menu-item { display:
+   none }` in someone else's résumé hides the menus. Nothing here can run code, but a document has no
+   business styling the product around it. So for the editor's live preview every selector is rewritten to
+   sit under the element that holds the sheet. What gets SAVED or EXPORTED is left alone — there the CSS is
+   global on purpose, because the file has to stand on its own. */
+
+const ROOT_TOKEN = /^(:root|html|body)(?![\w-])/i;
+/** conditional group rules whose contents are themselves rules, so scoping has to go inside them */
+const GROUP_AT_RULES = new Set(["media", "supports", "container", "layer", "scope", "document"]);
+
+/** one selector (no commas) rewritten to live under `scope` */
+function scopeOne(selector: string, scope: string): string {
+    let rest = selector.trim(), wasRoot = false;
+    for (;;) {                                   // `html body .cv-page` — collapse every leading root token
+        const m = ROOT_TOKEN.exec(rest);
+        if (!m) break;
+        wasRoot = true;
+        rest = rest.slice(m[0].length);
+        const another = /^\s+(?=(:root|html|body)(?![\w-]))/i.exec(rest);
+        if (!another) break;
+        rest = rest.slice(another[0].length);
+    }
+    // the document's root IS the scope element: `body.dark` → `.cvm-host.dark`, `body > p` → `.cvm-host > p`
+    return wasRoot ? scope + rest : scope + " " + rest;
+}
+
+const scopeSelectorList = (list: string, scope: string): string =>
+    list.split(",").map((s) => s.trim()).filter(Boolean).map((s) => scopeOne(s, scope)).join(", ");
+
+/** from the `{` at `open`, the block's contents and the index just past its `}` (strings and comments skipped) */
+function readBlock(css: string, open: number): { body: string; end: number } {
+    let depth = 0, i = open;
+    while (i < css.length) {
+        const ch = css[i];
+        if (ch === "/" && css[i + 1] === "*") { const e = css.indexOf("*/", i + 2); i = e < 0 ? css.length : e + 2; continue; }
+        if (ch === '"' || ch === "'") { let j = i + 1; while (j < css.length && css[j] !== ch) j += css[j] === "\\" ? 2 : 1; i = j + 1; continue; }
+        if (ch === "{") depth++;
+        else if (ch === "}") { depth--; if (depth === 0) return { body: css.slice(open + 1, i), end: i + 1 }; }
+        i++;
+    }
+    return { body: css.slice(open + 1), end: css.length };   // unbalanced: take what there is
+}
+
+/** Rewrite `css` so it can only reach what is inside `scope`. The editor's live preview only.
+ *  Hand-walked rather than handed to the CSSOM on purpose: this has to behave identically in the app and
+ *  under test, and a real parser silently drops whatever syntax it happens not to know. */
+export function scopeCss(css: string, scope = ".cvm-host"): string {
+    if (!css.trim()) return "";
+    const out: string[] = [];
+    let prelude = "", i = 0;
+    while (i < css.length) {
+        const ch = css[i];
+        if (ch === "/" && css[i + 1] === "*") { const e = css.indexOf("*/", i + 2); const seg = e < 0 ? css.slice(i) : css.slice(i, e + 2); prelude += seg; i += seg.length; continue; }
+        if (ch === '"' || ch === "'") { let j = i + 1; while (j < css.length && css[j] !== ch) j += css[j] === "\\" ? 2 : 1; prelude += css.slice(i, j + 1); i = j + 1; continue; }
+        if (ch === ";") {
+            const statement = prelude.trim();
+            // @import would come back unscoped — and off the network. The desktop app's CSP already refuses
+            // it, so dropping it here only makes the browser behave the way the app does.
+            if (statement && !/^@import\b/i.test(statement)) out.push(statement + ";");
+            prelude = ""; i++; continue;
+        }
+        if (ch === "{") {
+            const { body, end } = readBlock(css, i);
+            i = end;
+            const comments: string[] = [];
+            const head = prelude.replace(/\/\*[\s\S]*?\*\//g, (m) => { comments.push(m); return " "; }).trim();
+            prelude = "";
+            if (comments.length) out.push(comments.join("\n"));
+            if (head.startsWith("@")) {
+                const name = (/^@([\w-]+)/.exec(head) || ["", ""])[1].toLowerCase();
+                // @font-face, @keyframes, @page, @property … hold no selectors of ours to scope
+                out.push(GROUP_AT_RULES.has(name) ? `${head} {\n${scopeCss(body, scope)}\n}` : `${head} {${body}}`);
+            } else if (head) {
+                // the body is emitted verbatim: under CSS nesting its own rules are already relative to this one
+                out.push(`${scopeSelectorList(head, scope)} {${body}}`);
+            }
+            continue;
+        }
+        prelude += ch; i++;
+    }
+    return out.join("\n");
+}
+
 /* ---------------- migrations: fixes to CSS that IcedCoffee's own templates once shipped ----------------
    A document carries its own copy of the stylesheet, so a fix to templates/ only reaches NEW documents.
    Anything here runs on every document as it is read, so files saved before the fix pick it up too. */
