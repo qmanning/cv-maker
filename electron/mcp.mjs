@@ -214,7 +214,20 @@ export function setupMcp({ editorWindow, currentFile, files = () => null, socket
     return {
         codexState, connectCodex: andTell(connectCodex), disconnectCodex: andTell(disconnectCodex),
         socket: SOCKET, entry, claudeState, getNotes: readNotes, setNotes: writeNotes, connectClaude: andTell(connectClaude), disconnectClaude: andTell(disconnectClaude), editorStatus,
-        state: () => ({ needsMove: temporaryHome() ? needsMove : "", claude: claudeState(), codex: codexState(), codexCommand: `codex mcp add ${SERVER_NAME} --env ELECTRON_RUN_AS_NODE=1 -- ${JSON.stringify(entry().command)} ${JSON.stringify(entry().args[0])}`, clients, lastSeen, snippet: JSON.stringify({ mcpServers: { [SERVER_NAME]: entry() } }, null, 2), claudeCode: `claude mcp add ${SERVER_NAME} --env ELECTRON_RUN_AS_NODE=1 -- ${JSON.stringify(entry().command)} ${JSON.stringify(entry().args[0])}` }),
+        state: () => {
+            const claudeCode = `claude mcp add ${SERVER_NAME} --env ELECTRON_RUN_AS_NODE=1 -- ${JSON.stringify(entry().command)} ${JSON.stringify(entry().args[0])}`;
+            const codexCommand = `codex mcp add ${SERVER_NAME} --env ELECTRON_RUN_AS_NODE=1 -- ${JSON.stringify(entry().command)} ${JSON.stringify(entry().args[0])}`;
+            // a plain-language message the person can paste straight into their AI to connect it and put it to work
+            const prompt = [
+                "I'm using IcedCoffee — a free résumé and cover-letter editor on my Mac. It has a built-in connection (an MCP server) you can use to see and edit the résumé that's open on my screen right now. Everything stays on this computer: no API key, no account.",
+                "",
+                "If you can add MCP servers yourself (Claude Code, Cursor, Codex and the like), connect by running:",
+                claudeCode,
+                "",
+                "Once you're connected you'll have tools like get_document, edit_document, set_keywords and export_document. Please help me tailor my résumé to a job: save a copy off my master first and never change the master, keep it to one page, and write in active, results-first language. Tell me when you're connected, then ask me for the job description.",
+            ].join("\n");
+            return { needsMove: temporaryHome() ? needsMove : "", claude: claudeState(), codex: codexState(), codexCommand, clients, lastSeen, snippet: JSON.stringify({ mcpServers: { [SERVER_NAME]: entry() } }, null, 2), claudeCode, prompt };
+        },
         onChange: (fn) => { listeners.add(fn); return () => listeners.delete(fn); },
         revealClaudeConfig: () => shell.showItemInFolder(claudeConfigPath()),
     };

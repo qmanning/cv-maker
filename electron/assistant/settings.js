@@ -98,4 +98,5 @@
     show(decodeURIComponent(location.hash.slice(1))); api.onShow(show);
 
     $("copy-cc").addEventListener("click", async () => { await api.mcp.copy("claude-code"); flash("Copied"); });
+    $("copy-prompt").addEventListener("click", async () => { await api.mcp.copy("prompt"); const el = $("prompt-copied"); el.textContent = "Copied — now paste it to your AI"; setTimeout(() => { el.textContent = ""; }, 3500); });
 })();

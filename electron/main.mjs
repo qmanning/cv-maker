@@ -285,14 +285,16 @@ async function smoke(win) {
     fileSteps.followedExternalEdit = true; fileSteps.cleanAfterReload = !files.state().dirty;
     /* ⌘+ / ⌘− zoom the sheet by its %, from the keyboard and from the View menu */
     const pct = () => js(`parseInt((document.querySelector(".pt-dim-scale")?.textContent || "").replace(/[^0-9]/g, ""), 10)`);
-    const z0 = await pct();
+    win.webContents.send("view:zoom", "fit");   // establish the fit-width baseline (the default view is now 100%, not fit)
+    await until("Fit Width to apply", async () => (await pct()) > 0, 6000);
+    const zFit = await pct();
     win.webContents.sendInputEvent({ type: "keyDown", keyCode: "=", modifiers: [process.platform === "darwin" ? "meta" : "control"] });
-    await until("⌘+ to zoom the sheet in", async () => (await pct()) > z0, 6000);
+    await until("⌘+ to zoom the sheet in", async () => (await pct()) > zFit, 6000);
     const z1 = await pct();
     win.webContents.send("view:zoom", "out");
     await until("View ▸ Zoom Out to zoom the sheet out", async () => (await pct()) < z1, 6000);
     win.webContents.send("view:zoom", "fit");
-    await until("Fit Width to restore the fit", async () => (await pct()) === z0, 6000);
+    await until("Fit Width to restore the fit", async () => (await pct()) === zFit, 6000);
     fileSteps.zoomKeys = true;
 
     /* one-click connect: both config writers keep whatever else is in those files */

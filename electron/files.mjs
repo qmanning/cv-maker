@@ -223,7 +223,7 @@ export function setupFiles({ templatePath, letterTemplatePath = "", smokeDir = "
                 { type: "separator" },
                 { role: "togglefullscreen" }, ...(app.isPackaged ? [] : [{ type: "separator" }, { role: "reload" }, { role: "toggleDevTools" }])] },
             { role: "windowMenu" },
-            { role: "help", submenu: [{ label: "Welcome to IcedCoffee", click: () => onWelcome() }, ...(mac ? [] : [{ type: "separator" }, ...updateItems]), { type: "separator" }, { label: "IcedCoffee on the Web", click: () => shell.openExternal("https://qmanning.com/labs/icedcoffee") }, { label: "Source on GitHub", click: () => shell.openExternal("https://github.com/qmanning/icedcoffee") }] },
+            { role: "help", submenu: [{ label: "Connect your AI…", click: () => onAssistant() }, { label: "Welcome to IcedCoffee", click: () => onWelcome() }, ...(mac ? [] : [{ type: "separator" }, ...updateItems]), { type: "separator" }, { label: "IcedCoffee on the Web", click: () => shell.openExternal("https://qmanning.com/labs/icedcoffee") }, { label: "Source on GitHub", click: () => shell.openExternal("https://github.com/qmanning/icedcoffee") }] },
         ]));
     }
 

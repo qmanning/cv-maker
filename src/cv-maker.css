@@ -21,7 +21,7 @@
    every corner here too. Our 30px controls round to the dialed radius, capped at a full circle (15px). */
 .cvm-root { --cvm-ctl-r: min(var(--glass-radius, 40px), 15px); }
 /* Infospector's color picker mounts on <body>; lift it above this full-screen tool */
-body > .pt-cpick { z-index: 2100; }
+body > .pt-cpick { z-index: 4200; }   /* above the icon-picker modal too, so recolouring works there */
 
 /* the bar: Infospector's #pt-bar, centered and sized to its contents */
 #pt-bar.cvm-bar { left: 50%; transform: translateX(-50%); width: min(860px, calc(100vw - 24px)); transition: none; }
@@ -89,7 +89,15 @@ body > .pt-cpick { z-index: 2100; }
 .cvm-dirty { width: 7px; height: 7px; border-radius: 50%; background: var(--pt-open); flex: none; }
 .pt-menu-item.cvm-row { display: flex; align-items: center; gap: 9px; }
 .pt-menu-item.cvm-row .cvm-hint { margin-left: auto; color: var(--pt-text-faint); font-size: 11.5px; }
-.pt-menu-item.cvm-credit { text-decoration: none; justify-content: space-between; box-sizing: border-box; }
+/* "Made by Q" — a pill filled with the chosen page background, its label + logo in the adaptive ink so it
+   reads on any theme (concentric radius, like the rest of the chrome) */
+.pt-menu-item.cvm-credit { display: flex; justify-content: center; align-items: center; box-sizing: border-box; width: 100%;
+    margin: 16px 0 8px; padding: 9px 16px; border-radius: var(--glass-inner-r); text-decoration: none;   /* concentric with the menu (radius − padding), 16px above / ~16px below */
+    background: var(--pt-ground); color: var(--pt-text); font: 600 13px var(--pt-font); transition: filter .12s; }
+.pt-menu-item.cvm-credit:hover { background: var(--pt-ground); filter: brightness(1.2); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pt-text) 22%, transparent); }
+.pt-menu-item.cvm-credit:active { filter: brightness(1.08); }
+.cvm-credit .cvm-credit-in { display: inline-flex; align-items: center; gap: 5px; }
+.cvm-credit .cvm-qlogo { width: 17px; height: 17px; }   /* Q logo, inherits the label colour */
 .pt-menu-item.cvm-active { background: var(--pt-accent-soft); }
 
 /* the canvas: Infospector's #pt-stagewrap, but it scrolls (a page is taller than a window) */
@@ -204,7 +212,7 @@ body > .pt-cpick { z-index: 2100; }
   background-color: var(--pt-glass); -webkit-backdrop-filter: var(--pt-blur-webkit); backdrop-filter: var(--pt-blur); }
 .cvm-ask-connect:hover { border-color: var(--pt-accent, #3666f8); }
 .cvm-ask-connect-main { display: inline-flex; align-items: center; gap: 8px; height: 100%; padding: 0 8px 0 14px; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; border-radius: 999px 0 0 999px; }
-.cvm-ask-connect svg { width: 17px; height: 17px; stroke-width: 2; color: var(--pt-accent, #3666f8); }
+.cvm-ask-connect svg { width: 17px; height: 17px; stroke-width: 2; color: var(--pt-text); }
 .cvm-ask-connect b { font-weight: 650; } .cvm-ask-connect span { color: var(--pt-text-faint); font-size: 12px; }
 .cvm-ask-connect-x { width: 28px; height: 28px; display: grid; place-items: center; border: 0; border-radius: 50%; background: none; cursor: pointer; }
 .cvm-ask-connect-x svg { width: 14px; height: 14px; color: var(--pt-text-faint); } .cvm-ask-connect-x:hover { background: var(--pt-glass-2); } .cvm-ask-connect-x:hover svg { color: var(--pt-text); }
@@ -267,7 +275,7 @@ body > .pt-cpick { z-index: 2100; }
   background-color: var(--pt-glass); -webkit-backdrop-filter: var(--pt-blur-webkit); backdrop-filter: var(--pt-blur); }
 .cvm-getapp-cta-main { flex: 1 1 auto; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; cursor: pointer;
   background: none; border: 0; color: inherit; padding: 11px 12px 11px 46px; position: relative; }
-.cvm-getapp-cta-main > svg { position: absolute; left: 18px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: #e6a86a; }
+.cvm-getapp-cta-main > svg { position: absolute; left: 18px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: var(--pt-text); }
 .cvm-getapp-cta-main b { font-weight: 600; font-size: 13px; }
 .cvm-getapp-cta-main span { color: var(--pt-text-faint); font-size: 11.5px; }
 .cvm-getapp-x { flex: none; width: 40px; display: grid; place-items: center; background: none; border: 0; border-left: 1px solid var(--pt-glass-brd);
@@ -276,14 +284,15 @@ body > .pt-cpick { z-index: 2100; }
 .cvm-getapp-x svg { width: 15px; height: 15px; }
 .pt-confirm.cvm-getapp { position: fixed; inset: 0; z-index: 2200; display: grid; place-items: center; background: rgba(0, 0, 0, .32); }
 /* these must out-specify host.css's .pt-confirm-card { padding } and .pt-confirm-card p { margin: 0 } */
-.pt-confirm-card.cvm-getapp-card { max-width: 380px; text-align: center; padding: 24px; }
+.pt-confirm-card.cvm-getapp-card { max-width: 380px; text-align: center; padding: 24px; border-radius: var(--glass-radius); }
 .cvm-getapp-card .cvm-getapp-mark { display: grid; place-items: center; width: 66px; height: 66px; margin: 0 auto 16px; border-radius: 17px; background: linear-gradient(180deg, #A44400, #502202); color: #fff; }
 .cvm-getapp-card .cvm-getapp-mark .cvm-brand-glyph { width: 40px; height: 40px; stroke-width: 2; }
 .cvm-getapp-card h3 { margin: 0 0 5px; font: 700 18px var(--pt-font); }
 .pt-confirm-card .cvm-getapp-free { margin: 0 0 16px; color: var(--pt-text-faint); font: 600 12px var(--pt-font); letter-spacing: .3px; }
 .pt-confirm-card .cvm-getapp-body { margin: 0 0 24px; color: var(--pt-text-dim); font: 400 13px/1.6 var(--pt-font); }
 .cvm-getapp-actions { display: flex; justify-content: center; gap: 10px; }
-.cvm-getapp-actions .pt-mini { height: 40px; padding: 0 22px; border-radius: 11px; font: 600 13px var(--pt-font); gap: 9px; }
+/* rounded pill controls, driven by the Radius dial (full pill for a 40px button at the top of the range) */
+.cvm-getapp-actions .pt-mini { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 40px; padding: 0 22px; border-radius: min(var(--glass-radius), 20px); font: 600 13px var(--pt-font); }
 .cvm-getapp-actions .pt-mini.pt-primary { background: #3a1f0d; border-color: transparent; color: #fff; }
 .cvm-getapp-actions .pt-mini.pt-primary:hover { background: #542a0c; filter: none; }
 
@@ -326,3 +335,28 @@ body > .pt-cpick { z-index: 2100; }
 .cvm-coach-actions { display: flex; align-items: center; gap: 8px; margin-top: 13px; }
 .cvm-coach-skip { margin-right: auto; background: none; border: 0; color: var(--pt-text-faint); font: 12px var(--pt-font); cursor: pointer; padding: 4px 2px; }
 .cvm-coach-skip:hover { color: var(--pt-text); }
+
+/* ---- Choose Icon: typeahead over the Lucide library, recolourable ---- */
+/* no dark overlay — just a transparent catcher so an outside click closes it, and the document stays visible
+   behind (so the icon colour reads against the real background) */
+.cvm-iconpick-scrim { position: fixed; inset: 0; z-index: 3500; background: transparent; }
+/* .pt-open (host.css) forces display:block at equal specificity — include it here so flex wins. Positioned
+   next to the image via the inline left/top. */
+.cvm-iconpick.pt-menu-pop.pt-open { position: fixed; width: min(300px, 92vw); height: min(400px, 85vh); display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+.cvm-iconpick-div { flex: none; height: 1px; margin: 2px 12px 6px; background: var(--pt-glass-brd); }
+.cvm-iconpick-head { display: flex; align-items: center; gap: 8px; padding: 12px 12px 8px; }
+/* match the Background menu's inputs (shared with Infospector): same 7px radius as .pt-ctx-color inputs */
+.cvm-iconpick-search { flex: 1 1 auto; height: 38px; padding: 0 14px; border-radius: 7px; border: 1px solid var(--pt-glass-brd); background: var(--pt-glass-2); color: var(--pt-text); font: 14px var(--pt-font); outline: none; }
+.cvm-iconpick-search:focus { border-color: var(--pt-accent); box-shadow: 0 0 0 3px var(--pt-accent-soft); }
+.cvm-iconpick-search::placeholder { color: var(--pt-text-faint); opacity: 1; }
+.cvm-iconpick-x { flex: none; width: 34px; height: 34px; display: grid; place-items: center; border: 0; border-radius: 50%; background: none; color: var(--pt-text-faint); cursor: pointer; }
+.cvm-iconpick-x:hover { background: var(--pt-glass-2); color: var(--pt-text); }
+.cvm-iconpick-x svg { width: 16px; height: 16px; }
+.cvm-iconpick-color { padding: 0 12px 8px; }
+.cvm-iconpick-grid { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 8px 12px 12px; display: grid; grid-template-columns: repeat(auto-fill, minmax(46px, 1fr)); gap: 4px; align-content: start; }
+.cvm-iconpick-cell { display: grid; place-items: center; height: 46px; border: 1px solid transparent; border-radius: var(--glass-item-r); background: none; color: var(--pt-text); cursor: pointer; transition: background .1s, border-color .1s; }
+.cvm-iconpick-cell:hover { background: var(--pt-glass-2); border-color: var(--pt-glass-brd); }
+.cvm-iconpick-cell.cvm-on { background: var(--pt-accent-soft); border-color: var(--pt-accent); }
+.cvm-iconpick-cell svg { width: 22px; height: 22px; }
+.cvm-iconpick-empty { grid-column: 1 / -1; padding: 28px; text-align: center; color: var(--pt-text-faint); }
+.cvm-iconpick-foot { padding: 8px 14px; border-top: 1px solid var(--pt-glass-brd); color: var(--pt-text-faint); font-size: 11.5px; text-align: center; }

@@ -6,7 +6,7 @@
 "use client";
 
 import "./cv-maker.css";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Editor } from "@tiptap/core";
 import { StarterKit } from "@tiptap/starter-kit";
 import { TextStyle } from "@tiptap/extension-text-style";
@@ -16,7 +16,7 @@ import {
     AlignCenter, AlignLeft, AlignRight, ArrowDown, ArrowLeft, ArrowUp, Bold, BookOpen, BriefcaseBusiness, Plus, Text, Columns2, Copy, Download,
     Eraser, FileCode2, FileImage, FileText, FileType2, ImageUp, Italic, Link2, List, Minus, Moon, RotateCcw,
     Save, SpellCheck, Sun, Upload, Trash2, Underline as UnderlineIcon, ALargeSmall, MoveVertical, MoveHorizontal,
-    Sparkles, Bot, SendHorizontal, Undo2, Check, Settings2, X, Star, RefreshCw, FileUser, ChevronLeft, Files, GripVertical, ScanSearch, CircleCheck, CircleDashed,
+    Sparkles, Bot, Shapes, LifeBuoy, SendHorizontal, Undo2, Check, Settings2, X, Star, RefreshCw, FileUser, ChevronLeft, Files, GripVertical, ScanSearch, CircleCheck, CircleDashed,
 } from "lucide-react";
 import { FontSize } from "@/components/ui/font-size-extension";
 import { FontWeight } from "@/components/ui/font-weight-extension";
@@ -32,7 +32,7 @@ const LOCAL_KEY = "cvm:doc", LETTER_KEY = "cvm:letter", KW_KEY = "cvm:keywords",
 const stored = (k: string) => { try { return localStorage.getItem(k) || ""; } catch { return ""; } };
 const store = (k: string, v: string) => { try { if (v) localStorage.setItem(k, v); else localStorage.removeItem(k); } catch { /* ignore */ } };
 // the viewer remembers the last size the person set (across documents and sessions); null = fit to width
-const readViewZoom = (): number | "width" | "height" | null => { const s = stored(VIEW_ZOOM_KEY); if (s === "width" || s === "height") return s; const n = parseFloat(s); return Number.isFinite(n) && n > 0 ? n : null; };
+const readViewZoom = (): number | "width" | "height" => { const s = stored(VIEW_ZOOM_KEY); if (s === "width" || s === "height") return s; const n = parseFloat(s); return Number.isFinite(n) && n > 0 ? n : 1; };   // default 100%, not fit-width
 const ZOOMS = [1, 1.25, 1.5, 2];
 
 // zoom: a fixed number, or a LIVE fit that tracks the window — "width" (the sheet fills the canvas width; null is the
@@ -89,7 +89,18 @@ function IcedCoffeeGlyph(props: { className?: string }) {
         </svg>
     );
 }
+/** Q Manning's own logo mark, for the attribution button — takes currentColor so it matches the label. */
+function QLogo(props: { className?: string }) {
+    return (
+        <svg viewBox="0 0 40 41" fill="currentColor" xmlns="http://www.w3.org/2000/svg" className={props.className} aria-hidden="true">
+            <path d="M19.4828 4.74833C17.0018 4.74624 14.5581 5.35074 12.3651 6.50902C10.1721 7.66731 8.29652 9.34413 6.90222 11.393C5.50792 13.4419 4.63731 15.8005 4.36646 18.2628C4.09561 20.7251 4.43274 23.2161 5.34843 25.5183C6.26411 27.8205 7.73048 29.8638 9.61943 31.4697C11.5084 33.0756 13.7624 34.1952 16.1847 34.7308C18.6069 35.2664 21.1237 35.2017 23.5151 34.5422C25.9065 33.8827 28.0998 32.6486 29.9034 30.9477L26.3954 27.4451C26.3099 27.3595 26.2619 27.2435 26.262 27.1226C26.2622 27.0017 26.3104 26.8857 26.3962 26.8003C26.4819 26.7149 26.5981 26.6671 26.7192 26.6672C26.8403 26.6673 26.9564 26.7155 27.0419 26.8011L30.5408 30.3022C32.5732 28.1466 33.929 25.4441 34.441 22.5281C34.953 19.6121 34.5989 16.6103 33.4222 13.893C32.2455 11.1756 30.2978 8.8617 27.8194 7.23667C25.3409 5.61165 22.4402 4.74662 19.4752 4.74833H19.4828ZM30.2837 24.0048C30.247 24.0988 30.1874 24.1822 30.1104 24.2475C30.0333 24.3127 29.9411 24.3578 29.8423 24.3786C29.7434 24.3994 29.6409 24.3953 29.544 24.3666C29.4471 24.3379 29.3589 24.2857 29.2873 24.2144L27.1484 22.0789C27.0343 21.9653 26.8798 21.9014 26.7187 21.9014C26.5575 21.9014 26.403 21.9653 26.2889 22.0789L21.5547 26.8041C21.4982 26.8606 21.4533 26.9276 21.4227 27.0013C21.392 27.0751 21.3763 27.1541 21.3763 27.234C21.3763 27.3138 21.392 27.3929 21.4227 27.4666C21.4533 27.5404 21.4982 27.6074 21.5547 27.6638L23.6739 29.7797C23.7466 29.8522 23.7997 29.9419 23.8283 30.0405C23.8569 30.139 23.86 30.2432 23.8374 30.3433C23.8148 30.4434 23.7671 30.5361 23.6989 30.6129C23.6306 30.6896 23.5441 30.7478 23.4472 30.7821C20.966 31.6948 18.2468 31.7325 15.7412 30.889C13.2356 30.0455 11.0945 28.3715 9.67337 26.1452C8.25227 23.9188 7.63676 21.274 7.92909 18.6501C8.22142 16.0263 9.404 13.5812 11.2804 11.7211C13.1568 9.86094 15.6141 8.69771 18.2441 8.42459C20.874 8.15147 23.5185 8.7849 25.7381 10.2197C27.9577 11.6544 29.6189 13.8042 30.4458 16.3118C31.2727 18.8195 31.2155 21.5341 30.2837 24.0048Z" />
+            <path d="M39.822 34.7389L36.0661 30.9887C35.9694 30.8922 35.9081 30.7659 35.8921 30.6304C35.8761 30.4948 35.9063 30.3578 35.9778 30.2414C37.169 28.3357 38.0194 26.2378 38.4909 24.0413C40.747 13.5944 33.845 3.04568 23.3605 0.899486C18.3231 -0.129812 13.0825 0.871968 8.78209 3.68623C4.48173 6.50049 1.47074 10.8988 0.406197 15.9213C-1.7616 26.1374 4.98367 36.6268 15.1883 38.9158C20.1637 40.0381 25.3816 39.1596 29.7133 36.4704C29.8297 36.4 29.9663 36.3705 30.1015 36.3867C30.2366 36.403 30.3624 36.464 30.4587 36.56L34.2284 40.3223C34.3424 40.4359 34.497 40.4997 34.6581 40.4997C34.8193 40.4997 34.9738 40.4359 35.0879 40.3223L39.822 35.597C39.9358 35.4831 39.9997 35.3288 39.9997 35.168C39.9997 35.0071 39.9358 34.8528 39.822 34.7389ZM35.7146 36.1059C35.6722 36.1483 35.6219 36.1821 35.5664 36.2051C35.5109 36.228 35.4514 36.2399 35.3914 36.2399C35.3313 36.2399 35.2718 36.228 35.2164 36.2051C35.1609 36.1821 35.1105 36.1483 35.0681 36.1059L30.55 31.5948C27.4757 34.495 23.3816 36.0706 19.153 35.9809C14.9245 35.8911 10.9012 34.1433 7.95311 31.1152C5.00505 28.0871 3.36913 24.0221 3.3991 19.7993C3.42906 15.5764 5.12248 11.535 8.11322 8.54894C11.104 5.56286 15.1517 3.87206 19.3811 3.84214C23.6105 3.81223 27.6818 5.44559 30.7146 8.38906C33.7474 11.3325 35.4981 15.3496 35.5879 19.5716C35.6778 23.7936 34.0998 27.8813 31.195 30.9507L35.7146 35.4619C35.799 35.5474 35.8461 35.6626 35.8458 35.7827C35.8456 35.9027 35.7979 36.0177 35.7131 36.1028L35.7146 36.1059Z" />
+        </svg>
+    );
+}
 // first-run tour: each step reveals one more toolbar control (REVEAL) and points a coach-mark at it.
+// "Choose Icon" picker: its own chunk (the Lucide set is large), so it only loads when someone opens it
+const IconPicker = lazy(() => import("./IconPicker"));
 const TOUR_KEY = "ic:onboarded";
 const REVEAL: Record<string, number> = { glyph: 1, omni: 2, size: 3, paginate: 4, spell: 5, save: 6, export: 7, seg: 8 };
 type TourStep = { at: string; title: string; body: string; side?: "letter" | "brandMenu" | "bgOptions"; place?: "right" };
@@ -207,6 +218,16 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
     const [menu, setMenu] = useState<{ id: "size" | "export" | "more" | "brand"; left?: number; right?: number; top: number } | null>(null);
     const [ctx, setCtx] = useState<{ x: number; y: number } | null>(null);
     const [imgPop, setImgPop] = useState<{ img: HTMLImageElement; left: number; top: number } | null>(null);
+    const [iconFor, setIconFor] = useState<HTMLImageElement | null>(null);   // "Choose Icon" target
+    const [iconAt, setIconAt] = useState({ left: 0, top: 0 });
+    const [iconColor, setIconColor] = useState("#111111");
+    const openIconPicker = (img: HTMLImageElement) => {
+        const r = img.getBoundingClientRect(), W = 300, H = 400;
+        let left = r.right + 10; if (left + W > window.innerWidth - 8) left = Math.max(8, r.left - W - 10);
+        const top = Math.max(8, Math.min(r.top, window.innerHeight - H - 8));
+        setIconAt({ left, top }); setImgPop(null); setIconFor(img);
+    };
+    // live: recolour whatever SVG icon is on the target image (works for one placed this session or earlier)
     const [linkOpen, setLinkOpen] = useState(false);
     const [linkUrl, setLinkUrl] = useState("");
     const [confirm, setConfirm] = useState<{ msg: string; ok: string; run: () => void } | null>(null);
@@ -325,6 +346,18 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
             try { localStorage.setItem(keyOf(t), JSON.stringify(doc)); } catch { /* ignore */ }
         }, 600);
     }, [schedule, serialize]);
+    // live: recolour whatever SVG icon is on the target image (works for one placed this session or earlier)
+    const recolorIcon = useCallback((css: string) => {
+        setIconColor(css);
+        const img = iconFor;
+        if (img && /^data:image\/svg\+xml;base64,/i.test(img.src)) {
+            try {
+                const svg = decodeURIComponent(escape(atob(img.src.split(",")[1]))).replace(/stroke="[^"]*"/, `stroke="${css}"`);
+                img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
+                touch();
+            } catch { /* ignore */ }
+        }
+    }, [iconFor, touch]);
 
     /* ---- boot: what this browser last had, else the source file (nothing is stored server-side) ---- */
     useEffect(() => {
@@ -1348,14 +1381,15 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
                     <div className="pt-ctx-title">Window</div>
                     <button className="pt-menu-item cvm-row" onClick={() => { setMenu(null); setKwOpen((o) => !o); }}><ScanSearch />ATS keywords<span className="cvm-hint">{kw.keywords.length ? `${kwUses.filter((u) => u[tab] > 0).length} of ${kw.keywords.length} used` : kwOpen ? "hide" : "none yet"}</span></button>
                     <button className="pt-menu-item cvm-row" onClick={() => startTour()}><Sparkles />Take the tour again</button>
+                    <button className="pt-menu-item cvm-row" onClick={() => { setMenu(null); if (remote?.configure || assistant?.configure) openConnect(); else setGetApp(true); }}><LifeBuoy />Help · connect your AI</button>
                     <div className="pt-menu-div" />
                     <div className="pt-ctx-title">Document</div>
                     <button className="pt-menu-item cvm-row pt-danger" onClick={() => { setMenu(null); resetSource(); }}><RotateCcw />Reset to original source</button>
                     <div className="pt-menu-div" />
-                    {files?.checkUpdates && <button className="pt-menu-item cvm-row" onClick={checkUpdates}><RefreshCw />Check for Updates…{appVersion && <span className="cvm-hint">{appVersion}</span>}</button>}
+                    {files?.checkUpdates && <button className="pt-menu-item cvm-row" onClick={checkUpdates}><IcedCoffeeGlyph className="cvm-menu-glyph" />Check for Updates…{appVersion && <span className="cvm-hint">{appVersion}</span>}</button>}
                     {isWebBuild && <button className="pt-menu-item cvm-row" onClick={() => { setMenu(null); setGetApp(true); }}><Download />Get the Mac app<span className="cvm-hint">free</span></button>}
                     {/* credit: the tool says who made it and where it lives — never the exported résumé, which is the user's */}
-                    <button className="pt-menu-item cvm-row cvm-credit" onClick={visitHomepage}><span>IcedCoffee <span className="cvm-hint" style={{ marginLeft: 4 }}>by Q Manning</span></span><span className="cvm-hint">qmanning.com ↗</span></button>
+                    <button className="pt-menu-item cvm-credit" onClick={visitHomepage} data-tip="qmanning.com ↗"><span className="cvm-credit-in">Made by <QLogo className="cvm-qlogo" /></span></button>
                 </div>
             )}
             {kwOpen && (() => {
@@ -1436,8 +1470,16 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
             {imgPop && (
                 <div className="pt-menu-pop pt-open cvm-imgpop" style={{ left: imgPop.left, top: imgPop.top }}>
                     <button className="pt-menu-item cvm-row" onClick={() => imgFileRef.current?.click()}><ImageUp />Change image…</button>
+                    <button className="pt-menu-item cvm-row" onClick={() => openIconPicker(imgPop.img)}><Shapes />Choose Icon and Color…</button>
                     <button className="pt-menu-item cvm-row" onClick={() => { const img = imgPop.img; img.style.removeProperty("width"); img.style.removeProperty("height"); touch(); setImgPop(null); }}><RotateCcw />Reset size</button>
                 </div>
+            )}
+            {iconFor && (
+                <Suspense fallback={null}>
+                    <IconPicker at={iconAt} color={iconColor} fmt={look.fmt} onColor={recolorIcon}
+                        onPick={(uri) => { iconFor.src = uri; touch(); }}
+                        onClose={() => setIconFor(null)} />
+                </Suspense>
             )}
             {ctx && <LookMenu look={look} at={ctx} say={say} onClose={() => setCtx(null)} startup={{
                 size: startSize, page: home, defaultPage: templateUrl,
@@ -1544,7 +1586,7 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
                     )}
 {aiStatus?.ready ? (
                     <form className={"cvm-ask" + (aiBusy ? " cvm-ask-busy" : "")} onSubmit={(e) => { e.preventDefault(); runAssistant(ask); }}>
-                            <button type="button" className="pt-rbtn" aria-label="AI settings" data-tip={aiStatus?.ready ? `Your AI: ${aiStatus.label} · change…` : "Connect your AI"} onClick={openConnect}>{aiStatus?.ready ? <Sparkles /> : <Settings2 />}</button>
+                            <button type="button" className="pt-rbtn" aria-label="AI settings" data-tip={aiStatus?.ready ? `Your AI: ${aiStatus.label} · change…` : "Connect your AI"} onClick={openConnect}>{aiStatus?.ready ? <Bot /> : <Settings2 />}</button>
                             <textarea ref={askRef} rows={1} value={aiBusy || ask} readOnly={!!aiBusy} aria-label="Ask your AI to change this résumé"
                                 placeholder={aiStatus?.ready ? "Ask your AI to change this résumé…  ⌘K" : "Connect your own AI to edit by asking — your key stays on this computer"}
                                 onFocus={() => { setAskFocus(true); if (aiStatus && !aiStatus.ready) { askRef.current?.blur(); openConnect(); } }} onBlur={() => setAskFocus(false)}
@@ -1561,7 +1603,7 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
                                         <span>{remoteStatus.live > 0 ? "changes it makes appear here, with Undo" : "ask it to change this résumé"}</span>
                                     </button>
                                 ) : (
-                                    <button type="button" className="cvm-ask-connect-main" onClick={openConnect}><Sparkles /><b>Connect your AI</b><span>Claude Desktop, ChatGPT and others · no API key needed</span></button>
+                                    <button type="button" className="cvm-ask-connect-main" onClick={openConnect}><Bot /><b>Connect your AI</b><span>Claude Desktop, ChatGPT and others · no API key needed</span></button>
                                 )}
                                 <button type="button" className="cvm-ask-connect-x" aria-label="Hide this" data-tip="Hide this — it stays under the AI menu" onClick={hidePill}><X /></button>
                             </div>
