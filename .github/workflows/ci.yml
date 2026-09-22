@@ -1,0 +1,25 @@
+# Runs on every push (branches and release tags) and every pull request. desktop-release.yml only
+# packages installers — this is what actually guards the code. Among other things `npm test` checks
+# that the committed dist/ is a real build of the current src/ (dist/ is what ships, so nothing else
+# stands between them) and that the installer names the release workflow produces are the ones the
+# updater looks for.
+name: ci
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test

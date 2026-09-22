@@ -26,9 +26,13 @@
     "private": true,
     "license": "MIT",
     "type": "module",
+    "engines": {
+        "node": ">=20"
+    },
     "scripts": {
         "build": "node build.mjs",
         "test": "node --test test/unit/*.test.mjs",
+        "typecheck": "tsc --noEmit",
         "serve": "node test/serve.mjs 7333"
     },
     "devDependencies": {
@@ -39,6 +43,8 @@
         "@tiptap/extension-text-style": "^3.0.1",
         "@tiptap/pm": "^3.0.1",
         "@tiptap/starter-kit": "^3.0.1",
+        "@types/react": "^19.3.0",
+        "@types/react-dom": "^19.3.0",
         "docx": "9.5.1",
         "esbuild": "^0.25.9",
         "jsdom": "^26.1.0",
