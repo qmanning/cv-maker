@@ -173,7 +173,8 @@ only network request IcedCoffee makes on its own. (Windows: the dialog opens the
 Exports render in a throwaway window with JavaScript off and every network request refused, the same
 posture as `server.mjs`. `npm run smoke` launches the app hidden, exports a PDF and a PNG through the
 real UI, and — if puppeteer is resolvable (or `CVM_PUPPETEER_FROM=/path/with/node_modules`) — compares
-the PDF with puppeteer's, text run by text run. It isn't signed or auto-updating yet.
+the PDF with puppeteer's, text run by text run. The builds are **not** code-signed or notarized (see *First
+launch* above); updates are signed separately, with IcedCoffee's own key, and verified before they install.
 
 **Connect the AI app you already use — no API key.** This is what the desktop app is for. IcedCoffee runs a
 small [MCP](https://modelcontextprotocol.io) server, so your own AI app can read the résumé that's open and
@@ -245,7 +246,9 @@ so every browser starts set up the same way; **Save** remembers it in this brows
 
 | Keys | Does |
 | --- | --- |
-| `⌘S` / `Ctrl+S` | Save to this browser (`localStorage`) |
+| `⌘S` / `Ctrl+S` | Save — to the file on disk in the desktop app, to this browser (`localStorage`) on the web |
+| `⇧⌘S` / `Ctrl+Shift+S` | Save As (desktop app) |
+| `⌘+` / `⌘−` / `⌘0` | Zoom the sheet in / out / fit to width |
 | `⌘B` / `Ctrl+B` | Bold |
 | `⌘I` / `Ctrl+I` | Italic |
 | `⌘U` / `Ctrl+U` | Underline |
@@ -253,11 +256,25 @@ so every browser starts set up the same way; **Save** remembers it in this brows
 
 ## Privacy
 
-Nothing is stored on or sent to a server. Your document autosaves to this browser's
-`localStorage` only — export Source HTML to move it anywhere else, or hand a variant to someone
-else as a file. The only network calls IcedCoffee ever makes on its own are to fetch the template
-file it's pointed at; the optional export server (above) is one you run yourself, on your own
-machine, and it blocks every outbound request during a render.
+**The web version** stores nothing on a server and sends nothing to one. Your document autosaves to this
+browser's `localStorage` only — export Source HTML to move it anywhere else, or hand a variant to someone
+else as a file. The only network calls it makes on its own are to fetch the template file it's pointed at;
+the optional export server (above) is one you run yourself, on your own machine, and it blocks every
+outbound request during a render.
+
+**The desktop app** keeps your documents as ordinary files on your disk. It makes exactly two kinds of
+network request, both of which you control:
+
+- the **update check** against this repo's Releases, once a few seconds after launch — switch it off under
+  *Settings ▸ Updates*;
+- **"Ask your AI"**, if — and only if — you configure a provider yourself. Your prompt and the document's
+  text are then sent to that provider, and nowhere else. Your API key is encrypted with your operating
+  system's keychain, stays in the app's main process, and never reaches the editor page.
+
+Connecting your own AI app over **MCP** instead involves no key and no network: the AI app talks to
+IcedCoffee over a local socket only your user account can open. Note that a connected AI app can, through
+those tools, open any `.html` file and embed any image file you point it at — the same reach you would give
+it over your own files.
 
 ## Browser support & known limits
 
@@ -275,10 +292,16 @@ machine, and it blocks every outbound request during a render.
 
 ```bash
 npm install
-npm run build   # esbuild → dist/icedcoffee.js + dist/icedcoffee.css
-npm test        # node --test, pure helpers in src/cv-source.ts
-npm run serve   # static server on :7333, for local hacking against dist/
+npm run build      # esbuild → dist/icedcoffee.js + dist/icedcoffee.css
+npm test           # node --test: the src/ helpers, the export server, the templates, the updater,
+                   #   and a check that the committed dist/ really is a build of the current src/
+npm run typecheck  # tsc --noEmit
+npm run serve      # static server on :7333, for local hacking against dist/
 ```
+
+**`dist/` is committed** — that's the whole "one prebuilt folder, no build" premise, so it is what people
+actually run. Rebuild it and commit the result in the same change as any edit under `src/`; `npm test`
+fails if the two have drifted.
 
 `src/` is kept byte-identical to how these files live in the author's own site, so they can be
 re-synced by copying. That means two of their imports point at paths that don't exist in this
@@ -290,6 +313,10 @@ of editing the source files, so don't "fix" those imports; they're intentional.
 `colorpicker.js`. If Infospector changes upstream, re-copy those three files (and its `LICENSE`)
 rather than editing them here — a comment at the top of `vendor/infospector/README.md` says the
 same.
+
+Pull requests are welcome — [CONTRIBUTING.md](./CONTRIBUTING.md) covers the two things that trip people
+up (the committed `dist/`, and why some imports look wrong). Found a security problem? Please report it
+privately: [SECURITY.md](./SECURITY.md).
 
 ## Credits
 
