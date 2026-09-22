@@ -9,6 +9,9 @@
     "license": "MIT",
     "type": "module",
     "main": "main.mjs",
+    "engines": {
+        "node": ">=20"
+    },
     "scripts": {
         "start": "electron .",
         "smoke": "node smoke.mjs",
@@ -99,7 +102,7 @@
             "identity": "-",
             "hardenedRuntime": false,
             "gatekeeperAssess": false,
-            "artifactName": "IcedCoffee-${version}-${env.ITERA_BUILD}-${arch}.${ext}"
+            "artifactName": "IcedCoffee-${version}-mac-${arch}.${ext}"
         },
         "dmg": {
             "title": "IcedCoffee ${version}",

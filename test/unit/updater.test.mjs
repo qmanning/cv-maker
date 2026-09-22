@@ -2,6 +2,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
+import { repoRoot } from "./_helpers.mjs";
 import { newer, pickAssets, verifyUpdate, signUpdate, UPDATE_PUBLIC_KEY } from "../../electron/updater-core.mjs";
 
 test("newer(): semver order, v-prefix, pre-releases, junk", () => {
@@ -36,4 +39,42 @@ test("verifyUpdate(): accepts the publisher's signature, refuses everything else
     assert.equal(verifyUpdate(data, "not base64 at all", pub), false);
     assert.equal(verifyUpdate(data, sig.slice(0, 20), pub), false);
     assert.match(UPDATE_PUBLIC_KEY, /BEGIN PUBLIC KEY/);
+});
+
+/* ---- the release names and the updater must agree, or the app can never update itself ----
+   electron-builder expands `build.<platform>.artifactName` at packaging time. Two ways this has broken:
+     • an `${env.X}` macro that the release workflow doesn't set — electron-builder THROWS
+       (ERR_ELECTRON_BUILDER_ENV_NOT_DEFINED) and the whole platform's build fails;
+     • a name that packages fine but that pickAssets() doesn't recognise — the app silently loses
+       self-update and only ever offers the download page.
+   So: no env macros in the committed patterns, and what they expand to is what pickAssets() looks for. */
+const builderConfig = JSON.parse(fs.readFileSync(path.join(repoRoot, "electron", "package.json"), "utf8")).build;
+/** the subset of electron-builder's macros these patterns are allowed to use */
+const expand = (pattern, { version, arch, ext }) =>
+    pattern.replace(/\$\{version\}/g, version).replace(/\$\{arch\}/g, arch).replace(/\$\{ext\}/g, ext);
+
+test("artifactName patterns use no ${env.*} macro (the release workflow sets none, and electron-builder throws)", () => {
+    for (const platform of ["mac", "win"]) {
+        const pattern = builderConfig[platform]?.artifactName;
+        assert.ok(pattern, `electron/package.json build.${platform}.artifactName is missing`);
+        assert.doesNotMatch(pattern, /\$\{env\./, `build.${platform}.artifactName uses an \${env.*} macro: the release workflow runs electron-builder directly and sets no such variable, so this platform's build would fail`);
+    }
+});
+
+test("what electron-builder names a release is exactly what pickAssets() looks for", () => {
+    const version = "9.9.9";
+    const cases = [
+        { platform: "darwin", builderKey: "mac", arch: "arm64", ext: "zip" },
+        { platform: "darwin", builderKey: "mac", arch: "x64", ext: "zip" },
+        { platform: "win32", builderKey: "win", arch: "x64", ext: "exe" },
+        { platform: "win32", builderKey: "win", arch: "arm64", ext: "exe" },
+    ];
+    for (const { platform, builderKey, arch, ext } of cases) {
+        const built = expand(builderConfig[builderKey].artifactName, { version, arch, ext });
+        const release = { tag_name: `v${version}`, assets: [built, built + ".sig"].map((name) => ({ name, size: 5, browser_download_url: "https://example/" + name })) };
+        const picked = pickAssets(release, platform, arch);
+        assert.equal(picked.name, built, `updater-core.pickAssets() wants "${picked.name}" but electron-builder produces "${built}" for ${platform}/${arch}`);
+        assert.equal(picked.url, "https://example/" + built);
+        assert.equal(picked.sigUrl, "https://example/" + built + ".sig");
+    }
 });
