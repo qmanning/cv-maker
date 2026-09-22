@@ -81,7 +81,12 @@ async function renderExport(body) {
         err.payload = { error: "Headless Chrome is not available here. Run `npm i puppeteer` next to server.mjs, then restart it." };
         throw err;
     }
-    const browser = await puppeteer.launch({ headless: true, args: ["--no-sandbox", "--font-render-hinting=none"] });
+    // Chrome's own sandbox stays ON: this renders document HTML, and the belt-and-braces below (JS disabled,
+    // every request aborted) is not a reason to give that up. --no-sandbox is added only where Chrome refuses
+    // to start without it — running as root, typically in a container.
+    const asRoot = typeof process.getuid === "function" && process.getuid() === 0;
+    const args = ["--font-render-hinting=none", ...(asRoot ? ["--no-sandbox"] : [])];
+    const browser = await puppeteer.launch({ headless: true, args });
     try {
         const page = await browser.newPage();
         await page.setJavaScriptEnabled(false);

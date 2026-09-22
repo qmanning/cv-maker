@@ -138,12 +138,19 @@ export function setupFiles({ templatePath, letterTemplatePath = "", smokeDir = "
         send("files:opened", { text: fs.readFileSync(letter ? letterTemplatePath : templatePath, "utf8"), name: letter ? "Cover Letter" : "Résumé", kind, note: `New ${LABEL[kind]} — Save (⌘S) to choose where it lives` });
     }
 
-    ipcMain.handle("files:current", (_e, kind) => {
+    // Only the editor window may drive these. It is the one renderer with the cvMakerFiles bridge today, but
+    // these handlers open dialogs and read and write real files, so they check rather than assume — the same
+    // posture assistant.mjs and mcp.mjs already take with their own channels.
+    const fromEditor = (e) => !!win && !win.isDestroyed() && e.sender === win.webContents;
+
+    ipcMain.handle("files:current", (e, kind) => {
+        if (!fromEditor(e)) return null;
         const k = asKind(kind), d = docs[k]; if (!d.current) return null;
         try { const text = fs.readFileSync(d.current, "utf8"); d.known = hash(text); watch(k); title(); return { text, name: path.basename(d.current) }; }
         catch { setCurrent(k, "", null); return null; }
     });
-    ipcMain.handle("files:save", async (_e, html, opts) => {
+    ipcMain.handle("files:save", async (e, html, opts) => {
+        if (!fromEditor(e)) throw new Error("not allowed");
         const k = asKind(opts?.kind || active), d = docs[k]; let target = d.current;
         if (!target || opts.as) {
             if (smokeDir) target = path.join(smokeDir, k === "letter" ? "saved-letter.html" : "saved.html");
@@ -158,17 +165,22 @@ export function setupFiles({ templatePath, letterTemplatePath = "", smokeDir = "
         setCurrent(k, target, html);
         return path.basename(target);
     });
-    ipcMain.handle("files:saveAs", (_e, html, name, kind) => writeDocument(html, { saveAs: String(name || ""), kind: asKind(kind || active) }).file);
-    ipcMain.on("files:open", (_e, kind) => openDialog(asKind(kind || active)));
-    ipcMain.on("files:dropped", (_e, file) => { if (typeof file === "string" && file) openPath(file); });
-    ipcMain.on("files:dirty", (_e, flag, kind) => {
+    ipcMain.handle("files:saveAs", (e, html, name, kind) => {
+        if (!fromEditor(e)) throw new Error("not allowed");
+        return writeDocument(html, { saveAs: String(name || ""), kind: asKind(kind || active) }).file;
+    });
+    ipcMain.on("files:open", (e, kind) => { if (fromEditor(e)) openDialog(asKind(kind || active)); });
+    ipcMain.on("files:dropped", (e, file) => { if (fromEditor(e) && typeof file === "string" && file) openPath(file); });
+    ipcMain.on("files:dirty", (e, flag, kind) => {
+        if (!fromEditor(e)) return;
         docs[asKind(kind || active)].dirty = !!flag; title();
         if (closeAfterSave && !KINDS.some((k) => docs[k].dirty)) { closeAfterSave = false; win?.close(); }
     });
-    ipcMain.on("files:active", (_e, kind) => { active = asKind(kind); title(); buildMenu(); });
-    ipcMain.handle("files:recent", (_e, kind) => recentList(asKind(kind || active)));
-    ipcMain.on("files:openPath", (_e, file) => { if (typeof file === "string" && file) openPath(file); });
-    ipcMain.on("files:pin", (_e, msg) => {
+    ipcMain.on("files:active", (e, kind) => { if (!fromEditor(e)) return; active = asKind(kind); title(); buildMenu(); });
+    ipcMain.handle("files:recent", (e, kind) => (fromEditor(e) ? recentList(asKind(kind || active)) : []));
+    ipcMain.on("files:openPath", (e, file) => { if (fromEditor(e) && typeof file === "string" && file) openPath(file); });
+    ipcMain.on("files:pin", (e, msg) => {
+        if (!fromEditor(e)) return;
         const p = msg && msg.path, on = !!(msg && msg.pinned);
         if (typeof p !== "string" || !p) return;
         const k = KINDS.find((o) => docs[o].recent.includes(p)) || active, d = docs[k];
@@ -179,10 +191,10 @@ export function setupFiles({ templatePath, letterTemplatePath = "", smokeDir = "
     const buildInfo = (() => { try { return JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "build-info.json"), "utf8")); } catch { return {}; } })();
     const versionLabel = `${app.getVersion()}${buildInfo.build ? ` · build ${buildInfo.build}` : " · dev"}`;
     app.setAboutPanelOptions?.({ applicationName: "IcedCoffee", applicationVersion: app.getVersion(), version: buildInfo.build ? `build ${buildInfo.build} · ${buildInfo.commit || ""}` : "dev", copyright: "Q Manning · MIT" });
-    ipcMain.handle("shell:version", () => versionLabel);
+    ipcMain.handle("shell:version", (e) => (fromEditor(e) ? versionLabel : ""));
     // the brand menu's quick actions
-    ipcMain.on("shell:check-updates", () => updates?.check());
-    ipcMain.on("shell:open-external", (_e, url) => { if (typeof url === "string" && /^(https?:\/\/|mailto:)/i.test(url)) shell.openExternal(url); });   // web pages and mail only — never file: or an app scheme
+    ipcMain.on("shell:check-updates", (e) => { if (fromEditor(e)) updates?.check(); });
+    ipcMain.on("shell:open-external", (e, url) => { if (fromEditor(e) && typeof url === "string" && /^(https?:\/\/|mailto:)/i.test(url)) shell.openExternal(url); });   // web pages and mail only — never file: or an app scheme
 
     function buildMenu() {
         const mac = process.platform === "darwin";

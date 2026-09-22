@@ -49,6 +49,9 @@ const json = (status, payload) => new Response(JSON.stringify(payload), { status
 
 async function handleExport(req) {
     const started = Date.now();
+    // refuse on the declared size first, so an oversized body is never collected into memory just to be rejected
+    const declared = Number(req.headers.get("content-length"));
+    if (Number.isFinite(declared) && declared > MAX_BODY) return json(413, { error: "Request body too large", limitBytes: MAX_BODY });
     const text = await req.text();
     if (text.length > MAX_BODY) return json(413, { error: "Request body too large", limitBytes: MAX_BODY });
     let body = null;

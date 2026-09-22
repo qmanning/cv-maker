@@ -133,7 +133,13 @@ export function setupMcp({ editorWindow, currentFile, files = () => null, socket
         const gone = () => { clients = Math.max(0, clients - 1); changed(); };
         sock.once("close", gone); sock.on("error", () => {});
     });
-    if (process.platform !== "win32") fs.rmSync(SOCKET, { force: true });   // a stale socket from a crash
+    if (process.platform !== "win32") {
+        fs.rmSync(SOCKET, { force: true });   // a stale socket from a crash
+        // The socket is created by listen() at the prevailing umask and only chmodded once it exists, so for an
+        // instant it can be wider than 0600. Shut the containing directory instead — that is race-free, and on a
+        // shared machine it is what actually keeps another account from reaching the socket at all.
+        try { fs.chmodSync(path.dirname(SOCKET), 0o700); } catch { /* best effort */ }
+    }
     server.on("error", (e) => console.log("[mcp] socket error: " + e.message));
     server.listen(SOCKET, () => { if (process.platform !== "win32") { try { fs.chmodSync(SOCKET, 0o600); } catch { /* best effort */ } } console.log("[mcp] listening on " + SOCKET); });
     app.on("will-quit", () => { server.close(); if (process.platform !== "win32") fs.rmSync(SOCKET, { force: true }); });
