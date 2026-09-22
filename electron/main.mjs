@@ -206,11 +206,11 @@ async function leakCheck(win) {
     const tool = async (name, args = {}) => JSON.parse((await rpc("tools/call", { name, arguments: args })).result.content[0].text);
     await rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "leak-check", version: "0" } });
     const round = async (i) => {
-        const doc = await tool("get_resume"), job = doc.blocks.find((b) => b.kind === "job");
-        await tool("edit_resume", { summary: "round " + i, ops: [{ op: "set_text", target: job.regions[0].id, html: `<p>Round ${i} ${"x".repeat(40)}</p>` }, { op: "insert_block", target: job.id, kind: "experience", fill: ["<p>Temp</p>", "<p>2020</p>", "<ul><li><p>one</p></li><li><p>two</p></li></ul>"] }] });
-        await tool("undo_last_edit");
+        const doc = await tool("get_document", { document: "resume" }), job = doc.blocks.find((b) => b.kind === "job");
+        await tool("edit_document", { document: "resume", summary: "round " + i, ops: [{ op: "set_text", target: job.regions[0].id, html: `<p>Round ${i} ${"x".repeat(40)}</p>` }, { op: "insert_block", target: job.id, kind: "experience", fill: ["<p>Temp</p>", "<p>2020</p>", "<ul><li><p>one</p></li><li><p>two</p></li></ul>"] }] });
+        await tool("undo_last_edit", { document: "resume" });
         win.webContents.send("view:zoom", i % 2 ? "in" : "out");
-        if (i % 5 === 0) { await tool("export_resume", { format: i % 10 === 0 ? "png" : "pdf" }); }
+        if (i % 5 === 0) { await tool("export_document", { document: "resume", format: i % 10 === 0 ? "png" : "pdf" }); }
         if (i % 4 === 0) {
             assistant.openSettings();
             const panel = BrowserWindow.getAllWindows().find((w) => w !== win && w.webContents.getURL().includes("/__assistant/") || (w !== win && w.getTitle() === "Settings"));
@@ -369,62 +369,62 @@ async function smoke(win) {
     const tool = async (name, args = {}) => { const r = (await rpc("tools/call", { name, arguments: args })).result; return { isError: !!r.isError, value: (() => { try { return JSON.parse(r.content[0].text); } catch { return r.content[0].text; } })() }; };
     const init = (await rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "claude-ai", version: "0" } })).result;
     child.stdin.write(JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }) + "\n");
-    fileSteps.mcpInitialized = init.serverInfo?.name === "itera" && !!init.capabilities?.tools && /get_resume/.test(init.instructions || "");
-    fileSteps.mcpTools = ((await rpc("tools/list", {})).result.tools || []).map((t) => t.name).join(",") === "get_resume,edit_resume,undo_last_edit,export_resume,list_documents,open_document,save_document,get_page_setup,set_page_setup,set_keywords,get_keywords,list_images,replace_image";
-    const seen = (await tool("get_resume")).value;
+    fileSteps.mcpInitialized = init.serverInfo?.name === "itera" && !!init.capabilities?.tools && /get_document/.test(init.instructions || "");
+    fileSteps.mcpTools = ((await rpc("tools/list", {})).result.tools || []).map((t) => t.name).join(",") === "get_document,edit_document,undo_last_edit,export_document,list_documents,open_document,save_document,get_page_setup,set_page_setup,set_keywords,get_keywords,new_document,list_images,replace_image";
+    const seen = (await tool("get_document", { document: "resume" })).value;
     const job = seen.blocks.find((b) => b.kind === "job");
     fileSteps.mcpReadsResume = seen.blocks.length > 3 && !!job && seen.pages >= 1 && typeof seen.file === "string";
-    const edit = await tool("edit_resume", { summary: "Retitled the first job.", ops: [{ op: "set_text", target: job.regions[0].id, html: "<p>MCP WROTE THIS <img src=x onerror=alert(1)></p>" }] });
+    const edit = await tool("edit_document", { document: "resume", summary: "Retitled the first job.", ops: [{ op: "set_text", target: job.regions[0].id, html: "<p>MCP WROTE THIS <img src=x onerror=alert(1)></p>" }] });
     fileSteps.mcpEdited = !edit.isError && edit.value.applied === 1 && edit.value.pages_after >= 1 && (await js(`document.querySelector(".cv-page").textContent.includes("MCP WROTE THIS") && !document.querySelector(".cv-page img[onerror]")`));
     fileSteps.mcpShownInApp = await js(`/Claude/.test(document.querySelector(".cvm-ask-reply")?.textContent || "") && /Retitled the first job/.test(document.querySelector(".cvm-ask-reply p")?.textContent || "")`);
     fs.writeFileSync(path.join(SMOKE_DIR, "mcp-edit.png"), (await win.webContents.capturePage()).toPNG());
-    const bad = await tool("edit_resume", { summary: "x", ops: [{ op: "set_text", target: "r999", html: "<p>x</p>" }] });
+    const bad = await tool("edit_document", { document: "resume", summary: "x", ops: [{ op: "set_text", target: "r999", html: "<p>x</p>" }] });
     fileSteps.mcpReportsSkips = bad.value.applied === 0 && bad.value.skipped.length === 1;
-    const undone = (await tool("undo_last_edit")).value.undone === true;
+    const undone = (await tool("undo_last_edit", { document: "resume" })).value.undone === true;
     await until("the MCP undo to show", () => js(`!document.querySelector(".cv-page").textContent.includes("MCP WROTE THIS")`), 8000);
     fileSteps.mcpUndone = undone;
-    const exported = await tool("export_resume", { format: "pdf" });
+    const exported = await tool("export_document", { document: "resume", format: "pdf" });
     fileSteps.mcpExported = !exported.isError && fs.existsSync(exported.value.saved) && fs.readFileSync(exported.value.saved).subarray(0, 5).toString() === "%PDF-";
-    const docx = await tool("export_resume", { format: "docx" });
+    const docx = await tool("export_document", { document: "resume", format: "docx" });
     fileSteps.mcpExportedDocx = !docx.isError && /\.docx$/.test(docx.value.saved) && fs.readFileSync(docx.value.saved).subarray(0, 2).toString() === "PK";
     // page setup: read it, change the paper, put it back
-    const page0 = (await tool("get_page_setup")).value, pageA4 = (await tool("set_page_setup", { paper: "a4", fit_to_one_page: false })).value;
-    fileSteps.mcpPageSetup = page0.paper === "letter" && pageA4.paper === "a4" && pageA4.fit_to_one_page === false && pageA4.pages >= 1 && (await tool("set_page_setup", { paper: "nope" })).isError;
-    await tool("set_page_setup", { paper: page0.paper, fit_to_one_page: page0.fit_to_one_page });
+    const page0 = (await tool("get_page_setup", { document: "resume" })).value, pageA4 = (await tool("set_page_setup", { document: "resume", paper: "a4", fit_to_one_page: false })).value;
+    fileSteps.mcpPageSetup = page0.paper === "letter" && pageA4.paper === "a4" && pageA4.fit_to_one_page === false && pageA4.pages >= 1 && (await tool("set_page_setup", { document: "resume", paper: "nope" })).isError;
+    await tool("set_page_setup", { document: "resume", paper: page0.paper, fit_to_one_page: page0.fit_to_one_page });
     // images: swap the first one for a file on disk, see it land, take it back
     const pngFile = path.join(SMOKE_DIR, "pixel.png");
     fs.writeFileSync(pngFile, Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64"));
-    const imgs = (await tool("list_images")).value.images, swapped = await tool("replace_image", { image: imgs[0]?.id, path: pngFile, alt: "MCP PIXEL" });
+    const imgs = (await tool("list_images", { document: "resume" })).value.images, swapped = await tool("replace_image", { document: "resume", image: imgs[0]?.id, path: pngFile, alt: "MCP PIXEL" });
     fileSteps.mcpImages = imgs.length >= 1 && !swapped.isError && swapped.value.replaced === true && (await js(`document.querySelector(".cv-page img").alt === "MCP PIXEL"`))
-        && (await tool("replace_image", { image: "i0", path: path.join(SMOKE_DIR, "saved.html") })).isError;
-    await tool("undo_last_edit");
+        && (await tool("replace_image", { document: "resume", image: "i0", path: path.join(SMOKE_DIR, "saved.html") })).isError;
+    await tool("undo_last_edit", { document: "resume" });
     // documents: never open over unsaved work; branch with save_as (no dialog); open by name
     const docs0 = (await tool("list_documents")).value;
     fileSteps.mcpRefusesOverUnsaved = docs0.showing === "resume" && docs0.resume.unsaved_changes === true && (await tool("open_document", { name: "nothing-like-this" })).isError && (await tool("open_document", { name: "saved" })).isError;
-    const branch = await tool("save_document", { save_as: "MCP Branch / Test" });
+    const branch = await tool("save_document", { document: "resume", save_as: "MCP Branch / Test" });
     const docs1 = (await tool("list_documents")).value.resume;
     fileSteps.mcpSaveAs = !branch.isError && branch.value.file === "MCP Branch Test.html" && fs.existsSync(path.join(SMOKE_DIR, "MCP Branch Test.html")) && docs1.open === "MCP Branch Test.html" && docs1.unsaved_changes === false
-        && (await tool("save_document", { save_as: "saved" })).isError;   // never over another file
-    fileSteps.mcpExportNamedAfterFile = /mcp-branch-test\.pdf$/.test((await tool("export_resume", { format: "pdf" })).value.saved || "");
+        && (await tool("save_document", { document: "resume", save_as: "saved" })).isError;   // never over another file
+    fileSteps.mcpExportNamedAfterFile = /mcp-branch-test\.pdf$/.test((await tool("export_document", { document: "resume", format: "pdf" })).value.saved || "");
     const back = await tool("open_document", { name: "saved" });
     await until("the MCP-opened document to show", () => files.state().current === savedFile, 8000);
-    fileSteps.mcpOpened = !back.isError && back.value.opened === "saved.html" && back.value.document === "resume" && (await tool("get_resume")).value.file === "saved.html";
+    fileSteps.mcpOpened = !back.isError && back.value.opened === "saved.html" && back.value.document === "resume" && (await tool("get_document", { document: "resume" })).value.file === "saved.html";
     // the cover letter: the same tools with document: "cover_letter" — Itera shows it, and its header is the résumé's, read-only
     const L = { document: "cover_letter" };
-    const seenLetter = (await tool("get_resume", L)).value;
+    const seenLetter = (await tool("get_document", L)).value;
     const headerMirrored = await js(`(() => { const h = document.querySelector('.cv-page header[data-cv-mirror="header"]'); return !!h && !h.querySelector("[contenteditable=true]") && h.textContent.includes("Edited By Another Program") === document.querySelector(".cv-page") .textContent.includes("Edited By Another Program"); })()`);
     fileSteps.mcpLetterShown = seenLetter.document === "cover_letter" && seenLetter.file === "Untitled (not saved yet)" && seenLetter.blocks.length >= 5 && headerMirrored && (await js(`document.querySelector(".cvm-seg .cvm-on")?.getAttribute("aria-label") === "Cover Letter"`));
     const greeting = seenLetter.blocks.flatMap((b) => b.regions).find((r) => /Dear/.test(r.html));
-    const letterEdit = await tool("edit_resume", { ...L, summary: "Addressed the letter.", ops: [{ op: "set_text", target: greeting.id, html: "<p>Dear MCP Hiring Team,</p>" }] });
+    const letterEdit = await tool("edit_document", { ...L, summary: "Addressed the letter.", ops: [{ op: "set_text", target: greeting.id, html: "<p>Dear MCP Hiring Team,</p>" }] });
     fileSteps.mcpLetterEdited = !letterEdit.isError && letterEdit.value.document === "cover_letter" && letterEdit.value.applied === 1 && (await js(`document.querySelector(".cl-greeting").textContent.includes("MCP Hiring Team")`));
     const letterSaved = await tool("save_document", { ...L, save_as: "MCP Letter" });
     const letterOnDisk = fs.existsSync(path.join(SMOKE_DIR, "MCP Letter.html")) ? fs.readFileSync(path.join(SMOKE_DIR, "MCP Letter.html"), "utf8") : "";
     fileSteps.mcpLetterSaved = !letterSaved.isError && letterSaved.value.document === "cover_letter" && /MCP Hiring Team/.test(letterOnDisk) && /data-cv-mirror="header"/.test(letterOnDisk) && /itera:letter/.test(letterOnDisk);
     const docs2 = (await tool("list_documents")).value;
     fileSteps.mcpTwoFiles = docs2.cover_letter.open === "MCP Letter.html" && docs2.resume.open === "saved.html" && docs2.cover_letter.documents.length === 1 && !docs2.resume.documents.some((d) => d.name === "MCP Letter");
-    fileSteps.mcpLetterExported = /mcp-letter\.pdf$/.test((await tool("export_resume", { ...L, format: "pdf" })).value.saved || "");
+    fileSteps.mcpLetterExported = /mcp-letter\.pdf$/.test((await tool("export_document", { ...L, format: "pdf" })).value.saved || "");
     // …and back: naming the résumé puts it on the sheet again, untouched by any of that
-    const again = (await tool("get_resume", { document: "resume" })).value;
+    const again = (await tool("get_document", { document: "resume" })).value;
     fileSteps.mcpBackToResume = again.document === "resume" && again.file === "saved.html" && again.blocks.some((b) => b.kind === "job") && files.state("letter").current.endsWith("MCP Letter.html");
     // ATS keywords: the robot sets the list, the panel shows it, counts cover BOTH documents, and the model is told which regions are two-column
     const kws = (await tool("set_keywords", { job: "Staff Designer, Northline", keywords: ["dispatch", "MCP Hiring Team", "Kubernetes", "dispatch"] })).value;
@@ -434,6 +434,9 @@ async function smoke(win) {
         && (await tool("get_keywords")).value.keywords.length === 3;
     fileSteps.mcpColumnsHint = again.blocks.filter((b) => b.kind === "job").every((b) => b.regions.some((r) => r.columns === 2)) && !again.blocks[0].regions.some((r) => r.columns);
     await tool("set_keywords", { keywords: [] });
+    const fresh = (await tool("new_document", { document: "cover_letter" })).value;
+    fileSteps.mcpNewDocument = fresh.document === "cover_letter" && fresh.created === true && fresh.blocks.length >= 5 && files.state("letter").current === "" && (await js(`document.querySelector(".cvm-seg .cvm-on")?.getAttribute("aria-label") === "Cover Letter"`));
+    fileSteps.mcpRequiresDocument = (await tool("get_document", {})).isError && (await tool("edit_document", { summary: "x", ops: [{ op: "set_text", target: "r0", html: "<p>x</p>" }] })).isError;
     child.kill();
 
     /* the welcome sheet: it loads, and its primary button dismisses it */

@@ -48,7 +48,7 @@ export function setupMcp({ editorWindow, currentFile, files = () => null, socket
         const named = (k) => (k === "letter" ? "cover_letter" : "resume");
         // anything that reads or changes a document acts on the one on the sheet — so put the one they named there first
         let kind = "resume";
-        if (!["documents", "open", "keywords_get", "keywords_set"].includes(method)) kind = await editor("showDocument", [want]);
+        if (!["documents", "open", "new", "keywords_get", "keywords_set"].includes(method)) kind = await editor("showDocument", [want]);
         if (method === "describe") {
             const cur = files()?.state(kind).current ?? currentFile();
             const { document: _shown, ...doc } = await editor("describe");
@@ -78,6 +78,13 @@ export function setupMcp({ editorWindow, currentFile, files = () => null, socket
         if (method === "documents") {
             const f = shellFiles(), one = (k) => { const st = f.state(k); return { open: st.current ? path.basename(st.current) : null, open_path: st.current || null, unsaved_changes: !!st.dirty, documents: f.recentList(k).map((r) => ({ name: r.name, path: r.path, master: !!r.pinned })) }; };
             return { showing: named(f.state().active), resume: one("resume"), cover_letter: one("letter") };
+        }
+        if (method === "new") {
+            const nk = want || "resume";
+            shellFiles().newRemote(nk);
+            await new Promise((r) => setTimeout(r, 900));   // let the editor mount the template
+            const { document: _shown, ...d } = await editor("describe");
+            return { document: named(nk), created: true, ...d };
         }
         if (method === "open") {
             const out = shellFiles().openRemote(params?.name ?? params?.document, params?.name != null ? (want || "") : "");

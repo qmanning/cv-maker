@@ -99,6 +99,16 @@ export function setupFiles({ templatePath, letterTemplatePath = "", smokeDir = "
         setCurrent(kind, file, text); send("files:opened", { text, name: path.basename(file), kind });
         return { opened: path.basename(file), path: file, document: kind === "letter" ? "cover_letter" : "resume" };
     }
+    /** an AI app asks (MCP) to start a fresh document from the template — no dialog, and never over unsaved work */
+    function newRemote(kind) {
+        const k = asKind(kind), d = docs[k];
+        if (d.dirty) throw new Error(`The open ${LABEL[k]} has unsaved changes. Save it first (save_document), or ask the person.`);
+        d.dirty = false; setCurrent(k, "", null);
+        const letter = k === "letter" && letterTemplatePath;
+        const text = fs.readFileSync(letter ? letterTemplatePath : templatePath, "utf8");
+        send("files:opened", { text, name: letter ? "Cover Letter" : "Résumé", kind: k, note: `New ${LABEL[k]} — Save (⌘S) to choose where it lives` });
+        return { created: true };
+    }
     /** save with no dialog: to the document's open file, or (saveAs) a NEW file of that name beside it — else beside the other
      *  document, else in Documents. Never overwrites another file. */
     function writeDocument(html, { saveAs = "", kind = active } = {}) {
@@ -231,7 +241,7 @@ export function setupFiles({ templatePath, letterTemplatePath = "", smokeDir = "
             });
             win.on("closed", () => { KINDS.forEach((k) => { docs[k].watcher?.close(); docs[k].watcher = null; }); if (win === window) win = null; });
         },
-        openPath, openDialog, openRemote, writeDocument, recentList,
+        openPath, openDialog, openRemote, newRemote, writeDocument, recentList,
         /** `current` / `dirty` are the résumé's unless a kind is given — what callers meant before there were two documents */
         state: (kind = "resume") => ({ current: docs[asKind(kind)].current, dirty: docs[asKind(kind)].dirty, active }),
     };

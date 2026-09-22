@@ -433,7 +433,11 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
             body = body.replace(/<\/div>\s*$/, nos + "</div>");
         } else heightPt = Math.max(p.h, Math.ceil(contentPt) + 1);
         const css = `@page { size: ${p.w}pt ${heightPt}pt; margin: 0; }\nhtml, body { margin: 0; padding: 0; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }\n${pageBoxCss(p.w, sc)}\n${paged ? `.cv-page { min-height: ${((pages * p.h - 1) / sc).toFixed(2)}pt; }` : ""}`;
-        return { html: fullHtml(n, src?.css || "", body, css), widthPt: p.w, heightPt };
+        // printToPDF ignores CSS zoom, so fit-to-one-page is lost in the PDF. Report the scale and let the renderer apply
+        // it via printToPDF's own `scale` (single page only; multi-page keeps its manual layout). Print measures a touch
+        // taller than the screen, so when the content nearly fills the page, shrink a hair more to keep it on one sheet.
+        const fit = s.paginate && pages === 1 ? Math.min(sc, (heightPt - 6) * sc / Math.max(1, contentPt)) : 1;
+        return { html: fullHtml(n, src?.css || "", body, css), widthPt: p.w, heightPt, fit };
     }, [serialize]);
 
     const printFallback = useCallback((html: string) => {
