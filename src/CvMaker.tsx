@@ -155,6 +155,10 @@ async function rasterize(html: string, widthPt: number, heightPt: number, libUrl
     if (!w.htmlToImage) await new Promise<void>((res, rej) => { const sc = document.createElement("script"); sc.src = libUrl; sc.onload = () => res(); sc.onerror = () => rej(new Error("PNG export needs html-to-image.js (or an export server)")); document.head.appendChild(sc); });
     const frame = document.createElement("iframe"), wPx = Math.round(widthPt * PT), hPx = Math.round(heightPt * PT);
     frame.style.cssText = `position:fixed;left:-99999px;top:0;width:${wPx}px;height:${hPx}px;border:0;visibility:hidden`;
+    // a srcdoc iframe inherits this page's origin, so anything scripted in the document would run with it.
+    // allow-same-origin (and nothing else) keeps contentDocument and document.fonts readable — all the render
+    // needs — while scripts stay off.
+    frame.setAttribute("sandbox", "allow-same-origin");
     frame.srcdoc = html;
     await new Promise<void>((res) => { frame.onload = () => res(); document.body.appendChild(frame); });
     try {
