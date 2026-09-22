@@ -28,12 +28,14 @@ export interface GlassState {
 }
 export type ColorFmt = "hex" | "rgb" | "hsl" | "hsb";
 
-const BG_BASE: BgState = { pattern: "dots", opacity: 50, patternColor: null, groundColor: null, patternTheme: null, groundTheme: null, accent: null };
+// IcedCoffee ships a warm dark-brown look by default (the coffee theme): a deep-brown ground and accent,
+// faint white dots. The user can change any of it; a saved look (shared with Infospector) always wins.
+const BG_BASE: BgState = { pattern: "dots", opacity: 50, patternColor: "#ffffff8c", groundColor: "#251200", patternTheme: null, groundTheme: null, accent: "#211000" };
 const GLASS_BASE: GlassState = { blur: null, sat: null, light: null, dark: null, tint: null, color: null, colorTheme: null, backing: null, shine: null, shade: null, lightAngle: null, radius: null, pad: null };
-// IcedCoffee's defaults differ from Infospector's in two dials: its chrome floats over a white sheet of small type, so it
-// needs a heavier blur and backing to stay legible (Infospector: blur 8, backing 35 over a dark canvas). They apply only
-// while a dial is untouched — a look the user has set (in either tool: the saved look is shared) always wins.
-const GLASS_DEFAULTS = { blur: 44, sat: 150, tint: 14, color: "#bbbbbc", backing: 56, shine: 0, shade: 0, lightAngle: 145, radius: 40, pad: 8 };
+// The glass defaults finish the coffee theme: a warm brown tint under the frosted chrome, tuned so the
+// chrome floats over a white sheet of small type and stays legible. They apply only while a dial is
+// untouched — a look the user has set (in either tool: the saved look is shared) always wins.
+const GLASS_DEFAULTS = { blur: 44, sat: 150, tint: 14, color: "#482201", backing: 75, shine: 0, shade: 37, lightAngle: 360, radius: 40, pad: 8, light: 0.3, dark: 2 };
 const ROOT_PROPS = ["--pt-pattern-opacity", "--pt-pattern", "--pt-ground", "--pt-ground-2", "--pt-accent", "--pt-accent-ink", "--glass-blur", "--saturation", "--glass-reflex-light", "--glass-reflex-dark", "--glass-tint", "--glass-tint-2", "--c-glass", "--glass-backing-color", "--glass-backing", "--glass-shine", "--glass-shade", "--glass-light-angle", "--glass-radius", "--glass-pad", "--pt-text", "--pt-text-dim", "--pt-text-faint"];
 
 function read<T>(key: string, base: T): T {
@@ -108,19 +110,21 @@ export function useInfospectorLook(hostCssUrl: string) {
         const accent = cs().getPropertyValue("--pt-accent").trim();
         set("--pt-accent-ink", lib.contrast("#ffffff", accent) >= 3 ? "#ffffff" : "#111111");
 
-        const g = glass;
-        set("--glass-blur", (g.blur ?? GLASS_DEFAULTS.blur) + "px");
-        set("--saturation", g.sat == null ? null : g.sat + "%");
-        set("--glass-reflex-light", g.light); set("--glass-reflex-dark", g.dark);
-        set("--glass-tint", g.tint == null ? null : g.tint + "%");
-        set("--glass-tint-2", g.tint == null ? null : Math.min(100, g.tint + 22) + "%");
+        // every dial falls back to IcedCoffee's own GLASS_DEFAULTS (the coffee look), never to Infospector's
+        // host.css defaults — so a fresh load, and Reset, always land on the shipped theme.
+        const g = glass, D = GLASS_DEFAULTS;
+        const tintPct = g.tint ?? D.tint;
+        set("--glass-blur", (g.blur ?? D.blur) + "px");
+        set("--saturation", (g.sat ?? D.sat) + "%");
+        set("--glass-reflex-light", g.light ?? D.light); set("--glass-reflex-dark", g.dark ?? D.dark);
+        set("--glass-tint", tintPct + "%");
+        set("--glass-tint-2", Math.min(100, tintPct + 22) + "%");
         // directional light + the concentric geometry: one Radius and one Padding drive every nested corner in host.css
-        set("--glass-shine", g.shine); set("--glass-shade", g.shade); set("--glass-light-angle", g.lightAngle);
-        set("--glass-radius", g.radius == null ? null : g.radius + "px"); set("--glass-pad", g.pad == null ? null : g.pad + "px");
-        set("--c-glass", g.color ? lib.forTheme(g.color, g.colorTheme, theme) : null);
-        const tint = cs().getPropertyValue("--c-glass").trim() || GLASS_DEFAULTS.color;
-        const backing = g.backing == null ? GLASS_DEFAULTS.backing : g.backing;
-        const tintPct = g.tint == null ? GLASS_DEFAULTS.tint : g.tint;
+        set("--glass-shine", g.shine ?? D.shine); set("--glass-shade", g.shade ?? D.shade); set("--glass-light-angle", g.lightAngle ?? D.lightAngle);
+        set("--glass-radius", (g.radius ?? D.radius) + "px"); set("--glass-pad", (g.pad ?? D.pad) + "px");
+        set("--c-glass", lib.forTheme(g.color ?? D.color, g.colorTheme, theme));
+        const tint = cs().getPropertyValue("--c-glass").trim() || D.color;
+        const backing = g.backing ?? D.backing;
         set("--glass-backing-color", tint); set("--glass-backing", backing + "%");
         // UI ink: black or white, whichever reads better on the estimated glass surface
         root.removeProperty("--pt-text");

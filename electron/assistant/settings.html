@@ -5,7 +5,7 @@
 <meta charset="utf-8" />
 <title>Settings</title>
 <style>
-  :root { color-scheme: dark; --ink: #f2f3f6; --dim: rgba(242,243,246,.66); --line: rgba(255,255,255,.10); --blue: #004DFF; --field: rgba(255,255,255,.06); }
+  :root { color-scheme: dark; --ink: #f2f3f6; --dim: rgba(242,243,246,.66); --line: rgba(255,255,255,.10); --blue: #A44400; --field: rgba(255,255,255,.06); }
   html, body { margin: 0; height: 100%; }
   body { background: #14161c; color: var(--ink); font: 13.5px/1.45 -apple-system, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; display: flex; flex-direction: column; }
   header { padding: 24px 28px 0; }
@@ -16,7 +16,7 @@
   .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .seg label { display: block; padding: 11px 14px; border-radius: 12px; background: var(--field); box-shadow: inset 0 0 0 1px var(--line); cursor: pointer; }
   .seg input { position: absolute; opacity: 0; }
-  .seg label:has(input:checked) { box-shadow: inset 0 0 0 2px var(--blue); background: rgba(54,102,248,.12); }
+  .seg label:has(input:checked) { box-shadow: inset 0 0 0 2px var(--blue); background: rgba(164,68,0,.14); }
   .seg b { display: block; font-weight: 650; } .seg span { color: var(--dim); font-size: 12px; }
   .row { margin-top: 14px; } .row > label { display: block; font-weight: 600; font-size: 12.5px; margin-bottom: 5px; }
   input[type=text], input[type=password], select { width: 100%; box-sizing: border-box; height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--field); color: var(--ink); font: inherit; outline: none; }
@@ -41,12 +41,13 @@
   button:hover { background: rgba(255,255,255,.13); } button:disabled { opacity: .5; cursor: default; }
   button.primary { background: var(--blue); box-shadow: none; color: #fff; } button.quiet { background: none; box-shadow: none; color: var(--dim); padding-left: 0; margin-right: auto; }
 textarea { width: 100%; box-sizing: border-box; min-height: 76px; resize: vertical; padding: 9px 11px; border-radius: 10px; border: 1px solid var(--brd, #33384a); background: var(--field, #1b1e28); color: inherit; font: inherit; line-height: 1.5; }
-textarea:focus { outline: none; border-color: var(--accent, #004DFF); }
+textarea:focus { outline: none; border-color: var(--accent, #A44400); }
 </style>
 </head>
 <body>
   <header>
-    <div class="brand"><svg class="mark" width="40" height="40" viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="5.4" fill="#004DFF"/><path d="M6 6V5C5.44772 5 5 5.44772 5 6L6 6ZM14.6667 14.6667V15.6667C15.219 15.6667 15.6667 15.219 15.6667 14.6667H14.6667ZM6 14.6667H5C5 14.9319 5.10536 15.1862 5.29289 15.3738C5.48043 15.5613 5.73478 15.6667 6 15.6667V14.6667ZM10.3333 10.3333V9.33333C9.78105 9.33333 9.33333 9.78105 9.33333 10.3333H10.3333ZM19 19V20C19.5523 20 20 19.5523 20 19H19ZM19 10.3333H20C20 9.78105 19.5523 9.33333 19 9.33333V10.3333ZM10.3333 15.5333H9.33333V15.5333H10.3333ZM13.8 19V20V20V19ZM11.2 12.0667V11.0667H10.2V12.0667H11.2ZM12.9333 12.0667H13.9333V11.0667H12.9333V12.0667ZM12.9333 13.8V14.8H13.9333V13.8H12.9333ZM11.2 13.8H10.2V14.8H11.2V13.8ZM12.0667 11.2V10.2H11.0667V11.2H12.0667ZM13.8 11.2H14.8V10.2H13.8V11.2ZM13.8 12.9333V13.9333H14.8V12.9333H13.8ZM12.0667 12.9333H11.0667V13.9333H12.0667V12.9333ZM11.2 11.2V10.2H10.2V11.2H11.2ZM12.9333 11.2H13.9333V10.2H12.9333V11.2ZM12.9333 12.9333V13.9333H13.9333V12.9333H12.9333ZM11.2 12.9333H10.2V13.9333H11.2V12.9333ZM12.0667 12.0667V11.0667H11.0667V12.0667H12.0667ZM13.8 12.0667H14.8V11.0667H13.8V12.0667ZM13.8 13.8V14.8H14.8V13.8H13.8ZM12.0667 13.8H11.0667V14.8H12.0667V13.8ZM6 6V7H11.2V6V5H6V6ZM14.6667 9.46667H13.6667V14.6667H14.6667H15.6667V9.46667H14.6667ZM14.6667 14.6667V13.6667H6V14.6667V15.6667H14.6667V14.6667ZM6 14.6667H7V6L6 6L5 6V14.6667H6ZM11.2 6V7C12.5623 7 13.6667 8.10436 13.6667 9.46667H14.6667H15.6667C15.6667 6.9998 13.6669 5 11.2 5V6ZM10.3333 10.3333H9.33333L9.33333 15.5333H10.3333H11.3333L11.3333 10.3333H10.3333ZM13.8 19V20H19V19V18H13.8V19ZM19 19H20V10.3333H19H18V19H19ZM19 10.3333V9.33333L10.3333 9.33333V10.3333V11.3333L19 11.3333V10.3333ZM10.3333 15.5333H9.33333C9.33333 18.0002 11.3331 20 13.8 20V19V18C12.4377 18 11.3333 16.8956 11.3333 15.5333H10.3333ZM11.2 12.0667V13.0667H12.9333V12.0667V11.0667H11.2V12.0667ZM12.9333 12.0667H11.9333V13.8H12.9333H13.9333V12.0667H12.9333ZM12.9333 13.8V12.8H11.2V13.8V14.8H12.9333V13.8ZM11.2 13.8H12.2V12.0667H11.2H10.2V13.8H11.2ZM12.0667 11.2V12.2H13.8V11.2V10.2H12.0667V11.2ZM13.8 11.2H12.8V12.9333H13.8H14.8V11.2H13.8ZM13.8 12.9333V11.9333H12.0667V12.9333V13.9333H13.8V12.9333ZM12.0667 12.9333H13.0667V11.2H12.0667H11.0667V12.9333H12.0667ZM11.2 11.2V12.2H12.9333V11.2V10.2H11.2V11.2ZM12.9333 11.2H11.9333V12.9333H12.9333H13.9333V11.2H12.9333ZM12.9333 12.9333V11.9333H11.2V12.9333V13.9333H12.9333V12.9333ZM11.2 12.9333H12.2V11.2H11.2H10.2V12.9333H11.2ZM12.0667 12.0667V13.0667H13.8V12.0667V11.0667H12.0667V12.0667ZM13.8 12.0667H12.8V13.8H13.8H14.8V12.0667H13.8ZM13.8 13.8V12.8H12.0667V13.8V14.8H13.8V13.8ZM12.0667 13.8H13.0667V12.0667H12.0667H11.0667V13.8H12.0667Z" fill="#fff"/></svg><h1>Connect your AI</h1></div>
+    <div class="brand"><svg class="mark" width="40" height="40" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="9" fill="url(#icecup)"/><path d="M12 16.9341H29M24.5854 6L21.7835 16.4567M12.8095 16.9341L15.5238 33H25.4762L28.1905 16.9341C27.8889 14.7064 25.9286 10.251 20.5 10.251C15.0714 10.251 13.1111 14.7064 12.8095 16.9341ZM18.2381 27.4361L19.8052 28.3908L18.9004 30.0444L17.3333 29.0897L18.2381 27.4361ZM21.8571 24.1114L23.605 23.6172L24.0733 25.4615L22.3255 25.9558L21.8571 24.1114ZM17.3333 21.6426L17.8017 19.7983L19.5495 20.2925L19.0812 22.1368L17.3333 21.6426Z" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="icecup" x1="20" y1="0" x2="20" y2="40" gradientUnits="userSpaceOnUse"><stop stop-color="#A44400"/><stop offset="1" stop-color="#502202"/></linearGradient></defs></svg>
+<h1>Connect your AI</h1></div>
     <p>Use the AI app you already have. It reads the résumé that's open here and changes it while you watch. No API key, no account, nothing to pay IcedCoffee.</p>
   </header>
   <main>

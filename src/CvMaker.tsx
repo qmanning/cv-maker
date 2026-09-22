@@ -16,7 +16,7 @@ import {
     AlignCenter, AlignLeft, AlignRight, ArrowDown, ArrowLeft, ArrowUp, Bold, BookOpen, BriefcaseBusiness, Plus, Text, Columns2, Copy, Download,
     Eraser, FileCode2, FileImage, FileText, FileType2, ImageUp, Italic, Link2, List, Minus, Moon, RotateCcw,
     Save, SpellCheck, Sun, Upload, Trash2, Underline as UnderlineIcon, ALargeSmall, MoveVertical, MoveHorizontal,
-    Sparkles, SendHorizontal, Undo2, Check, Settings2, X, Star, RefreshCw, FileUser, ChevronLeft, Files, GripVertical, ScanSearch, CircleCheck, CircleDashed,
+    Sparkles, Bot, SendHorizontal, Undo2, Check, Settings2, X, Star, RefreshCw, FileUser, ChevronLeft, Files, GripVertical, ScanSearch, CircleCheck, CircleDashed,
 } from "lucide-react";
 import { FontSize } from "@/components/ui/font-size-extension";
 import { FontWeight } from "@/components/ui/font-weight-extension";
@@ -28,9 +28,11 @@ import { applyOps, describeDocument, type CvAssistant, type CvRemote, type CvRem
 import { coverage, findRanges, normalizeKeywords, pageText, type KeywordUse } from "./cv-keywords";
 import { FOOTER_PT, GAP_PT, MIN_FIT, PAPERS, PT, type DocKind, type PaperId, type Source, docKind, fullHtml, letterCss, mirrorHeader, pageBoxCss, parseSource, slugify, stepZoom } from "./cv-source";
 
-const LOCAL_KEY = "cvm:doc", LETTER_KEY = "cvm:letter", KW_KEY = "cvm:keywords", KW_POS_KEY = "cvm:kw-pos", KW_SIZE_KEY = "cvm:kw-size", START_SIZE_KEY = "cvm:startsize", HOME_KEY = "cvm:home";
+const LOCAL_KEY = "cvm:doc", LETTER_KEY = "cvm:letter", KW_KEY = "cvm:keywords", KW_POS_KEY = "cvm:kw-pos", KW_SIZE_KEY = "cvm:kw-size", START_SIZE_KEY = "cvm:startsize", HOME_KEY = "cvm:home", VIEW_ZOOM_KEY = "cvm:viewzoom";
 const stored = (k: string) => { try { return localStorage.getItem(k) || ""; } catch { return ""; } };
 const store = (k: string, v: string) => { try { if (v) localStorage.setItem(k, v); else localStorage.removeItem(k); } catch { /* ignore */ } };
+// the viewer remembers the last size the person set (across documents and sessions); null = fit to width
+const readViewZoom = (): number | "width" | "height" | null => { const s = stored(VIEW_ZOOM_KEY); if (s === "width" || s === "height") return s; const n = parseFloat(s); return Number.isFinite(n) && n > 0 ? n : null; };
 const ZOOMS = [1, 1.25, 1.5, 2];
 
 // zoom: a fixed number, or a LIVE fit that tracks the window — "width" (the sheet fills the canvas width; null is the
@@ -87,6 +89,24 @@ function IcedCoffeeGlyph(props: { className?: string }) {
         </svg>
     );
 }
+// first-run tour: each step reveals one more toolbar control (REVEAL) and points a coach-mark at it.
+const TOUR_KEY = "ic:onboarded";
+const REVEAL: Record<string, number> = { glyph: 1, omni: 2, size: 3, paginate: 4, spell: 5, save: 6, export: 7, seg: 8 };
+type TourStep = { at: string; title: string; body: string; side?: "letter" | "brandMenu" | "bgOptions"; place?: "right" };
+const TOUR: TourStep[] = [
+    { at: '[data-tour="glyph"]', title: "Enjoy some IcedCoffee!", body: "IcedCoffee is an AI-enabled résumé and CV tool. Point your AI at a job posting and it rewrites the wording and terms of your résumé to match it." },
+    { at: '[data-tour="omni"]', title: "Your document", body: "Edit the sample résumé, or open your own — import a .docx or .html file. Once you've saved a few, reopen recent ones right here." },
+    { at: '[data-tour="size"]', title: "Size & zoom", body: "IcedCoffee edits at full width by default. Change the paper size or fit here, or press ⌘/Ctrl with + or − to zoom in and out. It remembers the size you set and reopens every document there." },
+    { at: '[data-tour="paginate"]', title: "Pagination", body: "Switch between real pages — with page numbers, so you see exactly where each one ends — and one continuous sheet. (Turn on “Fit to one page” under Size to shrink the design onto a single page.)" },
+    { at: '[data-tour="spell"]', title: "Spellcheck", body: "Turn the browser's spellcheck on or off for the whole document: red squiggles under unrecognized words while you write, off for a clean view." },
+    { at: '[data-tour="save"]', title: "Save", body: "Save your work with ⌘S. Every résumé and cover letter is a plain .html file that's yours — “Save As” branches a copy so your master stays untouched." },
+    { at: '[data-tour="export"]', title: "Export", body: "Export a PDF with real, selectable text, a Word (.docx) for applicant-tracking systems, a PNG, or the source HTML — for the résumé, the cover letter, or both at once." },
+    { at: '[data-tour="seg"]', title: "Résumé & cover letter", body: "Switch between your résumé and its cover letter here. Let's take a look at the cover letter…" },
+    { at: '[data-tour="seg"]', title: "Two separate files", body: "The cover letter is its own file. But its header — your name, contact details and headline — mirrors the résumé, so you set those once on the résumé and the letter follows.", side: "letter" },
+    { at: ".cvm-brand-menu", title: "The IcedCoffee menu", body: "Appearance, ATS keywords, updates and more all live in this menu.", side: "brandMenu", place: "right" },
+    { at: "#pt-ctx", title: "Make it yours", body: "Background · colors · appearance is where the coffee theme is set — recolor the canvas, the frosted glass and the accent to anything you like.", side: "bgOptions", place: "right" },
+];
+
 // two documents share the editor — a résumé and its cover letter — one per tab, each with its own file / autosave slot
 const keyOf = (kind: DocKind) => (kind === "letter" ? LETTER_KEY : LOCAL_KEY);
 const KIND_LABEL: Record<DocKind, string> = { resume: "Résumé", letter: "Cover Letter" };
@@ -177,7 +197,7 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
     const look = useInfospectorLook(glassCssUrl);
     const [source, setSource] = useState<Source | null>(null);
     const [name, setName] = useState("Résumé");
-    const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+    const [settings, setSettings] = useState<Settings>(() => ({ ...DEFAULT_SETTINGS, zoom: readViewZoom() }));
     const [pages, setPages] = useState(1);
     const [scale, setScale] = useState(1);
     const [contentPt, setContentPt] = useState(0);
@@ -207,6 +227,10 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
     const [kwPos, setKwPos] = useState<{ x: number; y: number } | null>(() => { try { const v = JSON.parse(stored(KW_POS_KEY) || "null"); return v && Number.isFinite(v.x) && Number.isFinite(v.y) ? v : null; } catch { return null; } });
     const [kwSize, setKwSize] = useState<{ w: number; h: number } | null>(() => { try { const v = JSON.parse(stored(KW_SIZE_KEY) || "null"); return v && Number.isFinite(v.w) && Number.isFinite(v.h) ? v : null; } catch { return null; } });
     const kwRef = useRef<HTMLDivElement>(null);
+    // first-run tour: 0 = off, 1..TOUR.length = the current step. Starts on the first visit — or any time
+    // the URL carries ?tour (so it can be replayed without clearing anything).
+    const [tour, setTour] = useState(() => { try { const q = new URLSearchParams(window.location.search); if (q.has("smoke")) return 0; if (q.has("tour")) return 1; } catch { /* ignore */ } return stored(TOUR_KEY) ? 0 : 1; });
+    const [coach, setCoach] = useState<{ left: number; top: number; arrow: number; right: boolean } | null>(null);
     const [kwUses, setKwUses] = useState<KeywordUse[]>([]), [kwRev, setKwRev] = useState(0);
     const kwCount = useRef(0); kwCount.current = kw.keywords.length;
     // desktop only: the recent-documents typeahead that lives in the omni bar
@@ -313,11 +337,11 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
             if (dead) return;
             if (onDisk) {
                 const parsed = parseSource(onDisk.text);
-                setName(parsed.name || onDisk.name); setFileName(onDisk.name.replace(/\.html?$/i, "")); setSettings({ ...DEFAULT_SETTINGS, ...(local?.settings || {}), ...paperPatch }); setSource({ css: parsed.css, html: parsed.html }); return;
+                setName(parsed.name || onDisk.name); setFileName(onDisk.name.replace(/\.html?$/i, "")); setSettings({ ...DEFAULT_SETTINGS, ...(local?.settings || {}), ...paperPatch, zoom: readViewZoom() }); setSource({ css: parsed.css, html: parsed.html }); return;
             }
             if (files && local?.html && local.unsaved) { setDirty(true); say("Restored edits that were never saved to a file"); }
-            if (local?.html) { setName(local.name || "Résumé"); setSettings({ ...DEFAULT_SETTINGS, ...(local.settings || {}), ...paperPatch }); setSource({ css: local.css, html: local.html }); return; }
-            setSettings((st) => ({ ...st, ...paperPatch }));
+            if (local?.html) { setName(local.name || "Résumé"); setSettings({ ...DEFAULT_SETTINGS, ...(local.settings || {}), ...paperPatch, zoom: readViewZoom() }); setSource({ css: local.css, html: local.html }); return; }
+            setSettings((st) => ({ ...st, ...paperPatch, zoom: readViewZoom() }));
             const parsed = parseSource(await fetchSource(templateUrl));
             if (dead) return;
             setName(parsed.name || "Résumé"); setSource({ css: parsed.css, html: parsed.html });
@@ -373,6 +397,8 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
         return () => { ro.disconnect(); window.removeEventListener("resize", fit); };
     }, [settings.paper, look.ready]);
     const patch = useCallback((p: Partial<Settings>) => { setSettings((s) => ({ ...s, ...p })); setDirty(true); }, []);
+    // remember the size the person is viewing at, so every document reopens at it (null = fit to width)
+    useEffect(() => { store(VIEW_ZOOM_KEY, settings.zoom == null || settings.zoom === "browser" ? "" : String(settings.zoom)); }, [settings.zoom]);
 
     const zoomBy = useCallback((dir: 1 | -1 | 0) => {
         if (dir === 0) { patch({ zoom: "width" }); return say("Fit width"); }
@@ -685,6 +711,7 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
     // the hosted web build has no shell — the AI, real files and updates live only in the desktop app; offer it here instead of hiding it
     const isWebBuild = !files && !assistant && !remote;
     const [getApp, setGetApp] = useState(false);
+    const [ctaHidden, setCtaHidden] = useState(() => stored("cvm:cta") === "hidden");
     useEffect(() => { let dead = false; void files?.version?.().then((v) => { if (!dead) setAppVersion(v); }).catch(() => {}); return () => { dead = true; }; }, [files]);
     const visitHomepage = () => { setMenu(null); if (files?.openExternal) files.openExternal(BRAND_HOME); else window.open(BRAND_HOME, "_blank", "noopener"); };
     const checkUpdates = () => { setMenu(null); files?.checkUpdates?.(); };
@@ -1083,6 +1110,50 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
         setMenu((m) => (m?.id === id ? null : { id, top: r.bottom + 8, ...(align === "left" ? { left: r.left } : { right: window.innerWidth - r.right }) }));
     };
 
+    /* ---- first-run tour ---- */
+    const shown = (k: string) => !tour || tour >= (REVEAL[k] || 0);
+    const endTour = useCallback(() => { setTour(0); setMenu(null); setCtx(null); store(TOUR_KEY, "1"); }, []);
+    const startTour = useCallback(() => { setMenu(null); setCtx(null); void switchTab("resume"); setTour(1); }, [switchTab]);
+    // each step's side-effect: switch tab, or open the IcedCoffee menu / the Background panel for the last two steps
+    useEffect(() => {
+        if (!tour) return;
+        const step = TOUR[tour - 1];
+        if (!step) { endTour(); return; }
+        if (step.side === "letter") void switchTab("letter");
+        else if (step.side === "brandMenu") {
+            setCtx(null); void switchTab("resume");
+            const g = document.querySelector('[data-tour="glyph"]') as HTMLElement | null;
+            if (g) { const r = g.getBoundingClientRect(); setMenu({ id: "brand", top: r.bottom + 8, left: r.left }); }
+        } else if (step.side === "bgOptions") {
+            setMenu(null);
+            const g = document.querySelector('[data-tour="glyph"]') as HTMLElement | null;
+            const r = g?.getBoundingClientRect();
+            setCtx({ x: (r?.left ?? 40) + 6, y: (r?.bottom ?? 56) + 8 });
+        } else { setMenu(null); setCtx(null); }
+    }, [tour]);   // eslint-disable-line react-hooks/exhaustive-deps
+    // keep the coach-mark pinned under its target as the toolbar widens / menus open
+    useLayoutEffect(() => {
+        if (!tour) { setCoach(null); return; }
+        const step = TOUR[tour - 1];
+        const place = () => {
+            const el = step && document.querySelector(step.at) as HTMLElement | null;
+            if (!el) { setCoach(null); return; }
+            const r = el.getBoundingClientRect(), W = 330;
+            if (step.place === "right") {   // beside the menu it's describing, so it never covers it: try right, then left, then below
+                if (r.right + 14 + W <= window.innerWidth - 12) setCoach({ left: r.right + 14, top: Math.max(12, Math.min(r.top, window.innerHeight - 220)), arrow: 0, right: true });
+                else if (r.left - 14 - W >= 12) setCoach({ left: r.left - 14 - W, top: Math.max(12, Math.min(r.top, window.innerHeight - 220)), arrow: 0, right: true });
+                else setCoach({ left: Math.max(12, Math.min(r.left + r.width / 2 - W / 2, window.innerWidth - W - 12)), top: r.bottom + 12, arrow: 0, right: true });
+            } else {
+                const left = Math.max(12, Math.min(r.left + r.width / 2 - W / 2, window.innerWidth - W - 12));
+                setCoach({ left, top: r.bottom + 30, arrow: Math.max(20, Math.min(W - 20, r.left + r.width / 2 - left)), right: false });
+            }
+        };
+        place();
+        const id = window.setInterval(place, 150);
+        window.addEventListener("resize", place);
+        return () => { window.clearInterval(id); window.removeEventListener("resize", place); };
+    }, [tour]);
+
     /* ---- format bar state, read from what's actually rendered at the caret ---- */
     const fmt = useMemo(() => {
         if (!active || active.isDestroyed) return null;
@@ -1135,22 +1206,26 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
     const pill = (on: boolean) => ({ "aria-pressed": on } as const);
 
     return (
-        <div className="cvm-root" data-ready={look.ready}>
+        <div className={"cvm-root" + (tour === 1 ? " cvm-tour-cover" : "")} data-ready={look.ready}>
+            {/* desktop shell: a transparent strip where the OS title bar would be, so the frameless window
+                can be dragged (the toolbar's own controls stay clickable). Transparent, so it always shows
+                the chosen background through it and never clashes. CSS activates it only under .cvm-desktop. */}
+            <div className="cvm-titlebar" aria-hidden="true" />
             {source && <style>{`${source.css}\n${pageBoxCss(paper.w, scale)}`}</style>}
             {/* where the picked ATS keyword is used: highlighter yellow via the CSS Custom Highlight API (ranges only — no markup is touched) */}
             <style>{"::highlight(cvm-kw) { background-color: #ffe14d; color: #000; }"}</style>
 
             {/* main bar — Infospector's #pt-bar */}
-            <div id="pt-bar" className="cvm-bar">
+            <div id="pt-bar" className={"cvm-bar" + (tour ? " cvm-bar-tour" : "")}>
                 {backHref && <button className="pt-rbtn" aria-label="Back" data-tip="Back" onClick={() => { window.location.href = backHref; }}><ArrowLeft /></button>}
-                <button className="cvm-brand" aria-label="IcedCoffee menu" aria-haspopup="menu" data-tip="IcedCoffee" onClick={(e) => openMenu("brand", e, "left")}><IcedCoffeeGlyph className="cvm-brand-glyph" /></button>
-                <div className="pt-dim">
+                <button className="cvm-brand" data-tour="glyph" aria-label="IcedCoffee menu" aria-haspopup="menu" data-tip="IcedCoffee" onClick={(e) => openMenu("brand", e, "left")}><IcedCoffeeGlyph className="cvm-brand-glyph" /></button>
+                {shown("size") && <div className="pt-dim" data-tour="size">
                     <div className="pt-dim-trigger">
                         <button className="pt-dim-val" aria-haspopup="true" data-tip="Paper size and zoom" onClick={(e) => openMenu("size", e, "left")}>{paper.label}<span className="pt-dim-scale" style={{ color: "var(--pt-text-faint)" }}>· {Math.round(zoom * 100)}%</span></button>
                         <button className="pt-chev" aria-label="Choose a size" onClick={(e) => openMenu("size", e, "left")}>▾</button>
                     </div>
-                </div>
-                <div ref={omniRef} className={"pt-omni" + (hasRecents ? " cvm-omni-recent" : "") + ((hasRecents ? (omniOpen ? omniQuery : fileName) : name) ? " pt-has-value" : "")}>
+                </div>}
+                {shown("omni") && <div ref={omniRef} data-tour="omni" className={"pt-omni" + (hasRecents ? " cvm-omni-recent" : "") + ((hasRecents ? (omniOpen ? omniQuery : fileName) : name) ? " pt-has-value" : "")}>
                     <span className="pt-omni-icon"><FileText /></span>
                     {hasRecents ? (
                         <input type="text" spellCheck={false} aria-label="Open a recent document" placeholder={fileName || (tab === "letter" ? "Untitled — search recent cover letters" : "Untitled — search recent documents")}
@@ -1183,15 +1258,15 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
                             )}
                         </div>
                     )}
-                </div>
-                <button className="pt-rbtn" {...pill(settings.paginate)} aria-label="Pagination" data-tip={settings.paginate ? "Pagination on · pages + page numbers" : "Pagination off · one continuous page"} onClick={() => patch({ paginate: !settings.paginate })}><BookOpen /></button>
-                <button className="pt-rbtn cvm-secondary" {...pill(settings.spellcheck)} aria-label="Spellcheck" data-tip={settings.spellcheck ? "Spellcheck on" : "Spellcheck off"} onClick={() => patch({ spellcheck: !settings.spellcheck })}><SpellCheck /></button>
-                <button className="pt-rbtn pt-badge-btn" aria-label="Save" data-tip={files ? "Save · ⌘S   Save As · ⇧⌘S" : "Save in this browser · ⌘S"} onClick={() => save()}><Save />{dirty && <span className="cvm-dirty" />}</button>
-                <button className="pt-rbtn pt-badge-btn" aria-haspopup="true" aria-label="Export" data-tip={busy ? `Exporting ${busy}…` : "Export"} onClick={(e) => openMenu("export", e, "right")}><Download /></button>
-                <div className="cvm-seg" role="tablist" aria-label="Document">
+                </div>}
+                {shown("paginate") && <button className="pt-rbtn" data-tour="paginate" {...pill(settings.paginate)} aria-label="Pagination" data-tip={settings.paginate ? "Pagination on · pages + page numbers" : "Pagination off · one continuous page"} onClick={() => patch({ paginate: !settings.paginate })}><BookOpen /></button>}
+                {shown("spell") && <button className="pt-rbtn cvm-secondary" data-tour="spell" {...pill(settings.spellcheck)} aria-label="Spellcheck" data-tip={settings.spellcheck ? "Spellcheck on" : "Spellcheck off"} onClick={() => patch({ spellcheck: !settings.spellcheck })}><SpellCheck /></button>}
+                {shown("save") && <button className="pt-rbtn pt-badge-btn" data-tour="save" aria-label="Save" data-tip={files ? "Save · ⌘S   Save As · ⇧⌘S" : "Save in this browser · ⌘S"} onClick={() => save()}><Save />{dirty && <span className="cvm-dirty" />}</button>}
+                {shown("export") && <button className="pt-rbtn pt-badge-btn" data-tour="export" aria-haspopup="true" aria-label="Export" data-tip={busy ? `Exporting ${busy}…` : "Export"} onClick={(e) => openMenu("export", e, "right")}><Download /></button>}
+                {shown("seg") && <div className="cvm-seg" data-tour="seg" role="tablist" aria-label="Document">
                     <button role="tab" aria-selected={tab === "resume"} aria-label="Résumé" data-tip="Résumé" className={tab === "resume" ? "cvm-on" : ""} onClick={() => void switchTab("resume")}><FileUser /></button>
                     <button role="tab" aria-selected={tab === "letter"} aria-label="Cover Letter" data-tip="Cover Letter" className={tab === "letter" ? "cvm-on" : ""} onClick={() => void switchTab("letter")}><FileText /></button>
-                </div>
+                </div>}
             </div>
 
             {/* format bar */}
@@ -1272,6 +1347,7 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
                     <div className="pt-menu-div" />
                     <div className="pt-ctx-title">Window</div>
                     <button className="pt-menu-item cvm-row" onClick={() => { setMenu(null); setKwOpen((o) => !o); }}><ScanSearch />ATS keywords<span className="cvm-hint">{kw.keywords.length ? `${kwUses.filter((u) => u[tab] > 0).length} of ${kw.keywords.length} used` : kwOpen ? "hide" : "none yet"}</span></button>
+                    <button className="pt-menu-item cvm-row" onClick={() => startTour()}><Sparkles />Take the tour again</button>
                     <div className="pt-menu-div" />
                     <div className="pt-ctx-title">Document</div>
                     <button className="pt-menu-item cvm-row pt-danger" onClick={() => { setMenu(null); resetSource(); }}><RotateCcw />Reset to original source</button>
@@ -1398,6 +1474,24 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
             <div className="cvm-status">{scale < 1 ? `fit to one page · ${Math.round(scale * 100)}% · ` : ""}{settings.paginate ? `${pages} page${pages > 1 ? "s" : ""}` : `continuous · ${(contentPt / paper.h).toFixed(2)} pages long`} · {paper.name}</div>
             <div id="pt-tip" ref={tipRef} role="tooltip" hidden />
             <div id="pt-toast" className={toast ? "pt-show" : undefined}>{toast}</div>
+            {tour > 0 && (
+                <>
+                    {/* stray clicks shouldn't derail the walk-through — Next / Skip drive it */}
+                    <div className="cvm-tour-scrim" onMouseDown={(e) => e.preventDefault()} />
+                    {coach && (() => { const step = TOUR[tour - 1], last = tour >= TOUR.length; return (
+                        <div className="cvm-coach" style={{ left: coach.left, top: coach.top }} role="dialog" aria-label={step.title}>
+                            {!coach.right && <span className="cvm-coach-arrow" style={{ left: coach.arrow }} />}
+                            <div className="cvm-coach-step">{tour} of {TOUR.length}</div>
+                            <h4>{step.title}</h4>
+                            <p>{step.body}</p>
+                            <div className="cvm-coach-actions">
+                                <button className="cvm-coach-skip" onClick={endTour}>Skip</button>
+                                <button className="pt-mini pt-primary" onClick={() => (last ? endTour() : setTour((t) => t + 1))}>{last ? "Done" : "Next"}</button>
+                            </div>
+                        </div>
+                    ); })()}
+                </>
+            )}
             {getApp && (
                 <div className="pt-confirm cvm-getapp" onMouseDown={(e) => { if (e.target === e.currentTarget) setGetApp(false); }}>
                     <div className="pt-confirm-card cvm-getapp-card" role="dialog" aria-label="Get IcedCoffee for Mac">
@@ -1419,11 +1513,14 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
                     </div>
                 </div>
             )}
-            {isWebBuild && (
+            {isWebBuild && !ctaHidden && (
                 <div className="cvm-ask-wrap">
-                    <button type="button" className="cvm-getapp-cta" onClick={() => setGetApp(true)}>
-                        <Sparkles /><b>Edit by asking your AI</b><span>Claude, ChatGPT and others drive IcedCoffee — in the free Mac app</span>
-                    </button>
+                    <div className="cvm-getapp-cta">
+                        <button type="button" className="cvm-getapp-cta-main" onClick={() => setGetApp(true)}>
+                            <Bot /><b>Edit by asking your AI</b><span>Claude, ChatGPT and others drive IcedCoffee — in the free Mac app</span>
+                        </button>
+                        <button type="button" className="cvm-getapp-x" aria-label="Dismiss" data-tip="Dismiss" onClick={() => { setCtaHidden(true); store("cvm:cta", "hidden"); }}><X /></button>
+                    </div>
                 </div>
             )}
             {(assistant || remote) && (

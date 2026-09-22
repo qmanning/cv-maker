@@ -121,7 +121,7 @@ function createWindow() {
     win.webContents.setWindowOpenHandler(({ url }) => { external(url); return { action: "deny" }; });
     win.webContents.on("will-navigate", (e, url) => { if (!url.startsWith(ORIGIN + "/")) { e.preventDefault(); external(url); } });
     win.webContents.session.setPermissionRequestHandler((_wc, _perm, cb) => cb(false));
-    win.loadURL(ORIGIN + "/index.html");
+    win.loadURL(ORIGIN + "/index.html" + (SMOKE_DIR ? "?smoke=1" : ""));   // automation skips the first-run tour
     return win;
 }
 

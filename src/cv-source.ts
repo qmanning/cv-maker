@@ -32,7 +32,7 @@ export type DocKind = "resume" | "letter";
 export const docKind = (pageHtml: string): DocKind => (/data-cv-kind="letter"|data-cv-mirror="header"/.test(pageHtml) ? "letter" : "resume");
 
 const LETTER_MARK = "/* icedcoffee:letter";
-const LETTER_MARK_LEGACY = "/* icedcoffee:letter";   // files written before the IcedCoffee rename still open
+const LETTER_MARK_LEGACY = "/* itera:letter";   // files written before the IcedCoffee rename still open
 /** index of the letter marker (new or legacy), or -1 */
 const letterMarkIndex = (css: string): number => { const i = css.indexOf(LETTER_MARK); return i >= 0 ? i : css.indexOf(LETTER_MARK_LEGACY); };
 /** a letter file's CSS = a snapshot of the résumé's styles + (after the marker) the letter's own. This is the letter's own. */

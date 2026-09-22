@@ -7,6 +7,16 @@
   color: var(--pt-text); font: 13px/1.5 var(--pt-font); -webkit-font-smoothing: antialiased;
 }
 .cvm-root[data-ready="false"] { visibility: hidden; }
+/* placeholders (the search bar, the start-up Page field, any menu input) would otherwise fall back to the
+   browser's fixed cool gray, which clashes with a warm/tinted background. Route them to the adaptive ink
+   instead — white or black by mode, faded — so they always source from the chosen background. Covers the
+   toolbar and every glass menu, whether it renders inside .cvm-root or portals to <body>. */
+.cvm-root ::placeholder,
+#pt-bar ::placeholder,
+.pt-ctx ::placeholder,
+.pt-dim-pop ::placeholder,
+.pt-menu-pop ::placeholder,
+.pt-omni-results ::placeholder { color: var(--pt-text-faint); opacity: 1; }
 /* concentric chrome, by Infospector's formula: its Radius + Padding dials (--glass-radius / --glass-pad) drive
    every corner here too. Our 30px controls round to the dialed radius, capped at a full circle (15px). */
 .cvm-root { --cvm-ctl-r: min(var(--glass-radius, 40px), 15px); }
@@ -15,8 +25,13 @@ body > .pt-cpick { z-index: 2100; }
 
 /* the bar: Infospector's #pt-bar, centered and sized to its contents */
 #pt-bar.cvm-bar { left: 50%; transform: translateX(-50%); width: min(860px, calc(100vw - 24px)); transition: none; }
-/* desktop shell (Electron, hidden OS title bar): the floating bar is the window's drag handle — its own
-   controls stay clickable. On a narrow window it drops below the traffic lights so nothing sits under them. */
+/* desktop shell (Electron, hidden OS title bar): a transparent strip across the top where the title bar
+   would be, so the frameless window still drags. It is see-through, so it always shows the chosen
+   background through it and never clashes with it. Only active in the desktop shell (.cvm-desktop). */
+.cvm-titlebar { display: none; }
+.cvm-desktop .cvm-titlebar { display: block; position: fixed; top: 0; left: 0; right: 0; height: 40px;
+   z-index: 100; -webkit-app-region: drag; app-region: drag; }
+/* the floating bar sits above the strip and is also a drag handle, but its own controls stay clickable */
 .cvm-desktop #pt-bar.cvm-bar { -webkit-app-region: drag; app-region: drag; }
 .cvm-desktop #pt-bar.cvm-bar button,
 .cvm-desktop #pt-bar.cvm-bar input,
@@ -162,9 +177,9 @@ body > .pt-cpick { z-index: 2100; }
 /* ---- ask your AI: a glass prompt bar docked at the bottom (desktop shells only) ---- */
 .cvm-ask-wrap { position: fixed; left: 50%; bottom: 34px; transform: translateX(-50%); z-index: 121; width: min(640px, calc(100vw - 24px)); display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
 /* prose sits on this glass (not just icons), often over the white sheet — so it gets a tint of its own under the text */
-.cvm-root { --cvm-ask-tint: rgba(14, 16, 22, .52); }
-[data-pt-theme="light"] .cvm-root { --cvm-ask-tint: rgba(255, 255, 255, .55); }
-.cvm-ask, .cvm-ask-reply { background: linear-gradient(var(--cvm-ask-tint), var(--cvm-ask-tint)), var(--pt-glass); -webkit-backdrop-filter: var(--pt-blur-webkit); backdrop-filter: var(--pt-blur); border: 1px solid var(--pt-glass-brd); box-shadow: var(--pt-shadow); border-radius: var(--glass-bar-r); padding: var(--glass-pad, 8px); }
+/* the AI prompt / connect bars are the same real glass as the menus (they're in host.css's reflex+backing
+   group), so they just need the base fill + blur + geometry here. */
+.cvm-ask, .cvm-ask-reply { background-color: var(--pt-glass); -webkit-backdrop-filter: var(--pt-blur-webkit); backdrop-filter: var(--pt-blur); border-radius: var(--glass-bar-r); padding: var(--glass-pad, 8px); }
 .cvm-ask { display: flex; align-items: flex-end; gap: 8px; }
 .cvm-ask textarea { flex: 1 1 auto; min-width: 0; min-height: 36px; max-height: 168px; field-sizing: content; resize: none; box-sizing: border-box; padding: 8px 12px; border-radius: var(--glass-item-r); border: 1px solid var(--pt-glass-brd); background: var(--pt-glass-2); color: var(--pt-text); font: 13px/1.45 var(--pt-font); outline: none; }
 .cvm-ask textarea:focus { border-color: var(--pt-accent, #3666f8); }
@@ -186,7 +201,7 @@ body > .pt-cpick { z-index: 2100; }
 .cvm-root:has(.cvm-ask, .cvm-ask-connect) #pt-toast { bottom: 100px; }   /* toasts rise clear of the prompt bar */
 .cvm-root:has(.cvm-ask, .cvm-ask-connect) #pt-stagewrap.cvm-wrap { padding-bottom: 128px; }   /* the last lines of the sheet can scroll clear of the bar */
 .cvm-ask-connect { align-self: center; display: inline-flex; align-items: center; height: 40px; padding: 0 5px 0 0; border-radius: 999px; color: var(--pt-text); font: 13px var(--pt-font);
-  background: linear-gradient(var(--cvm-ask-tint), var(--cvm-ask-tint)), var(--pt-glass); -webkit-backdrop-filter: var(--pt-blur-webkit); backdrop-filter: var(--pt-blur); border: 1px solid var(--pt-glass-brd); box-shadow: var(--pt-shadow); }
+  background-color: var(--pt-glass); -webkit-backdrop-filter: var(--pt-blur-webkit); backdrop-filter: var(--pt-blur); }
 .cvm-ask-connect:hover { border-color: var(--pt-accent, #3666f8); }
 .cvm-ask-connect-main { display: inline-flex; align-items: center; gap: 8px; height: 100%; padding: 0 8px 0 14px; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; border-radius: 999px 0 0 999px; }
 .cvm-ask-connect svg { width: 17px; height: 17px; stroke-width: 2; color: var(--pt-accent, #3666f8); }
@@ -247,21 +262,30 @@ body > .pt-cpick { z-index: 2100; }
 .cvm-drop-line { position: fixed; z-index: 151; height: 3px; border-radius: 2px; background: var(--pt-accent); pointer-events: none; }
 
 /* web build: a call to the free desktop app where the AI bar would be, and its popup */
-.cvm-getapp-cta { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 100%; text-align: left; cursor: pointer;
-  padding: 10px 16px; border-radius: var(--glass-radius, 22px); border: 1px solid var(--pt-glass-brd); background: var(--pt-glass); color: var(--pt-text);
-  -webkit-backdrop-filter: var(--pt-blur-webkit); backdrop-filter: var(--pt-blur); box-shadow: var(--pt-shadow); position: relative; padding-left: 44px; }
-.cvm-getapp-cta > svg { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: var(--pt-accent); }
-.cvm-getapp-cta b { font-weight: 600; font-size: 13px; }
-.cvm-getapp-cta span { color: var(--pt-text-faint); font-size: 11.5px; }
-.cvm-getapp-cta:hover { border-color: var(--pt-accent); }
+.cvm-getapp-cta { display: flex; align-items: stretch; width: 100%; overflow: hidden;
+  border-radius: var(--glass-radius, 22px); color: var(--pt-text);
+  background-color: var(--pt-glass); -webkit-backdrop-filter: var(--pt-blur-webkit); backdrop-filter: var(--pt-blur); }
+.cvm-getapp-cta-main { flex: 1 1 auto; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; cursor: pointer;
+  background: none; border: 0; color: inherit; padding: 11px 12px 11px 46px; position: relative; }
+.cvm-getapp-cta-main > svg { position: absolute; left: 18px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: #e6a86a; }
+.cvm-getapp-cta-main b { font-weight: 600; font-size: 13px; }
+.cvm-getapp-cta-main span { color: var(--pt-text-faint); font-size: 11.5px; }
+.cvm-getapp-x { flex: none; width: 40px; display: grid; place-items: center; background: none; border: 0; border-left: 1px solid var(--pt-glass-brd);
+  color: var(--pt-text-faint); cursor: pointer; transition: color .12s, background .12s; }
+.cvm-getapp-x:hover { color: var(--pt-text); background: var(--pt-glass-2); }
+.cvm-getapp-x svg { width: 15px; height: 15px; }
 .pt-confirm.cvm-getapp { position: fixed; inset: 0; z-index: 2200; display: grid; place-items: center; background: rgba(0, 0, 0, .32); }
-.cvm-getapp-card { max-width: 360px; text-align: center; padding: 22px 22px 18px; }
-.cvm-getapp-mark { display: grid; place-items: center; width: 46px; height: 46px; margin: 0 auto 10px; border-radius: 12px; background: var(--pt-accent); color: #fff; }
-.cvm-getapp-mark .cvm-brand-glyph { width: 26px; height: 26px; stroke-width: 1.3; }
-.cvm-getapp-card h3 { margin: 0; font: 700 17px var(--pt-font); }
-.cvm-getapp-free { margin: 3px 0 10px; color: var(--pt-accent); font: 600 12px var(--pt-font); }
-.cvm-getapp-body { margin: 0 0 16px; color: var(--pt-text-dim); font-size: 12.5px; line-height: 1.5; }
-.cvm-getapp-actions { display: flex; justify-content: center; gap: 8px; }
+/* these must out-specify host.css's .pt-confirm-card { padding } and .pt-confirm-card p { margin: 0 } */
+.pt-confirm-card.cvm-getapp-card { max-width: 380px; text-align: center; padding: 24px; }
+.cvm-getapp-card .cvm-getapp-mark { display: grid; place-items: center; width: 66px; height: 66px; margin: 0 auto 16px; border-radius: 17px; background: linear-gradient(180deg, #A44400, #502202); color: #fff; }
+.cvm-getapp-card .cvm-getapp-mark .cvm-brand-glyph { width: 40px; height: 40px; stroke-width: 2; }
+.cvm-getapp-card h3 { margin: 0 0 5px; font: 700 18px var(--pt-font); }
+.pt-confirm-card .cvm-getapp-free { margin: 0 0 16px; color: var(--pt-text-faint); font: 600 12px var(--pt-font); letter-spacing: .3px; }
+.pt-confirm-card .cvm-getapp-body { margin: 0 0 24px; color: var(--pt-text-dim); font: 400 13px/1.6 var(--pt-font); }
+.cvm-getapp-actions { display: flex; justify-content: center; gap: 10px; }
+.cvm-getapp-actions .pt-mini { height: 40px; padding: 0 22px; border-radius: 11px; font: 600 13px var(--pt-font); gap: 9px; }
+.cvm-getapp-actions .pt-mini.pt-primary { background: #3a1f0d; border-color: transparent; color: #fff; }
+.cvm-getapp-actions .pt-mini.pt-primary:hover { background: #542a0c; filter: none; }
 
 /* a visible grip so people know the ATS panel resizes (the native handle is invisible over glass) */
 .pt-menu-pop.cvm-kw::after { content: ""; position: absolute; right: 3px; bottom: 3px; width: 12px; height: 12px; pointer-events: none;
@@ -271,3 +295,34 @@ body > .pt-cpick { z-index: 2100; }
 .cvm-imgbox { position: fixed; z-index: 150; pointer-events: none; box-sizing: border-box; border: 1.5px solid var(--pt-accent); border-radius: 1px; }
 .cvm-imgbox .cvm-h-nw { left: -5px; top: -5px; } .cvm-imgbox .cvm-h-ne { right: -5px; top: -5px; }
 .cvm-imgbox .cvm-h-se { right: -5px; bottom: -5px; } .cvm-imgbox .cvm-h-sw { left: -5px; bottom: -5px; }
+
+/* ---- first-run tour ---- */
+/* the bar width-fits during the tour so it visibly widens as each control is revealed */
+#pt-bar.cvm-bar.cvm-bar-tour { width: auto; transition: width .34s cubic-bezier(.2,.7,.2,1); }
+/* each control slides + fades in as it's revealed (it mounts fresh, so the animation plays once) */
+.cvm-bar-tour > * { animation: cvm-tour-pop .42s cubic-bezier(.2,.7,.2,1) both; }
+@keyframes cvm-tour-pop { from { opacity: 0; transform: translateX(-10px) scale(.9); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .cvm-bar-tour > *, .cvm-coach { animation: none; } }
+/* a transparent catcher so stray clicks don't derail the walk-through (Next / Skip drive it) */
+.cvm-tour-scrim { position: fixed; inset: 0; z-index: 3000; background: transparent; }
+/* the coach-mark and ghost float over anything — the dark canvas OR the white sheet — so they can't lean on
+   translucency alone (over white, glass goes pale and white text vanishes). Back them with a near-opaque
+   warm tint sourced from the theme, so they read the same everywhere. */
+/* step 1 of the tour: hide the real sheet entirely (it stays mounted, just invisible) so the empty canvas
+   shows — then it fades in when the tour reaches the document step. */
+.cvm-paper { transition: opacity .45s ease; }
+.cvm-tour-cover .cvm-paper { opacity: 0; pointer-events: none; }
+/* the coach-mark that points at the freshly revealed control */
+.cvm-coach { position: fixed; z-index: 3001; width: 330px; box-sizing: border-box; padding: 13px 16px 12px; border-radius: 16px;
+  background-color: var(--pt-glass); -webkit-backdrop-filter: var(--pt-blur-webkit); backdrop-filter: var(--pt-blur); color: var(--pt-text);
+  transition: left .3s cubic-bezier(.2,.7,.2,1), top .3s cubic-bezier(.2,.7,.2,1); animation: cvm-tour-pop .22s cubic-bezier(.2,.7,.2,1); }
+/* a clean triangle pointing UP at the revealed control (solid, so no rotated-border seam over the text) */
+.cvm-coach-arrow { position: absolute; top: -8px; width: 0; height: 0; transform: translateX(-50%);
+  border-left: 9px solid transparent; border-right: 9px solid transparent;
+  border-bottom: 9px solid color-mix(in srgb, var(--c-glass, var(--pt-ground, #251200)) 92%, #000 14%); }
+.cvm-coach-step { font: 600 11px var(--pt-font); color: var(--pt-text-faint); letter-spacing: .3px; text-transform: uppercase; }
+.cvm-coach h4 { margin: 3px 0 6px; font-size: 15px; font-weight: 700; }
+.cvm-coach p { margin: 0; font-size: 12.75px; line-height: 1.5; color: var(--pt-text-dim); }
+.cvm-coach-actions { display: flex; align-items: center; gap: 8px; margin-top: 13px; }
+.cvm-coach-skip { margin-right: auto; background: none; border: 0; color: var(--pt-text-faint); font: 12px var(--pt-font); cursor: pointer; padding: 4px 2px; }
+.cvm-coach-skip:hover { color: var(--pt-text); }

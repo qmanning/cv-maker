@@ -617,7 +617,7 @@ body.pt-fit::after { content: ""; position: fixed; inset: 0; border: 2px solid v
 }
 
 /* surface reflex stack (the pen's .switcher) */
-#pt-bar, .pt-dim-pop, .pt-omni-results, .pt-menu-pop, #pt-ctx, .pt-modal, #pt-toast, #pt-tip, .pt-confirm-card, .pt-sheet-card, .pt-cpick {
+#pt-bar, .pt-dim-pop, .pt-omni-results, .pt-menu-pop, #pt-ctx, .pt-modal, #pt-toast, #pt-tip, .pt-confirm-card, .pt-sheet-card, .pt-cpick, .cvm-getapp-cta, .cvm-coach, .cvm-ask, .cvm-ask-reply, .cvm-ask-connect {
   /* Shine + Shadow (a directional light/dark the angle points) over the Backing (a solid legibility layer under the tint) */
   background-image:
     linear-gradient(calc(var(--glass-light-angle, 145) * 1deg + 180deg), color-mix(in srgb, var(--c-light) calc(var(--glass-shine, 0) * 0.85%), transparent) 0%, color-mix(in srgb, var(--c-light) calc(var(--glass-shine, 0) * 0.28%), transparent) 26%, transparent 55%),
