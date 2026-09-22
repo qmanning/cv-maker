@@ -1,10 +1,10 @@
 {
-    "name": "itera-desktop",
-    "productName": "Itera",
-    "version": "0.2.4",
-    "description": "Itera as a desktop app — the same prebuilt folder, wrapped in Electron. One-click PDF/PNG, no export server.",
+    "name": "icedcoffee-desktop",
+    "productName": "IcedCoffee",
+    "version": "0.3.0",
+    "description": "IcedCoffee as a desktop app — the same prebuilt folder, wrapped in Electron. One-click PDF/PNG, no export server.",
     "author": "Q Manning (https://qmanning.com)",
-    "homepage": "https://qmanning.com/labs/itera",
+    "homepage": "https://qmanning.com/labs/icedcoffee",
     "private": true,
     "license": "MIT",
     "type": "module",
@@ -24,8 +24,8 @@
         "pdfjs-dist": "^6.3.289"
     },
     "build": {
-        "appId": "com.qmanning.itera",
-        "productName": "Itera",
+        "appId": "com.qmanning.icedcoffee",
+        "productName": "IcedCoffee",
         "copyright": "MIT © 2026 Q Manning",
         "directories": {
             "output": "out",
@@ -99,10 +99,10 @@
             "identity": "-",
             "hardenedRuntime": false,
             "gatekeeperAssess": false,
-            "artifactName": "Itera-${version}-${env.ITERA_BUILD}-${arch}.${ext}"
+            "artifactName": "IcedCoffee-${version}-${env.ITERA_BUILD}-${arch}.${ext}"
         },
         "dmg": {
-            "title": "Itera ${version}",
+            "title": "IcedCoffee ${version}",
             "background": "build/background.png",
             "iconSize": 92,
             "iconTextSize": 12,
@@ -133,7 +133,7 @@
                     ]
                 }
             ],
-            "artifactName": "Itera-${version}-win-${arch}.${ext}"
+            "artifactName": "IcedCoffee-${version}-win-${arch}.${ext}"
         },
         "nsis": {
             "oneClick": false,

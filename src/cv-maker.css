@@ -1,4 +1,4 @@
-/* Itera — only what Infospector's host.css (loaded at runtime) doesn't already give us.
+/* IcedCoffee — only what Infospector's host.css (loaded at runtime) doesn't already give us.
    Everything here leans on its --pt-* / glass tokens, so the two tools always look alike. */
 
 .cvm-root {
@@ -15,6 +15,16 @@ body > .pt-cpick { z-index: 2100; }
 
 /* the bar: Infospector's #pt-bar, centered and sized to its contents */
 #pt-bar.cvm-bar { left: 50%; transform: translateX(-50%); width: min(860px, calc(100vw - 24px)); transition: none; }
+/* desktop shell (Electron, hidden OS title bar): the floating bar is the window's drag handle — its own
+   controls stay clickable. On a narrow window it drops below the traffic lights so nothing sits under them. */
+.cvm-desktop #pt-bar.cvm-bar { -webkit-app-region: drag; app-region: drag; }
+.cvm-desktop #pt-bar.cvm-bar button,
+.cvm-desktop #pt-bar.cvm-bar input,
+.cvm-desktop #pt-bar.cvm-bar a,
+.cvm-desktop #pt-bar.cvm-bar label,
+.cvm-desktop #pt-bar.cvm-bar .pt-omni,
+.cvm-desktop #pt-bar.cvm-bar [role="button"] { -webkit-app-region: no-drag; app-region: no-drag; }
+@media (max-width: 1000px) { .cvm-desktop #pt-bar.cvm-bar { top: 46px; } }
 /* the buttons are never pushed off-screen: they keep their size, and the two fields (paper size, document
    name) give up width and truncate instead */
 .cvm-bar > .pt-rbtn { flex: none; }
@@ -38,7 +48,7 @@ body > .pt-cpick { z-index: 2100; }
 .cvm-omni-pin.pt-active { color: var(--pt-accent); }
 .cvm-omni-pin svg { width: 15px; height: 15px; }
 
-/* the Itera mark, far left — a quick-menu trigger in the brand accent that animates on hover */
+/* the IcedCoffee mark, far left — a quick-menu trigger in the brand accent that animates on hover */
 .cvm-bar .cvm-brand { flex: none; display: grid; place-items: center; width: 34px; height: 36px; padding: 0; border: none; background: none; cursor: pointer;
   color: var(--pt-text); border-radius: var(--cvm-ctl-r); }   /* ghost: no ring, no fill — the mark floats (white on the dark bar) */
 .cvm-bar .cvm-brand .cvm-brand-glyph { width: 27px; height: 27px; stroke-width: 1.3; }
@@ -187,7 +197,7 @@ body > .pt-cpick { z-index: 2100; }
 .cvm-live .cvm-dot { animation: cvm-ask-pulse 1.4s ease-in-out infinite; }
 @media (max-width: 560px) { .cvm-ask-connect span { display: none; } }
 
-/* ATS keywords — a small floating glass panel (drag its header; reopen from the Itera menu) */
+/* ATS keywords — a small floating glass panel (drag its header; reopen from the IcedCoffee menu) */
 .pt-menu-pop.cvm-kw { position: fixed; z-index: 190; width: 288px; height: 440px; min-width: 240px; min-height: 220px; max-width: 520px; max-height: 84vh;
   display: flex; flex-direction: column; padding: var(--glass-pad, 8px); overflow: hidden; resize: both; }
 .cvm-kw-add { flex: none; }

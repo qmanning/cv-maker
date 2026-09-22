@@ -52,18 +52,18 @@
         const c = m.claude, pill = $("claude-pill");
         pill.textContent = c.connected ? (c.current ? "Connected" : "Needs reconnecting") : ""; pill.className = "pill" + (c.connected && c.current ? " on" : "");
         $("claude-sub").textContent = !c.installed ? "Claude Desktop isn't installed on this computer. Get it free at claude.ai/download, then come back."
-            : c.connected && c.current ? "Claude Desktop knows about Itera."
-            : c.connected ? "Itera has moved since you connected (an update, or a different folder). Connect again to fix it."
-            : "One click adds Itera to Claude's settings (a backup of the file is kept next to it).";
+            : c.connected && c.current ? "Claude Desktop knows about IcedCoffee."
+            : c.connected ? "IcedCoffee has moved since you connected (an update, or a different folder). Connect again to fix it."
+            : "One click adds IcedCoffee to Claude's settings (a backup of the file is kept next to it).";
         $("claude-connect").hidden = c.connected && c.current; $("claude-connect").disabled = !c.installed;
         $("claude-connect").textContent = c.connected ? "Reconnect Claude Desktop" : "Connect Claude Desktop";
         $("claude-disconnect").hidden = !c.connected; $("claude-steps").hidden = !(c.connected && c.current);
         const x = m.codex, xp = $("codex-pill");
         xp.textContent = x.connected ? (x.current ? "Connected" : "Needs reconnecting") : ""; xp.className = "pill" + (x.connected && x.current ? " on" : "");
         $("codex-sub").textContent = !x.installed ? "Not set up on this computer yet. Open the ChatGPT desktop app's Codex (or install the Codex CLI) once, then come back."
-            : x.connected && x.current ? "ChatGPT and Codex know about Itera. They share one settings file."
-            : x.connected ? "Itera has moved since you connected. Connect again to fix it."
-            : "One click adds Itera to the settings file the ChatGPT app, Codex CLI and the IDE extension share (a backup is kept).";
+            : x.connected && x.current ? "ChatGPT and Codex know about IcedCoffee. They share one settings file."
+            : x.connected ? "IcedCoffee has moved since you connected. Connect again to fix it."
+            : "One click adds IcedCoffee to the settings file the ChatGPT app, Codex CLI and the IDE extension share (a backup is kept).";
         $("codex-connect").hidden = x.connected && x.current; $("codex-connect").disabled = !x.installed;
         $("codex-connect").textContent = x.connected ? "Reconnect ChatGPT / Codex" : "Connect ChatGPT / Codex";
         $("codex-disconnect").hidden = !x.connected; $("codex-steps").hidden = !(x.connected && x.current);

@@ -1,20 +1,20 @@
-# Installing Itera — a checklist for AI assistants
+# Installing IcedCoffee — a checklist for AI assistants
 
-You are setting up **Itera**, a prebuilt static tool (one folder of HTML/CSS/JS, plus a
+You are setting up **IcedCoffee**, a prebuilt static tool (one folder of HTML/CSS/JS, plus a
 committed `dist/`) that lets a person edit a résumé in place in the browser — click any text and
 type — and export it as PDF, Word, PNG, or source HTML. Follow the steps in order. Ask the
 questions in step 4 as a single batch; don't ask anything else unless a step fails.
 
 ## 0. Ground rules
 
-- **Do not modify files in the `itera/` folder** except `config.js` and anything under
+- **Do not modify files in the `icedcoffee/` folder** except `config.js` and anything under
   `templates/`. Everything else — `index.html`, `dist/`, `vendor/`, `server.mjs` — is the tool;
   updates replace it wholesale.
 - **Do not add build steps, bundler config, or dependencies.** `dist/` is already built and
   committed; the user never runs `npm` to use the tool. If the framework needs anything to serve a
   static folder, it's already doing it for images.
 - **Never run `npm install` or `npm run build` inside the user's project for this tool.** Those
-  commands are only for developing Itera itself, from a clone of its own repo.
+  commands are only for developing IcedCoffee itself, from a clone of its own repo.
 - **Never put the user's real résumé into a public repo without asking.** If they want to use their
   own résumé as the starting template (step 5), ask first, and suggest adding that file's path to
   `.gitignore` if the project's repo is public.
@@ -40,18 +40,18 @@ Look at the project root and pick the first match:
 | `index.html` at root, no framework | static site | project root | `/` |
 
 If nothing matches, ask the user where static files are served from (one question). Unlike
-Infospector, Itera does **not** need to share an origin with anything else — it doesn't frame
+Infospector, IcedCoffee does **not** need to share an origin with anything else — it doesn't frame
 the user's pages — so it can live at any path your server serves, at any depth.
 
 ## 2. Copy the folder
 
-Copy the whole `itera/` folder to `<static dir>/labs/itera/` (create `labs/`). Keep the
-folder name `itera`. Result must contain at least: `index.html`, `config.js`, `brand/` (the favicon), `dist/itera.js`,
-`dist/itera.css`, `dist/chunks/`, `templates/sample-resume.html`, `vendor/html-to-image.js`,
+Copy the whole `icedcoffee/` folder to `<static dir>/labs/icedcoffee/` (create `labs/`). Keep the
+folder name `icedcoffee`. Result must contain at least: `index.html`, `config.js`, `brand/` (the favicon), `dist/icedcoffee.js`,
+`dist/icedcoffee.css`, `dist/chunks/`, `templates/sample-resume.html`, `vendor/html-to-image.js`,
 `vendor/infospector/host.css`, `vendor/infospector/lib.js`, `vendor/infospector/colorpicker.js`,
 `README.md`, `LICENSE`.
 
-Itera must be served over `http://` or `https://` — opening `index.html` via `file://` will not
+IcedCoffee must be served over `http://` or `https://` — opening `index.html` via `file://` will not
 work, because it fetches the template over `fetch()` and loads its bundle as an ES module.
 
 If the project has a `.gitignore` rule that would exclude it (e.g. ignoring `public/labs`), tell
@@ -62,11 +62,11 @@ the user rather than editing the ignore file.
 Start the dev server (whatever the project already uses), then confirm, with a browser tool if you
 have one, otherwise `curl -I`:
 
-- `GET <origin>/labs/itera/index.html` → 200, `text/html`
-- `GET <origin>/labs/itera/dist/itera.js` → 200, `application/javascript` (or `text/javascript`)
-- `GET <origin>/labs/itera/dist/itera.css` → 200, `text/css`
+- `GET <origin>/labs/icedcoffee/index.html` → 200, `text/html`
+- `GET <origin>/labs/icedcoffee/dist/icedcoffee.js` → 200, `application/javascript` (or `text/javascript`)
+- `GET <origin>/labs/icedcoffee/dist/icedcoffee.css` → 200, `text/css`
 
-If you have a browser tool: open `<origin>/labs/itera/`, wait for at least one
+If you have a browser tool: open `<origin>/labs/icedcoffee/`, wait for at least one
 `[data-cv-edit][contenteditable="true"]` element to appear (the sample résumé has 21 editable
 regions), and check the console for errors. A blank page or a stuck loading state almost always
 means one of the checks above failed — recheck the folder copy before anything else.
@@ -87,7 +87,7 @@ means one of the checks above failed — recheck the folder copy before anything
 
 Only if the user answered yes to Q1 above, and only after they've confirmed it.
 
-Checklist for turning their existing résumé into a Itera source file:
+Checklist for turning their existing résumé into a IcedCoffee source file:
 
 - One `.cv-page` root; everything else scoped under it; every size in `pt`.
 - Wrap each editable block of prose (a summary, a job description) in
@@ -135,7 +135,7 @@ to confirm the regions are editable before wiring it up as the default.
 
 ## 6. Write config
 
-Edit `<static dir>/labs/itera/config.js` only — it's already there with commented examples:
+Edit `<static dir>/labs/icedcoffee/config.js` only — it's already there with commented examples:
 
 ```js
 window.ITERA = {
@@ -148,7 +148,7 @@ window.ITERA = {
 If Q3 = yes, tell the user the command (don't run it yourself unless they ask):
 
 ```bash
-cd <static dir>/labs/itera
+cd <static dir>/labs/icedcoffee
 npm i puppeteer
 node server.mjs
 ```
@@ -157,7 +157,7 @@ node server.mjs
 
 Tell the user, in this order: the URL to open, what you set in `config.js` (from step 6), how to
 export (PDF/DOCX/PNG from the toolbar, no server required unless they opted into one), and the
-one-line reminder that Export → Source HTML is how they keep named variants — Itera only
+one-line reminder that Export → Source HTML is how they keep named variants — IcedCoffee only
 autosaves one document per browser.
 
 ## Troubleshooting
@@ -165,7 +165,7 @@ autosaves one document per browser.
 | Symptom | Likely cause |
 | --- | --- |
 | Blank page, nothing loads | Opened via `file://` instead of `http(s)://` — it must be served |
-| 404 on `dist/chunks/*.js` | The folder was copied partially — re-copy the whole `itera/` folder, `dist/` included |
+| 404 on `dist/chunks/*.js` | The folder was copied partially — re-copy the whole `icedcoffee/` folder, `dist/` included |
 | Fonts look different from the design | Expected — fonts resolve to whatever the template's font stack finds on that machine; the sample uses Helvetica/Arial |
 | PNG export fails with a script-load error | `vendor/html-to-image.js` is missing — re-copy the folder |
 | Export server answers `501` | `puppeteer` isn't installed next to `server.mjs` — run `npm i puppeteer` there |
@@ -173,4 +173,4 @@ autosaves one document per browser.
 
 ---
 
-Made by [Q Manning](https://qmanning.com) · [Source on GitHub](https://github.com/qmanning/itera) · [See it live in the Labs](https://qmanning.com/labs/itera)
+Made by [Q Manning](https://qmanning.com) · [Source on GitHub](https://github.com/qmanning/icedcoffee) · [See it live in the Labs](https://qmanning.com/labs/icedcoffee)

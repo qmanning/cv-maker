@@ -1,6 +1,6 @@
-// src/components/labs/itera/CvMaker.tsx
-// Itera: a sheet of paper on an Infospector-style canvas. The résumé is a source HTML file
-// (public/itera/templates/…) whose [data-cv-edit] regions each become a TipTap editor mounted
+// src/components/labs/icedcoffee/CvMaker.tsx
+// IcedCoffee: a sheet of paper on an Infospector-style canvas. The résumé is a source HTML file
+// (public/icedcoffee/templates/…) whose [data-cv-edit] regions each become a TipTap editor mounted
 // directly ON the template's own element — so what you edit is exactly what gets exported.
 
 "use client";
@@ -78,15 +78,12 @@ export interface CvFiles {
     openExternal?(url: string): void;
 }
 
-/** the Itera mark, for the toolbar: the same two overlapping sheets as public/itera/brand/itera-glyph.svg (which stays the
- *  source of truth, untouched), redrawn from their centre lines as strokes so the weight can sit with the other icons —
- *  the brand file's lines are a fixed 2 units. Takes currentColor; the overlap stays filled. */
-function IteraGlyph(props: { className?: string }) {
+/** the IcedCoffee mark, for the toolbar: the same iced-coffee cup as public/icedcoffee/brand/icedcoffee-glyph.svg
+ *  (the source of truth). Takes currentColor so it sits with the other toolbar icons. */
+function IcedCoffeeGlyph(props: { className?: string }) {
     return (
-        <svg viewBox="4.5 4.5 16 16" fill="none" stroke="currentColor" strokeWidth={1.3} strokeLinejoin="round" xmlns="http://www.w3.org/2000/svg" className={props.className} aria-hidden="true">
-            <path d="M6 6H11.2A3.4667 3.4667 0 0 1 14.6667 9.4667V14.6667H6Z" />
-            <path d="M10.3333 10.3333H19V19H13.8A3.4667 3.4667 0 0 1 10.3333 15.5333Z" />
-            <rect x="10.3333" y="10.3333" width="4.3334" height="4.3334" fill="currentColor" stroke="none" />
+        <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" xmlns="http://www.w3.org/2000/svg" className={props.className} aria-hidden="true">
+            <path d="M8 12.9341H25M20.5854 2L17.7835 12.4567M8.80952 12.9341L11.5238 29H21.4762L24.1905 12.9341C23.8889 10.7064 21.9286 6.25099 16.5 6.25099C11.0714 6.25099 9.11111 10.7064 8.80952 12.9341ZM14.2381 23.4361L15.8052 24.3908L14.9004 26.0444L13.3333 25.0897L14.2381 23.4361ZM17.8571 20.1114L19.605 19.6172L20.0733 21.4615L18.3255 21.9558L17.8571 20.1114ZM13.3333 17.6426L13.8017 15.7983L15.5495 16.2925L15.0812 18.1368L13.3333 17.6426Z" />
         </svg>
     );
 }
@@ -154,7 +151,7 @@ function normalizeGaps(page: HTMLElement, pageWPt: number): void {
 /* ---------------- component ---------------- */
 
 // Framework-agnostic on purpose (no router, no server assumptions): the same component runs inside this
-// site and as the standalone drop-in (github.com/qmanning/itera), configured only by these props.
+// site and as the standalone drop-in (github.com/qmanning/icedcoffee), configured only by these props.
 export interface CvMakerProps {
     /** the source HTML the editor starts from (Start-up → Page in the menu overrides it per browser) */
     templateUrl: string;
@@ -682,8 +679,8 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
         else if (e.key === "Escape") { setOmniOpen(false); (e.target as HTMLInputElement).blur(); }
     };
 
-    /* ---- brand menu (the Itera mark, far left): quick shell actions ---- */
-    const BRAND_HOME = "https://qmanning.com/labs/itera";
+    /* ---- brand menu (the IcedCoffee mark, far left): quick shell actions ---- */
+    const BRAND_HOME = "https://qmanning.com/labs/icedcoffee";
     const [appVersion, setAppVersion] = useState("");
     // the hosted web build has no shell — the AI, real files and updates live only in the desktop app; offer it here instead of hiding it
     const isWebBuild = !files && !assistant && !remote;
@@ -1146,7 +1143,7 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
             {/* main bar — Infospector's #pt-bar */}
             <div id="pt-bar" className="cvm-bar">
                 {backHref && <button className="pt-rbtn" aria-label="Back" data-tip="Back" onClick={() => { window.location.href = backHref; }}><ArrowLeft /></button>}
-                <button className="cvm-brand" aria-label="Itera menu" aria-haspopup="menu" data-tip="Itera" onClick={(e) => openMenu("brand", e, "left")}><IteraGlyph className="cvm-brand-glyph" /></button>
+                <button className="cvm-brand" aria-label="IcedCoffee menu" aria-haspopup="menu" data-tip="IcedCoffee" onClick={(e) => openMenu("brand", e, "left")}><IcedCoffeeGlyph className="cvm-brand-glyph" /></button>
                 <div className="pt-dim">
                     <div className="pt-dim-trigger">
                         <button className="pt-dim-val" aria-haspopup="true" data-tip="Paper size and zoom" onClick={(e) => openMenu("size", e, "left")}>{paper.label}<span className="pt-dim-scale" style={{ color: "var(--pt-text-faint)" }}>· {Math.round(zoom * 100)}%</span></button>
@@ -1282,7 +1279,7 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
                     {files?.checkUpdates && <button className="pt-menu-item cvm-row" onClick={checkUpdates}><RefreshCw />Check for Updates…{appVersion && <span className="cvm-hint">{appVersion}</span>}</button>}
                     {isWebBuild && <button className="pt-menu-item cvm-row" onClick={() => { setMenu(null); setGetApp(true); }}><Download />Get the Mac app<span className="cvm-hint">free</span></button>}
                     {/* credit: the tool says who made it and where it lives — never the exported résumé, which is the user's */}
-                    <button className="pt-menu-item cvm-row cvm-credit" onClick={visitHomepage}><span>Itera <span className="cvm-hint" style={{ marginLeft: 4 }}>by Q Manning</span></span><span className="cvm-hint">qmanning.com ↗</span></button>
+                    <button className="pt-menu-item cvm-row cvm-credit" onClick={visitHomepage}><span>IcedCoffee <span className="cvm-hint" style={{ marginLeft: 4 }}>by Q Manning</span></span><span className="cvm-hint">qmanning.com ↗</span></button>
                 </div>
             )}
             {kwOpen && (() => {
@@ -1293,7 +1290,7 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
                         <div className="cvm-kw-head" onPointerDown={dragKw}>
                             <ScanSearch /><b>ATS keywords</b>
                             {kw.keywords.length > 0 && <span className="cvm-kw-tally" data-tip={`Used in the ${KIND_LABEL[tab].toLowerCase()}`}>{used}/{kw.keywords.length}</span>}
-                            <button className="cvm-kw-x" aria-label="Close" data-tip="Close · reopen from the Itera menu" onClick={() => { setKwOpen(false); setKwActive(null); }}><X /></button>
+                            <button className="cvm-kw-x" aria-label="Close" data-tip="Close · reopen from the IcedCoffee menu" onClick={() => { setKwOpen(false); setKwActive(null); }}><X /></button>
                         </div>
                         {kw.job && <div className="cvm-kw-job">{kw.job}</div>}
                         <div className="cvm-kw-add">
@@ -1403,9 +1400,9 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
             <div id="pt-toast" className={toast ? "pt-show" : undefined}>{toast}</div>
             {getApp && (
                 <div className="pt-confirm cvm-getapp" onMouseDown={(e) => { if (e.target === e.currentTarget) setGetApp(false); }}>
-                    <div className="pt-confirm-card cvm-getapp-card" role="dialog" aria-label="Get Itera for Mac">
-                        <div className="cvm-getapp-mark"><IteraGlyph className="cvm-brand-glyph" /></div>
-                        <h3>Itera for Mac</h3>
+                    <div className="pt-confirm-card cvm-getapp-card" role="dialog" aria-label="Get IcedCoffee for Mac">
+                        <div className="cvm-getapp-mark"><IcedCoffeeGlyph className="cvm-brand-glyph" /></div>
+                        <h3>IcedCoffee for Mac</h3>
                         <p className="cvm-getapp-free">Free · open source</p>
                         <p className="cvm-getapp-body">Everything here, plus what the browser leaves out: your own AI editing the page as you ask (Claude, ChatGPT — no API key), your résumé as a real file you open and save, a cover letter that shares your header, and updates that arrive on their own.</p>
                         <div className="cvm-getapp-actions">
@@ -1425,7 +1422,7 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
             {isWebBuild && (
                 <div className="cvm-ask-wrap">
                     <button type="button" className="cvm-getapp-cta" onClick={() => setGetApp(true)}>
-                        <Sparkles /><b>Edit by asking your AI</b><span>Claude, ChatGPT and others drive Itera — in the free Mac app</span>
+                        <Sparkles /><b>Edit by asking your AI</b><span>Claude, ChatGPT and others drive IcedCoffee — in the free Mac app</span>
                     </button>
                 </div>
             )}

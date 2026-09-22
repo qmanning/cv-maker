@@ -1,10 +1,10 @@
-<img src="brand/itera-icon.svg" width="72" height="72" alt="Itera" />
+<img src="brand/icedcoffee-icon.svg" width="72" height="72" alt="IcedCoffee" />
 
-# Itera
+# IcedCoffee
 
 **Your résumé is one HTML file. Open it, click any text, type — and export it as a real, ATS-readable document.**
 
-Itera is an edit-in-place résumé editor that runs entirely in the browser. There's no form to fill in and no template gallery — your résumé shows up as a sheet of paper on a canvas, and every piece of copy is exactly where it'll be in the export, because you're editing the export. Click a line, it becomes a rich-text box with a floating format bar; click an image, swap it; done editing, export a PDF with real selectable text and live links, a Word file built for ATS parsing, a PNG, or the source HTML itself so you can keep variants.
+IcedCoffee is an edit-in-place résumé editor that runs entirely in the browser. There's no form to fill in and no template gallery — your résumé shows up as a sheet of paper on a canvas, and every piece of copy is exactly where it'll be in the export, because you're editing the export. Click a line, it becomes a rich-text box with a floating format bar; click an image, swap it; done editing, export a PDF with real selectable text and live links, a Word file built for ATS parsing, a PNG, or the source HTML itself so you can keep variants.
 
 - **Edit in place, not in a form.** Each `[data-cv-edit]` region in the template becomes a TipTap editor mounted directly on the template's own element — what you see while editing is what gets exported.
 - **A format bar that follows you.** It appears just above the box you're editing (or below, if there's no room) with bold, italic, underline, font size in pt, weight, line height, letter spacing, a glass color picker, links, bullets, a horizontal rule, alignment, and clear formatting.
@@ -14,7 +14,7 @@ Itera is an edit-in-place résumé editor that runs entirely in the browser. The
 - **Move, duplicate, and delete any block** — click into it and a small tool pill appears beside it.
 - **Swap any image** — click it, choose a file, and it's embedded straight into the document as a data URI. No uploads, no broken links later.
 - **A cover letter beside the résumé.** The picker at the right of the bar switches the sheet between the two. They are two documents (two files), and the letter's header *is* the résumé's: change your phone number or headline on the résumé and the letter follows. A default letter ships in `templates/sample-cover-letter.html`.
-- **ATS keywords panel.** The words a job ad is screened for, each marked used / not yet, with a ×N count and a note when only the other document uses it. Click one and every hit on the page lights up (CSS Custom Highlight — the document's markup is never touched). Add them yourself, or have your AI read the ad. Itera menu ▸ ATS keywords.
+- **ATS keywords panel.** The words a job ad is screened for, each marked used / not yet, with a ×N count and a note when only the other document uses it. Click one and every hit on the page lights up (CSS Custom Highlight — the document's markup is never touched). Add them yourself, or have your AI read the ad. IcedCoffee menu ▸ ATS keywords.
 - **US Letter and A4**, switchable any time.
 - **Fit to one page** scales the whole design down as a single unit (never below 80%) so every line still breaks exactly where it was designed to.
 - **Pagination, your way.** On: real page breaks and centered page numbers once you're past one page. Off: one continuous page, no breaks.
@@ -23,20 +23,20 @@ Itera is an edit-in-place résumé editor that runs entirely in the browser. The
 - **Four export formats**: PDF (real text, real links), Word DOCX (real paragraphs, bullets and tables, built for ATS parsing), PNG at 2×, and Source HTML — the one you reload to keep a variant. Pick a format, then **Résumé**, **Cover Letter** or **All**.
 - **Nothing leaves your browser.** Autosaves to `localStorage`. No server, no account, no analytics — unless you run the optional local export server yourself.
 
-![Itera editing a résumé in place](docs/screenshots/editor.png)
+![IcedCoffee editing a résumé in place](docs/screenshots/editor.png)
 
 ## Quick start
 
-1. Copy this whole folder into your project's static directory, e.g. `public/labs/itera/`.
+1. Copy this whole folder into your project's static directory, e.g. `public/labs/icedcoffee/`.
 2. Start your dev server the way you normally do.
-3. Open `/labs/itera/` — you'll land on the sample résumé (Mara Quill), ready to edit.
+3. Open `/labs/icedcoffee/` — you'll land on the sample résumé (Mara Quill), ready to edit.
 
 ### Let your AI assistant install it
 
 Paste this into Claude, Cursor, or whatever you use, from your project root:
 
-> Install Itera (a static résumé editor) from this folder into my project. Read `INSTALL.md`
-> in the `itera` folder and follow it exactly — it's written as a checklist for you.
+> Install IcedCoffee (a static résumé editor) from this folder into my project. Read `INSTALL.md`
+> in the `icedcoffee` folder and follow it exactly — it's written as a checklist for you.
 
 It'll detect your framework's static directory, copy the folder to the right place, verify it
 serves, and ask you a short batch of questions (your own résumé as the starting template? US
@@ -71,7 +71,7 @@ top of `templates/sample-resume.html` for the authoritative list):
 The page size, page breaks, and page numbers belong to the editor, not to the file — your template
 never sets a page height or draws its own footer number.
 
-![Itera's in-place format bar above an edited line](docs/screenshots/format-bar.png)
+![IcedCoffee's in-place format bar above an edited line](docs/screenshots/format-bar.png)
 
 ## Make your own template
 
@@ -106,7 +106,7 @@ Choose a format, then what to export: **Résumé**, **Cover Letter**, or **All**
 The two-segment picker at the far right of the bar switches between the résumé and its cover letter. Everything in the bar — the document name, Open/Import, Save, Export — acts on the tab that is showing, and a file opened from the wrong tab lands in its own (a letter marks itself with `data-cv-kind="letter"`).
 
 - **Two files.** Each is a plain `.html` you own. In the desktop app each tab has its own open file, recent list and pinned master; on the web each has its own autosave slot.
-- **One header.** The letter's `<header data-cv-mirror="header">` is filled from the résumé's header (its `[data-cv-header]`, else the page's first `<header>`) every time the letter takes the sheet — read-only, with the résumé's styles put in front of the letter's own (everything after the `/* itera:letter` marker in its `<style>`). The file keeps a snapshot, so it still stands alone.
+- **One header.** The letter's `<header data-cv-mirror="header">` is filled from the résumé's header (its `[data-cv-header]`, else the page's first `<header>`) every time the letter takes the sheet — read-only, with the résumé's styles put in front of the letter's own (everything after the `/* icedcoffee:letter` marker in its `<style>`). The file keeps a snapshot, so it still stands alone.
 - **Your own letter template** needs only that header slot plus `[data-cv-block][data-cv-edit]` regions for the date, recipient, greeting, body and sign-off.
 
 ## Optional export server
@@ -139,7 +139,7 @@ and it renders your document with JavaScript disabled and all network requests b
 serves the folder on its own `app://` origin and answers the editor's existing export-server option
 itself, so **PDF and PNG are one click — no `server.mjs`, no puppeteer, no print dialog.**
 
-**Download** an installer from [Releases](https://github.com/qmanning/itera/releases) — macOS
+**Download** an installer from [Releases](https://github.com/qmanning/icedcoffee/releases) — macOS
 (`…-mac-arm64.dmg` for Apple Silicon, `…-mac-x64.dmg` for Intel) or Windows — **or run it from source:**
 
 ```bash
@@ -150,44 +150,44 @@ npm start
 
 ### First launch (the builds are unsigned)
 
-Itera is free and I don't pay Apple or Microsoft for a signing certificate, so your computer will
-ask you to vouch for the app once. If you'd rather not, use the [web version](https://qmanning.com/labs/itera/demo)
+IcedCoffee is free and I don't pay Apple or Microsoft for a signing certificate, so your computer will
+ask you to vouch for the app once. If you'd rather not, use the [web version](https://qmanning.com/labs/icedcoffee/demo)
 or run it from source (above) — same editor, and neither shows a warning.
 
-- **macOS** — open the disk image and **double-click Itera right there** (don't drag it anywhere; the window
-  with the steps needs to stay in front of you). macOS says *"Apple could not verify “Itera” is free of
+- **macOS** — open the disk image and **double-click IcedCoffee right there** (don't drag it anywhere; the window
+  with the steps needs to stay in front of you). macOS says *"Apple could not verify “IcedCoffee” is free of
   malware that may harm your Mac or compromise your privacy."* Click **Done** (not *Move to Trash*; the dialog
   offers nothing else), then double-click **Open Privacy & Security** in that same window — or open **System
-  Settings → Privacy & Security** yourself — scroll to the bottom, click **Open Anyway**, and confirm. Itera
+  Settings → Privacy & Security** yourself — scroll to the bottom, click **Open Anyway**, and confirm. IcedCoffee
   starts and offers to **install itself in Applications**: say yes. It copies itself there, reopens from
   Applications, and macOS doesn't ask again; eject the disk image. (If macOS says the app *"is damaged"*
   instead, run `xattr -cr` on the app in Terminal and open it again.)
 - **Windows** — on *"Windows protected your PC"*, click **More info → Run anyway**.
 
 Build the installers yourself with `npm run dist` (macOS) or `npm run dist:win`; pushing a `v*` tag
-makes GitHub build both and attach them to a draft release. **Updates:** once installed, Itera checks this repo's Releases when it starts and offers to update itself —
-it downloads the new version, verifies it is signed by Itera's publisher, installs it and reopens, with no second
+makes GitHub build both and attach them to a draft release. **Updates:** once installed, IcedCoffee checks this repo's Releases when it starts and offers to update itself —
+it downloads the new version, verifies it is signed by IcedCoffee's publisher, installs it and reopens, with no second
 macOS warning. *File ▸ Check for Updates…* asks now; *Settings ▸ Updates ▸ Check automatically* turns the check off. That check is the
-only network request Itera makes on its own. (Windows: the dialog opens the download page for now.) See `RELEASING.md`.
+only network request IcedCoffee makes on its own. (Windows: the dialog opens the download page for now.) See `RELEASING.md`.
 
 Exports render in a throwaway window with JavaScript off and every network request refused, the same
 posture as `server.mjs`. `npm run smoke` launches the app hidden, exports a PDF and a PNG through the
 real UI, and — if puppeteer is resolvable (or `CVM_PUPPETEER_FROM=/path/with/node_modules`) — compares
 the PDF with puppeteer's, text run by text run. It isn't signed or auto-updating yet.
 
-**Connect the AI app you already use — no API key.** This is what the desktop app is for. Itera runs a
+**Connect the AI app you already use — no API key.** This is what the desktop app is for. IcedCoffee runs a
 small [MCP](https://modelcontextprotocol.io) server, so your own AI app can read the résumé that's open and
 change it while you watch: *"Tailor my résumé to this job description." "Tighten it to one page."* Every
 change lands on the sheet as one step with **Undo** beside it.
 
 - **One click to connect** (File ▸ Settings…, or AI ▸ Connect Your AI…): **Claude Desktop**, and **the ChatGPT desktop app / Codex
-  CLI / Codex IDE extension** (they share `~/.codex/config.toml`). Itera adds one entry to the app's
+  CLI / Codex IDE extension** (they share `~/.codex/config.toml`). IcedCoffee adds one entry to the app's
   settings file, keeps a backup next to it, and can remove it again. For **Claude Code, Cursor, VS Code,
   LM Studio** and anything else that speaks MCP there is a *Copy the settings* button.
 - **No keys, no account, no network.** The AI app starts `electron/mcp/server.mjs` (dependency-free, run by
-  Itera's own binary, so nobody needs Node) and that talks to the running app over a local socket only
-  your user account can open. Itera itself never calls an AI service in this mode.
-- **Thirteen tools**, each taking `document: "resume" | "cover_letter"` (Itera shows that one and acts on it): `get_resume`, `edit_resume`, `undo_last_edit`, `export_resume` (PDF / PNG / DOCX / HTML to Downloads), `list_documents`, `open_document`, `save_document` (`save_as` branches a copy beside the open file — tailor a copy, never the master), `get_page_setup` / `set_page_setup` (paper, fit to one page, pagination, zoom), `list_images` / `replace_image`, and `set_keywords` / `get_keywords` (the ATS panel: the AI reads the ad, Itera counts both documents).
+  IcedCoffee's own binary, so nobody needs Node) and that talks to the running app over a local socket only
+  your user account can open. IcedCoffee itself never calls an AI service in this mode.
+- **Thirteen tools**, each taking `document: "resume" | "cover_letter"` (IcedCoffee shows that one and acts on it): `get_resume`, `edit_resume`, `undo_last_edit`, `export_resume` (PDF / PNG / DOCX / HTML to Downloads), `list_documents`, `open_document`, `save_document` (`save_as` branches a copy beside the open file — tailor a copy, never the master), `get_page_setup` / `set_page_setup` (paper, fit to one page, pagination, zoom), `list_images` / `replace_image`, and `set_keywords` / `get_keywords` (the ATS panel: the AI reads the ad, IcedCoffee counts both documents).
 - **Layout hints, not rules.** Regions that flow in two columns are described with `columns: 2`, and the model is told an even number of bullets balances there — a default the person can override, and only where the template has such regions.
 - **It never discards your work.** `open_document` refuses while that document has unsaved changes, and `save_as` never overwrites another file.
 - **The design can't break.** The model never rewrites the file. It sees the résumé as addressable blocks
@@ -197,7 +197,7 @@ change lands on the sheet as one step with **Undo** beside it.
 - **It can see the page; the model can't.** `edit_resume` reports pages before and after, and tells the
   model to tighten up when an edit spills onto another page.
 - It is told not to invent facts: if it needs something it doesn't have ("add my last job"), it asks.
-- **Advanced — a prompt bar inside Itera.** If you'd rather type requests in the app, the same window
+- **Advanced — a prompt bar inside IcedCoffee.** If you'd rather type requests in the app, the same window
   lets you add a pay-as-you-go API key (Claude, OpenAI, Gemini, OpenRouter) or a local model (Ollama,
   LM Studio). The key is encrypted with the OS keychain, stays in the main process, and goes only to the
   provider you chose.
@@ -227,7 +227,7 @@ Every key is optional — `window.ITERA = {}` (or no `config.js` at all) is a va
 
 ![The glass look menu and color picker](docs/screenshots/look-menu.png)
 
-Itera wears [Infospector](https://github.com/qmanning/infospector)'s glass UI, vendored MIT
+IcedCoffee wears [Infospector](https://github.com/qmanning/infospector)'s glass UI, vendored MIT
 under `vendor/infospector/`, and shares its saved look through the same `pt:*` `localStorage` keys
 — dial in a look in Infospector and it's the look here too, and vice versa. Right-click the canvas
 for:
@@ -255,18 +255,18 @@ so every browser starts set up the same way; **Save** remembers it in this brows
 
 Nothing is stored on or sent to a server. Your document autosaves to this browser's
 `localStorage` only — export Source HTML to move it anywhere else, or hand a variant to someone
-else as a file. The only network calls Itera ever makes on its own are to fetch the template
+else as a file. The only network calls IcedCoffee ever makes on its own are to fetch the template
 file it's pointed at; the optional export server (above) is one you run yourself, on your own
 machine, and it blocks every outbound request during a render.
 
 ## Browser support & known limits
 
-- **Chromium-based browsers recommended** (Chrome, Edge, Brave, Arc). Itera relies on CSS
+- **Chromium-based browsers recommended** (Chrome, Edge, Brave, Arc). IcedCoffee relies on CSS
   `zoom`, CSS multi-column layout, and the browser's print pipeline for PDF export; Safari and
   Firefox are untested.
 - **DOCX can't be pixel-identical to the design.** It aims at a clean, ATS-readable structure —
   real paragraphs, native Word columns, borderless tables — not a visual clone of the PDF.
-- **One document per browser.** Itera keeps a single autosaved document in `localStorage`; use
+- **One document per browser.** IcedCoffee keeps a single autosaved document in `localStorage`; use
   Export → Source HTML to save named variants and Load source HTML to switch between them.
 - **Fonts are whatever your template's font stack resolves to** on the machine viewing or
   exporting it. The sample template uses Helvetica/Arial, which every OS ships some version of.
@@ -275,7 +275,7 @@ machine, and it blocks every outbound request during a render.
 
 ```bash
 npm install
-npm run build   # esbuild → dist/itera.js + dist/itera.css
+npm run build   # esbuild → dist/icedcoffee.js + dist/icedcoffee.css
 npm test        # node --test, pure helpers in src/cv-source.ts
 npm run serve   # static server on :7333, for local hacking against dist/
 ```
@@ -293,7 +293,7 @@ same.
 
 ## Credits
 
-- [Infospector](https://github.com/qmanning/infospector) — the glass UI Itera wears (MIT, same author).
+- [Infospector](https://github.com/qmanning/infospector) — the glass UI IcedCoffee wears (MIT, same author).
 - [TipTap](https://tiptap.dev) / [ProseMirror](https://prosemirror.net) — the rich-text editing underneath every region (MIT).
 - [docx](https://github.com/dolanmiu/docx) — the DOCX export (MIT).
 - [html-to-image](https://github.com/bubkoo/html-to-image) — the in-browser PNG fallback (MIT).
@@ -305,4 +305,4 @@ MIT © 2026 Q Manning. See [LICENSE](./LICENSE).
 
 ---
 
-Made by [Q Manning](https://qmanning.com) · [Source on GitHub](https://github.com/qmanning/itera) · [See it live in the Labs](https://qmanning.com/labs/itera)
+Made by [Q Manning](https://qmanning.com) · [Source on GitHub](https://github.com/qmanning/icedcoffee) · [See it live in the Labs](https://qmanning.com/labs/icedcoffee)

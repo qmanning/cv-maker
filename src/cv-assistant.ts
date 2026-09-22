@@ -1,4 +1,4 @@
-// src/components/labs/itera/cv-assistant.ts
+// src/components/labs/icedcoffee/cv-assistant.ts
 // The editor's side of "ask your AI to change this résumé". Pure DOM in, DOM out — no network, no keys:
 // a desktop shell supplies the `CvAssistant` that actually talks to the person's own model.
 //

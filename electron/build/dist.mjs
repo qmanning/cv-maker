@@ -1,5 +1,5 @@
 // electron/build/dist.mjs — stamp this build, then run electron-builder with the stamp in the artifact NAME,
-// so every dogfood DMG has a unique, sortable filename (Itera-0.2.1-0921.1530-arm64.dmg). `npm run dist*`.
+// so every dogfood DMG has a unique, sortable filename (IcedCoffee-0.2.1-0921.1530-arm64.dmg). `npm run dist*`.
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

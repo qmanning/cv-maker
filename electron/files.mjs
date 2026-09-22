@@ -36,7 +36,7 @@ export function setupFiles({ templatePath, letterTemplatePath = "", smokeDir = "
     const title = () => {
         if (!win || win.isDestroyed()) return;
         const d = docs[active], anyDirty = KINDS.some((k) => docs[k].dirty);
-        win.setTitle((d.current ? path.basename(d.current) : active === "letter" ? "Untitled Cover Letter" : "Untitled") + (d.dirty && process.platform !== "darwin" ? " •" : "") + " — Itera");
+        win.setTitle((d.current ? path.basename(d.current) : active === "letter" ? "Untitled Cover Letter" : "Untitled") + (d.dirty && process.platform !== "darwin" ? " •" : "") + " — IcedCoffee");
         win.setRepresentedFilename(d.current || ""); win.setDocumentEdited(anyDirty);   // macOS: the proxy icon and the dot in the close button
     };
     const send = (channel, payload) => { if (win && !win.isDestroyed()) win.webContents.send(channel, payload); };
@@ -175,10 +175,10 @@ export function setupFiles({ templatePath, letterTemplatePath = "", smokeDir = "
         d.pinned = on ? p : (d.pinned === p ? "" : d.pinned);   // one master per kind; unpin only clears its own
         persist(); buildMenu(); emitRecent(k);
     });
-    // which build is this? — the Itera menu, the About box and the MCP server all say (build-info.json is written by build/stamp.mjs)
+    // which build is this? — the IcedCoffee menu, the About box and the MCP server all say (build-info.json is written by build/stamp.mjs)
     const buildInfo = (() => { try { return JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "build-info.json"), "utf8")); } catch { return {}; } })();
     const versionLabel = `${app.getVersion()}${buildInfo.build ? ` · build ${buildInfo.build}` : " · dev"}`;
-    app.setAboutPanelOptions?.({ applicationName: "Itera", applicationVersion: app.getVersion(), version: buildInfo.build ? `build ${buildInfo.build} · ${buildInfo.commit || ""}` : "dev", copyright: "Q Manning · MIT" });
+    app.setAboutPanelOptions?.({ applicationName: "IcedCoffee", applicationVersion: app.getVersion(), version: buildInfo.build ? `build ${buildInfo.build} · ${buildInfo.commit || ""}` : "dev", copyright: "Q Manning · MIT" });
     ipcMain.handle("shell:version", () => versionLabel);
     // the brand menu's quick actions
     ipcMain.on("shell:check-updates", () => updates?.check());
@@ -223,7 +223,7 @@ export function setupFiles({ templatePath, letterTemplatePath = "", smokeDir = "
                 { type: "separator" },
                 { role: "togglefullscreen" }, ...(app.isPackaged ? [] : [{ type: "separator" }, { role: "reload" }, { role: "toggleDevTools" }])] },
             { role: "windowMenu" },
-            { role: "help", submenu: [{ label: "Welcome to Itera", click: () => onWelcome() }, ...(mac ? [] : [{ type: "separator" }, ...updateItems]), { type: "separator" }, { label: "Itera on the Web", click: () => shell.openExternal("https://qmanning.com/labs/itera") }, { label: "Source on GitHub", click: () => shell.openExternal("https://github.com/qmanning/itera") }] },
+            { role: "help", submenu: [{ label: "Welcome to IcedCoffee", click: () => onWelcome() }, ...(mac ? [] : [{ type: "separator" }, ...updateItems]), { type: "separator" }, { label: "IcedCoffee on the Web", click: () => shell.openExternal("https://qmanning.com/labs/icedcoffee") }, { label: "Source on GitHub", click: () => shell.openExternal("https://github.com/qmanning/icedcoffee") }] },
         ]));
     }
 

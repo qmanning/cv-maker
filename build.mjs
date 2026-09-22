@@ -1,4 +1,4 @@
-// build.mjs — esbuild build for the standalone Itera.
+// build.mjs — esbuild build for the standalone IcedCoffee.
 //
 // The source files under src/ are kept byte-identical to the site's originals (see src/README-ish
 // comment at the top of use-infospector-look.ts) so they can be re-synced by copying. That means two
@@ -42,7 +42,7 @@ export function buildOptions({ outdir } = {}) {
     return {
         entryPoints: [path.join(here, "src", "standalone.tsx")],
         outdir: outdir || path.join(here, "dist"),
-        entryNames: "itera",
+        entryNames: "icedcoffee",
         chunkNames: "chunks/[name]-[hash]",
         bundle: true,
         splitting: true,
@@ -80,5 +80,5 @@ const isMain = (() => {
 
 if (isMain) {
     await runBuild();
-    console.log("Built dist/itera.js + dist/itera.css");
+    console.log("Built dist/icedcoffee.js + dist/icedcoffee.css");
 }

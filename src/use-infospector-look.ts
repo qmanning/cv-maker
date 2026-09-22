@@ -1,5 +1,5 @@
-// src/components/labs/itera/use-infospector-look.ts
-// Itera wears Infospector's UI: it loads Infospector's own host.css, uses its color helpers
+// src/components/labs/icedcoffee/use-infospector-look.ts
+// IcedCoffee wears Infospector's UI: it loads Infospector's own host.css, uses its color helpers
 // (lib.js) and reads/writes the same pt:* localStorage keys — so a look dialed in there (theme,
 // background, accent, glass) is the look here, and vice versa. Only the wiring is re-done in React;
 // it mirrors applyBg()/applyGlass() in public/labs/infospector/host.js.
@@ -30,7 +30,7 @@ export type ColorFmt = "hex" | "rgb" | "hsl" | "hsb";
 
 const BG_BASE: BgState = { pattern: "dots", opacity: 50, patternColor: null, groundColor: null, patternTheme: null, groundTheme: null, accent: null };
 const GLASS_BASE: GlassState = { blur: null, sat: null, light: null, dark: null, tint: null, color: null, colorTheme: null, backing: null, shine: null, shade: null, lightAngle: null, radius: null, pad: null };
-// Itera's defaults differ from Infospector's in two dials: its chrome floats over a white sheet of small type, so it
+// IcedCoffee's defaults differ from Infospector's in two dials: its chrome floats over a white sheet of small type, so it
 // needs a heavier blur and backing to stay legible (Infospector: blur 8, backing 35 over a dark canvas). They apply only
 // while a dial is untouched — a look the user has set (in either tool: the saved look is shared) always wins.
 const GLASS_DEFAULTS = { blur: 44, sat: 150, tint: 14, color: "#bbbbbc", backing: 56, shine: 0, shade: 0, lightAngle: 145, radius: 40, pad: 8 };

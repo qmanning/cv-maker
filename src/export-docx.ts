@@ -1,4 +1,4 @@
-// src/components/labs/itera/export-docx.ts
+// src/components/labs/icedcoffee/export-docx.ts
 // DOCX export. Word can't be pixel-matched, so this aims at a clean, ATS-readable document that
 // keeps the design's structure: it walks the LIVE page and reads computed styles, so it works for
 // any source HTML — real paragraphs and bullets, borderless tables for anything side by side (flex rows AND
@@ -228,6 +228,6 @@ export async function exportDocx(page: HTMLElement, opts: Opts): Promise<Blob> {
         ...(opts.paginate ? { footers: { default: footer } } : {}),
         children: f.children,
     }));
-    const doc = new Document({ title: opts.name, creator: "Itera", styles: { default: { document: { run: { font: "Helvetica", size: 18 }, paragraph: { spacing: { before: 0, after: 0 } } } } }, sections });
+    const doc = new Document({ title: opts.name, creator: "IcedCoffee", styles: { default: { document: { run: { font: "Helvetica", size: 18 }, paragraph: { spacing: { before: 0, after: 0 } } } } }, sections });
     return Packer.toBlob(doc);
 }

@@ -1,15 +1,15 @@
 {
-    "name": "itera",
-    "version": "0.2.4",
+    "name": "icedcoffee",
+    "version": "0.3.0",
     "description": "Edit-in-place résumé editor: your résumé is one HTML file. Flowing columns, fit-to-one-page, PDF/DOCX/PNG export. One prebuilt folder, no build.",
     "author": "Q Manning (https://qmanning.com)",
-    "homepage": "https://qmanning.com/labs/itera",
+    "homepage": "https://qmanning.com/labs/icedcoffee",
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/qmanning/itera.git"
+        "url": "git+https://github.com/qmanning/icedcoffee.git"
     },
     "bugs": {
-        "url": "https://github.com/qmanning/itera/issues"
+        "url": "https://github.com/qmanning/icedcoffee/issues"
     },
     "keywords": [
         "resume",

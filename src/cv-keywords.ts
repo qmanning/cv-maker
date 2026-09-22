@@ -1,6 +1,6 @@
-// src/components/labs/itera/cv-keywords.ts
+// src/components/labs/icedcoffee/cv-keywords.ts
 // ATS keywords: the words a job ad is screened for, and where the résumé / cover letter already use them.
-// Pure text work — the list comes from the person or their AI (it reads the ad; Itera never does), and
+// Pure text work — the list comes from the person or their AI (it reads the ad; IcedCoffee never does), and
 // nothing here edits the document: hits are reported as counts and as DOM Ranges for the CSS Custom
 // Highlight API, so marking them never touches the markup the editors own.
 

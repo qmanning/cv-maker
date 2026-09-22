@@ -1,6 +1,6 @@
 // Checks that templates/sample-resume.html still follows the conventions documented in its own header
 // comment ([data-cv-edit], .cv-flow, [data-cv-block], etc.) — a regression test for the template file
-// itself, not for Itera's code. Also guards against the fictional sample leaking any of the real
+// itself, not for IcedCoffee's code. Also guards against the fictional sample leaking any of the real
 // author's identifying info.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -116,7 +116,7 @@ test("cover letter: date, recipient, greeting, body, sign-off are editable top-l
         const el = page.querySelector("." + cls);
         assert.ok(el?.hasAttribute("data-cv-edit") && el.hasAttribute("data-cv-block") && el.parentElement === page, cls);
     }
-    const css = letter.querySelector("style").textContent, at = css.indexOf("/* itera:letter");
+    const css = letter.querySelector("style").textContent, at = css.indexOf("/* icedcoffee:letter");
     assert.ok(at > 0 && css.indexOf(".cl-body", at) > at && css.lastIndexOf(".cv-header", at) >= 0);
     assert.doesNotMatch(letterHtml, /<script/i);
 });

@@ -1,10 +1,10 @@
-// electron/main.mjs — Itera as a desktop app. It wraps the SAME prebuilt folder the web version
+// electron/main.mjs — IcedCoffee as a desktop app. It wraps the SAME prebuilt folder the web version
 // ships (../index.html + dist/ + vendor/ + templates/); nothing in src/ knows Electron exists.
 //
-//   app://itera/…           the folder, served read-only from an allowlist (file:// can't fetch() the
+//   app://icedcoffee/…           the folder, served read-only from an allowlist (file:// can't fetch() the
 //                              template or load the ES-module chunks; a real origin also keeps localStorage)
-//   app://itera/config.js   generated here: points the editor's existing `exportServer` option at ↓
-//   app://itera/__export    POST — the ../server.mjs contract, answered by Electron's own Chromium (export.mjs)
+//   app://icedcoffee/config.js   generated here: points the editor's existing `exportServer` option at ↓
+//   app://icedcoffee/__export    POST — the ../server.mjs contract, answered by Electron's own Chromium (export.mjs)
 import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, net, shell } from "electron";
 import fs from "node:fs";
 import path from "node:path";
@@ -18,13 +18,13 @@ import { setupUpdater } from "./updater.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = app.isPackaged ? path.join(here, "web") : path.resolve(here, "..");   // the prebuilt folder (electron-builder copies it to web/)
-const ORIGIN = "app://itera";
+const ORIGIN = "app://icedcoffee";
 const SERVED = [/^\/index\.html$/, /^\/(dist|vendor|templates|brand)\/[^\0]+$/];
 const MAX_BODY = 25 * 1024 * 1024;
 const SMOKE_DIR = process.env.CVM_SMOKE_DIR || "";           // set by smoke.mjs: drive one PDF + one PNG export, keep the evidence, quit
 
 if (SMOKE_DIR) { app.setPath("userData", path.join(SMOKE_DIR, "userData")); fs.mkdirSync(path.join(SMOKE_DIR, "downloads"), { recursive: true }); app.setPath("downloads", path.join(SMOKE_DIR, "downloads")); }   // a clean profile: no leftovers in, none out
-app.setName("Itera");
+app.setName("IcedCoffee");
 let files = null, assistant = null, editor = null, mcp = null, updater = null, lastExportDir = "";
 const openWhenReady = [];                                    // macOS can deliver open-file (double-clicked document, Dock drop) before we're ready
 app.on("open-file", (e, file) => { e.preventDefault(); if (files) files.openPath(file); else openWhenReady.push(file); });
@@ -67,7 +67,7 @@ async function handleExport(req) {
 
 async function handleApp(req) {
     const url = new URL(req.url);
-    if (url.host !== "itera") return new Response("", { status: 404 });
+    if (url.host !== "icedcoffee") return new Response("", { status: 404 });
     if (url.pathname === "/__export") return req.method === "POST" ? handleExport(req) : json(405, { error: "POST only" });
     if (req.method !== "GET" && req.method !== "HEAD") return new Response("", { status: 405 });
     if (url.pathname.startsWith("/__welcome/")) {   // the sheet's two buttons are plain links to here: act, close it, navigate nowhere
@@ -97,7 +97,10 @@ async function handleApp(req) {
 function createWindow() {
     const win = new BrowserWindow({
         width: 1320, height: 960, minWidth: 720, minHeight: 520,
-        show: !SMOKE_DIR, backgroundColor: "#111214", title: "Itera",
+        show: !SMOKE_DIR, backgroundColor: "#111214", title: "IcedCoffee",
+        // No opaque OS title bar to clash with the chosen background: the app's own canvas fills to the
+        // top and the traffic lights float over it. macOS-only options; harmless on other platforms.
+        titleBarStyle: "hidden", trafficLightPosition: { x: 16, y: 16 },
         webPreferences: { preload: path.join(here, "preload.cjs"), contextIsolation: true, nodeIntegration: false, sandbox: true, spellcheck: true, backgroundThrottling: !SMOKE_DIR },
     });
     files.attach(win); editor = win;
@@ -123,9 +126,9 @@ function createWindow() {
 }
 
 /* ---- macOS: run from Applications, not from the disk image. From the image the app gets a random temporary path
-   (App Translocation), which breaks anything that remembers where Itera lives — above all the MCP connection. ---- */
+   (App Translocation), which breaks anything that remembers where IcedCoffee lives — above all the MCP connection. ---- */
 function installedCopy() {
-    const bundle = path.resolve(process.execPath, "..", "..", "..");   // …/Itera.app/Contents/MacOS/Itera
+    const bundle = path.resolve(process.execPath, "..", "..", "..");   // …/IcedCoffee.app/Contents/MacOS/IcedCoffee
     const home = process.env.CVM_INSTALL_DIR || "/Applications";       // (the env override is for tests)
     let dir = home; try { fs.accessSync(dir, fs.constants.W_OK); } catch { dir = path.join(app.getPath("home"), "Applications"); }
     return { bundle, dest: path.join(dir, path.basename(bundle)) };
@@ -138,7 +141,7 @@ function moveToApplications() {
     const { bundle, dest } = installedCopy();
     try {
         if (fs.existsSync(dest)) {
-            const replace = process.env.CVM_INSTALL_DIR ? 1 : dialog.showMessageBoxSync({ type: "question", buttons: ["Cancel", "Replace"], defaultId: 1, cancelId: 0, message: "There is already a Itera in your Applications folder.", detail: "Replace it with this one?" });
+            const replace = process.env.CVM_INSTALL_DIR ? 1 : dialog.showMessageBoxSync({ type: "question", buttons: ["Cancel", "Replace"], defaultId: 1, cancelId: 0, message: "There is already a IcedCoffee in your Applications folder.", detail: "Replace it with this one?" });
             if (replace !== 1) return false;
             fs.rmSync(dest, { recursive: true, force: true });
         }
@@ -149,22 +152,22 @@ function moveToApplications() {
         if (!process.env.CVM_INSTALL_NO_RELAUNCH) spawn("/usr/bin/open", ["-n", dest], { detached: true, stdio: "ignore" }).unref();
         setTimeout(() => app.exit(0), 300);
         return true;
-    } catch (e) { dialog.showErrorBox("Couldn't install Itera", String(e?.message || e) + "\n\nDrag Itera into your Applications folder yourself, then open it from there."); return false; }
+    } catch (e) { dialog.showErrorBox("Couldn't install IcedCoffee", String(e?.message || e) + "\n\nDrag IcedCoffee into your Applications folder yourself, then open it from there."); return false; }
 }
 function offerMoveToApplications(parent) {
     if (process.platform !== "darwin" || !app.isPackaged || SMOKE_DIR || runningFromInstall()) return false;
-    const choice = process.env.CVM_INSTALL_AUTO ? 0 : dialog.showMessageBoxSync(parent, { type: "question", buttons: ["Install in Applications", "Not Now"], defaultId: 0, cancelId: 1, message: "Install Itera in your Applications folder?", detail: "You're running it from the disk image. Itera will copy itself to Applications and reopen from there. After that you can eject the disk image, and macOS won't ask about it again." });
+    const choice = process.env.CVM_INSTALL_AUTO ? 0 : dialog.showMessageBoxSync(parent, { type: "question", buttons: ["Install in Applications", "Not Now"], defaultId: 0, cancelId: 1, message: "Install IcedCoffee in your Applications folder?", detail: "You're running it from the disk image. IcedCoffee will copy itself to Applications and reopen from there. After that you can eject the disk image, and macOS won't ask about it again." });
     return choice === 0 ? moveToApplications() : false;
 }
 
-/* ---- the welcome sheet: shown once on first run, and from Help ▸ Welcome to Itera ---- */
+/* ---- the welcome sheet: shown once on first run, and from Help ▸ Welcome to IcedCoffee ---- */
 let welcome = null;
 function showWelcome(parent) {
     if (!parent || parent.isDestroyed()) return;
     if (welcome && !welcome.isDestroyed()) return welcome.focus();
     welcome = new BrowserWindow({
         parent, modal: true, show: false, width: 620, height: 680, useContentSize: true, resizable: false, minimizable: false, maximizable: false, fullscreenable: false,
-        backgroundColor: "#14161c", title: "Welcome to Itera",
+        backgroundColor: "#14161c", title: "Welcome to IcedCoffee",
         webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, javascript: false },
     });
     welcome.setMenuBarVisibility(false);
@@ -300,14 +303,14 @@ async function smoke(win) {
     process.env.CVM_CLAUDE_CONFIG = claudeFile; process.env.CODEX_HOME = codexHome;
     mcp.connectClaude(); mcp.connectCodex();
     const cj = JSON.parse(fs.readFileSync(claudeFile, "utf8")), toml = fs.readFileSync(path.join(codexHome, "config.toml"), "utf8");
-    fileSteps.claudeConfigWritten = cj.theme === "dark" && !!cj.mcpServers.other && cj.mcpServers.itera.env.ELECTRON_RUN_AS_NODE === "1" && !cj.mcpServers["cv-maker"] && fs.existsSync(claudeFile + ".itera-backup") && mcp.claudeState().current;
-    fileSteps.codexConfigWritten = /model = "x"/.test(toml) && /\[mcp_servers\.other\]/.test(toml) && /\[profiles\.p\]/.test(toml) && !/old\/place|OLD = /.test(toml) && (toml.match(/\[mcp_servers\.itera\]/g) || []).length === 1 && !/mcp_servers\.cv-maker/.test(toml) && /ELECTRON_RUN_AS_NODE = "1"/.test(toml) && mcp.codexState().current;
+    fileSteps.claudeConfigWritten = cj.theme === "dark" && !!cj.mcpServers.other && cj.mcpServers.icedcoffee.env.ELECTRON_RUN_AS_NODE === "1" && !cj.mcpServers["cv-maker"] && fs.existsSync(claudeFile + ".icedcoffee-backup") && mcp.claudeState().current;
+    fileSteps.codexConfigWritten = /model = "x"/.test(toml) && /\[mcp_servers\.other\]/.test(toml) && /\[profiles\.p\]/.test(toml) && !/old\/place|OLD = /.test(toml) && (toml.match(/\[mcp_servers\.icedcoffee\]/g) || []).length === 1 && !/mcp_servers\.cv-maker/.test(toml) && /ELECTRON_RUN_AS_NODE = "1"/.test(toml) && mcp.codexState().current;
     // the pill under the page follows: it names the connected apps; after disconnecting it invites again; its ✕ sends it away for good
     await until("the pill to name the connected apps", () => js(`/Claude Desktop and ChatGPT \\/ Codex connected/.test(document.querySelector(".cvm-ask-connect")?.textContent || "")`));
     fileSteps.pillShowsConnected = true;
     fs.writeFileSync(path.join(SMOKE_DIR, "pill.png"), (await win.webContents.capturePage()).toPNG());
     mcp.disconnectClaude(); mcp.disconnectCodex();
-    fileSteps.configsCleanedUp = !JSON.parse(fs.readFileSync(claudeFile, "utf8")).mcpServers.itera && !/mcp_servers\.(itera|cv-maker)/.test(fs.readFileSync(path.join(codexHome, "config.toml"), "utf8"));
+    fileSteps.configsCleanedUp = !JSON.parse(fs.readFileSync(claudeFile, "utf8")).mcpServers.icedcoffee && !/mcp_servers\.(icedcoffee|cv-maker)/.test(fs.readFileSync(path.join(codexHome, "config.toml"), "utf8"));
     fs.writeFileSync(path.join(SMOKE_DIR, "codex-config.toml"), toml);
     await until("the pill to invite again after disconnecting", () => js(`/Connect your AI/.test(document.querySelector(".cvm-ask-connect")?.textContent || "")`));
     await js(`document.querySelector(".cvm-ask-connect-x").click()`);
@@ -369,7 +372,7 @@ async function smoke(win) {
     const tool = async (name, args = {}) => { const r = (await rpc("tools/call", { name, arguments: args })).result; return { isError: !!r.isError, value: (() => { try { return JSON.parse(r.content[0].text); } catch { return r.content[0].text; } })() }; };
     const init = (await rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "claude-ai", version: "0" } })).result;
     child.stdin.write(JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }) + "\n");
-    fileSteps.mcpInitialized = init.serverInfo?.name === "itera" && !!init.capabilities?.tools && /get_document/.test(init.instructions || "");
+    fileSteps.mcpInitialized = init.serverInfo?.name === "icedcoffee" && !!init.capabilities?.tools && /get_document/.test(init.instructions || "");
     fileSteps.mcpTools = ((await rpc("tools/list", {})).result.tools || []).map((t) => t.name).join(",") === "get_document,edit_document,undo_last_edit,export_document,list_documents,open_document,save_document,get_page_setup,set_page_setup,set_keywords,get_keywords,new_document,list_images,replace_image";
     const seen = (await tool("get_document", { document: "resume" })).value;
     const job = seen.blocks.find((b) => b.kind === "job");
@@ -409,7 +412,7 @@ async function smoke(win) {
     const back = await tool("open_document", { name: "saved" });
     await until("the MCP-opened document to show", () => files.state().current === savedFile, 8000);
     fileSteps.mcpOpened = !back.isError && back.value.opened === "saved.html" && back.value.document === "resume" && (await tool("get_document", { document: "resume" })).value.file === "saved.html";
-    // the cover letter: the same tools with document: "cover_letter" — Itera shows it, and its header is the résumé's, read-only
+    // the cover letter: the same tools with document: "cover_letter" — IcedCoffee shows it, and its header is the résumé's, read-only
     const L = { document: "cover_letter" };
     const seenLetter = (await tool("get_document", L)).value;
     const headerMirrored = await js(`(() => { const h = document.querySelector('.cv-page header[data-cv-mirror="header"]'); return !!h && !h.querySelector("[contenteditable=true]") && h.textContent.includes("Edited By Another Program") === document.querySelector(".cv-page") .textContent.includes("Edited By Another Program"); })()`);
@@ -419,7 +422,7 @@ async function smoke(win) {
     fileSteps.mcpLetterEdited = !letterEdit.isError && letterEdit.value.document === "cover_letter" && letterEdit.value.applied === 1 && (await js(`document.querySelector(".cl-greeting").textContent.includes("MCP Hiring Team")`));
     const letterSaved = await tool("save_document", { ...L, save_as: "MCP Letter" });
     const letterOnDisk = fs.existsSync(path.join(SMOKE_DIR, "MCP Letter.html")) ? fs.readFileSync(path.join(SMOKE_DIR, "MCP Letter.html"), "utf8") : "";
-    fileSteps.mcpLetterSaved = !letterSaved.isError && letterSaved.value.document === "cover_letter" && /MCP Hiring Team/.test(letterOnDisk) && /data-cv-mirror="header"/.test(letterOnDisk) && /itera:letter/.test(letterOnDisk);
+    fileSteps.mcpLetterSaved = !letterSaved.isError && letterSaved.value.document === "cover_letter" && /MCP Hiring Team/.test(letterOnDisk) && /data-cv-mirror="header"/.test(letterOnDisk) && /icedcoffee:letter/.test(letterOnDisk);
     const docs2 = (await tool("list_documents")).value;
     fileSteps.mcpTwoFiles = docs2.cover_letter.open === "MCP Letter.html" && docs2.resume.open === "saved.html" && docs2.cover_letter.documents.length === 1 && !docs2.resume.documents.some((d) => d.name === "MCP Letter");
     fileSteps.mcpLetterExported = /mcp-letter\.pdf$/.test((await tool("export_document", { ...L, format: "pdf" })).value.saved || "");
@@ -442,7 +445,7 @@ async function smoke(win) {
     /* the welcome sheet: it loads, and its primary button dismisses it */
     showWelcome(win);
     const sheet = welcome;
-    await until("the welcome sheet", () => !!sheet && !sheet.webContents.isLoading() && sheet.webContents.getTitle() === "Welcome to Itera");
+    await until("the welcome sheet", () => !!sheet && !sheet.webContents.isLoading() && sheet.webContents.getTitle() === "Welcome to IcedCoffee");
     fileSteps.welcomeLoaded = true;
     sheet.webContents.loadURL(ORIGIN + "/__welcome/start").catch(() => {});   // what the primary button links to (a hidden window takes no clicks)
     await until("the welcome sheet to close", () => sheet.isDestroyed(), 8000);

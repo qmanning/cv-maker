@@ -14,25 +14,25 @@ import { normalize } from "./assistant/prompt.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url));
 // catalog.mjs ships LOOSE beside mcp/server.mjs (extraResources), not inside the asar — the app and the stdio server share
 // the one file. electron-builder keeps that mcp/ folder out of the asar, so import it by absolute path from where it really
-// is, whether Itera runs packaged (process.resourcesPath) or from source (here).
+// is, whether IcedCoffee runs packaged (process.resourcesPath) or from source (here).
 const { INSTRUCTIONS, TOOLS, callTool } = await import(pathToFileURL(app.isPackaged ? path.join(process.resourcesPath, "mcp", "catalog.mjs") : path.join(here, "mcp", "catalog.mjs")).href);
-const SERVER_NAME = "itera";
+const SERVER_NAME = "icedcoffee";
 const LEGACY_NAMES = ["cv-maker"];   // what this app called itself until September 2026 — cleaned up whenever we write a config
 
 export function setupMcp({ editorWindow, currentFile, files = () => null, socketPath = "" }) {
-    // the person's own house rules for any AI that connects — folded into the MCP instructions Itera hands out
+    // the person's own house rules for any AI that connects — folded into the MCP instructions IcedCoffee hands out
     const notesPath = path.join(app.getPath("userData"), "ai-notes.txt");
     const readNotes = () => { try { return fs.readFileSync(notesPath, "utf8").trim(); } catch { return ""; } };
     const writeNotes = (text) => { const t = String(text || "").slice(0, 4000).trim(); try { t ? fs.writeFileSync(notesPath, t + "\n") : fs.rmSync(notesPath, { force: true }); } catch { /* not worth a dialog */ } return t; };
     const instructionsNow = () => { const n = readNotes(); return n ? INSTRUCTIONS + "\n\nHouse rules from the person who owns this résumé — follow them unless they tell you otherwise in the moment:\n" + n : INSTRUCTIONS; };
-    const SOCKET = socketPath || (process.platform === "win32" ? `\\\\.\\pipe\\itera-mcp-${os.userInfo().username}` : path.join(app.getPath("userData"), "mcp.sock"));
+    const SOCKET = socketPath || (process.platform === "win32" ? `\\\\.\\pipe\\icedcoffee-mcp-${os.userInfo().username}` : path.join(app.getPath("userData"), "mcp.sock"));
     let seq = 0, clients = 0, lastSeen = 0; const pending = new Map(), listeners = new Set();
     const changed = () => listeners.forEach((fn) => fn());
 
     /* ---- ask the editor (its handlers are CvRemoteHandlers in ../src/cv-assistant.ts, wired up in preload.cjs) ---- */
     ipcMain.on("remote:result", (e, m) => { if (e.sender !== editorWindow()?.webContents) return; const w = pending.get(m?.id); if (!w) return; pending.delete(m.id); m.ok ? w.resolve(m.value) : w.reject(new Error(m.error || "The editor couldn't do that.")); });
     const editor = (method, args = []) => new Promise((resolve, reject) => {
-        const win = editorWindow(); if (!win || win.isDestroyed()) return reject(new Error("Itera has no résumé window open."));
+        const win = editorWindow(); if (!win || win.isDestroyed()) return reject(new Error("IcedCoffee has no résumé window open."));
         const id = ++seq; pending.set(id, { resolve, reject });
         win.webContents.send("remote:call", { id, method, args });
         setTimeout(() => { if (pending.delete(id)) reject(new Error("The editor didn't answer (is a résumé open?).")); }, 30000);
@@ -41,9 +41,9 @@ export function setupMcp({ editorWindow, currentFile, files = () => null, socket
     async function handle(method, params, clientName) {
         lastSeen = Date.now(); changed();
         // the catalogue comes from THIS app, not from the stdio process an AI app started hours ago (see mcp/catalog.mjs)
-        if (method === "mcp:hello") return { app: "Itera", version: app.getVersion(), tools: TOOLS, instructions: instructionsNow() };
+        if (method === "mcp:hello") return { app: "IcedCoffee", version: app.getVersion(), tools: TOOLS, instructions: instructionsNow() };
         if (method === "mcp:call") return callTool(String(params?.name || ""), params?.args || {}, (inner, p) => handle(inner, p, clientName));
-        const shellFiles = () => { const f = files(); if (!f) throw new Error("Itera is still starting. Try again in a moment."); return f; };
+        const shellFiles = () => { const f = files(); if (!f) throw new Error("IcedCoffee is still starting. Try again in a moment."); return f; };
         const want = params?.document == null || params.document === "" ? null : (/letter/i.test(String(params.document)) ? "letter" : "resume");
         const named = (k) => (k === "letter" ? "cover_letter" : "resume");
         // anything that reads or changes a document acts on the one on the sheet — so put the one they named there first
@@ -124,9 +124,9 @@ export function setupMcp({ editorWindow, currentFile, files = () => null, socket
         readline.createInterface({ input: sock }).on("line", async (line) => {
             let m; try { m = JSON.parse(line); } catch { return; }
             try { let result = await handle(m.method, m.params, String(m.client || "Your AI").slice(0, 40));
-                // a stdio server from BEFORE the relay (its AI app hasn't been restarted since Itera was updated) can't learn about new
+                // a stdio server from BEFORE the relay (its AI app hasn't been restarted since IcedCoffee was updated) can't learn about new
                 // tools — so say it where the model will read it, and the model can tell the person
-                if (!m.relay && m.method === "describe" && result && typeof result === "object") result = { itera_notice: `Itera was updated to ${app.getVersion()} and has tools this connection cannot see yet (cover letter, documents, page setup, images, ATS keywords). Tell the person: quit and reopen this AI app once (not just reconnect) to get them.`, ...result };
+                if (!m.relay && m.method === "describe" && result && typeof result === "object") result = { itera_notice: `IcedCoffee was updated to ${app.getVersion()} and has tools this connection cannot see yet (cover letter, documents, page setup, images, ATS keywords). Tell the person: quit and reopen this AI app once (not just reconnect) to get them.`, ...result };
                 sock.write(JSON.stringify({ id: m.id, result }) + "\n"); }
             catch (e) { sock.write(JSON.stringify({ id: m.id, error: String(e?.message || e) }) + "\n"); }
         });
@@ -143,7 +143,7 @@ export function setupMcp({ editorWindow, currentFile, files = () => null, socket
     // macOS runs a quarantined app that hasn't been moved by the person from a random, temporary, read-only path
     // ("App Translocation"), and a disk image goes away when ejected — neither is a path to hand to another app
     const temporaryHome = () => app.isPackaged && (/\/AppTranslocation\//.test(process.execPath) || process.execPath.startsWith("/Volumes/"));
-    const needsMove = "Install Itera in your Applications folder first. Right now it is running from the disk image, so your AI app would lose track of it after a restart.";
+    const needsMove = "Install IcedCoffee in your Applications folder first. Right now it is running from the disk image, so your AI app would lose track of it after a restart.";
     const entry = () => ({ command: process.execPath, args: [serverScript], env: { ELECTRON_RUN_AS_NODE: "1" } });
 
     const claudeConfigPath = () => process.env.CVM_CLAUDE_CONFIG ? process.env.CVM_CLAUDE_CONFIG : process.platform === "darwin" ? path.join(os.homedir(), "Library", "Application Support", "Claude", "claude_desktop_config.json")
@@ -162,8 +162,8 @@ export function setupMcp({ editorWindow, currentFile, files = () => null, socket
         let config = {};
         if (fs.existsSync(file)) {
             const raw = fs.readFileSync(file, "utf8");
-            try { config = raw.trim() ? JSON.parse(raw) : {}; } catch { throw new Error("Claude's settings file isn't valid JSON, so Itera left it alone. Use “Copy the settings” instead."); }
-            fs.writeFileSync(file + ".itera-backup", raw);
+            try { config = raw.trim() ? JSON.parse(raw) : {}; } catch { throw new Error("Claude's settings file isn't valid JSON, so IcedCoffee left it alone. Use “Copy the settings” instead."); }
+            fs.writeFileSync(file + ".icedcoffee-backup", raw);
         }
         if (!config || typeof config !== "object" || Array.isArray(config)) config = {};
         config.mcpServers = { ...(config.mcpServers || {}), [SERVER_NAME]: entry() };
@@ -193,7 +193,7 @@ export function setupMcp({ editorWindow, currentFile, files = () => null, socket
         const file = codexConfigPath();
         if (!fs.existsSync(path.dirname(file))) throw new Error("ChatGPT / Codex doesn't seem to be set up on this computer yet.");
         const raw = readCodex() ?? "";
-        if (raw) fs.writeFileSync(file + ".itera-backup", raw);
+        if (raw) fs.writeFileSync(file + ".icedcoffee-backup", raw);
         const rest = stripOurs(raw);
         fs.writeFileSync(file, (rest ? rest + "\n\n" : "") + codexBlock());
         return codexState();
@@ -204,7 +204,7 @@ export function setupMcp({ editorWindow, currentFile, files = () => null, socket
         return codexState();
     }
 
-    // what the editor's pill shows: which apps have been told about Itera, and how many are attached right now
+    // what the editor's pill shows: which apps have been told about IcedCoffee, and how many are attached right now
     const editorStatus = () => ({ apps: [claudeState().connected && claudeState().current ? "Claude Desktop" : "", codexState().connected && codexState().current ? "ChatGPT / Codex" : ""].filter(Boolean), live: clients });
     const tellEditor = () => { const w = editorWindow(); if (w && !w.isDestroyed()) w.webContents.send("remote:status-changed", editorStatus()); };
     ipcMain.handle("remote:status", (e) => (e.sender === editorWindow()?.webContents ? editorStatus() : { apps: [], live: 0 }));

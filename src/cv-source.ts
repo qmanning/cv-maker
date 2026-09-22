@@ -1,5 +1,5 @@
-// src/components/labs/itera/cv-source.ts
-// Itera's pure, DOM-parsing/string-building helpers — pulled out of CvMaker.tsx so they can be
+// src/components/labs/icedcoffee/cv-source.ts
+// IcedCoffee's pure, DOM-parsing/string-building helpers — pulled out of CvMaker.tsx so they can be
 // unit-tested without mounting the component. No React, no fetch, no localStorage: just source text in,
 // source text out.
 
@@ -31,11 +31,14 @@ export type DocKind = "resume" | "letter";
 /** a cover letter says so on its page (`data-cv-kind="letter"`) or carries a mirrored header; everything else is a résumé */
 export const docKind = (pageHtml: string): DocKind => (/data-cv-kind="letter"|data-cv-mirror="header"/.test(pageHtml) ? "letter" : "resume");
 
-const LETTER_MARK = "/* itera:letter";
+const LETTER_MARK = "/* icedcoffee:letter";
+const LETTER_MARK_LEGACY = "/* icedcoffee:letter";   // files written before the IcedCoffee rename still open
+/** index of the letter marker (new or legacy), or -1 */
+const letterMarkIndex = (css: string): number => { const i = css.indexOf(LETTER_MARK); return i >= 0 ? i : css.indexOf(LETTER_MARK_LEGACY); };
 /** a letter file's CSS = a snapshot of the résumé's styles + (after the marker) the letter's own. This is the letter's own. */
-export const letterOwnCss = (css: string): string => { const i = css.indexOf(LETTER_MARK); return i < 0 ? css : css.slice(i); };
+export const letterOwnCss = (css: string): string => { const i = letterMarkIndex(css); return i < 0 ? css : css.slice(i); };
 /** …and this puts the OPEN résumé's styles back in front, so the mirrored header always looks like the résumé's */
-export const letterCss = (resumeCss: string, css: string): string => (css.indexOf(LETTER_MARK) < 0 ? css : resumeCss.trimEnd() + "\n" + letterOwnCss(css));
+export const letterCss = (resumeCss: string, css: string): string => (letterMarkIndex(css) < 0 ? css : resumeCss.trimEnd() + "\n" + letterOwnCss(css));
 
 /** the letter's header IS the résumé's header: copy it in (read-only — no editable regions), keeping the letter's body.
  *  The résumé's header is its `[data-cv-header]`, else the page's first <header>. No header on either side → unchanged. */

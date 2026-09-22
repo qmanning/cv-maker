@@ -17,7 +17,7 @@ test("newer(): semver order, v-prefix, pre-releases, junk", () => {
 });
 
 test("pickAssets(): only this platform's archive and its signature", () => {
-    const rel = { tag_name: "v0.2.0", html_url: "https://example/notes", assets: ["Itera-0.2.0-mac-arm64.zip", "Itera-0.2.0-mac-arm64.zip.sig", "Itera-0.2.0-mac-x64.zip", "Itera-0.2.0-mac-arm64.dmg"].map((name) => ({ name, size: 5, browser_download_url: "https://example/" + name })) };
+    const rel = { tag_name: "v0.2.0", html_url: "https://example/notes", assets: ["IcedCoffee-0.2.0-mac-arm64.zip", "IcedCoffee-0.2.0-mac-arm64.zip.sig", "IcedCoffee-0.2.0-mac-x64.zip", "IcedCoffee-0.2.0-mac-arm64.dmg"].map((name) => ({ name, size: 5, browser_download_url: "https://example/" + name })) };
     const a = pickAssets(rel, "darwin", "arm64");
     assert.equal(a.version, "0.2.0"); assert.match(a.url, /mac-arm64\.zip$/); assert.match(a.sigUrl, /mac-arm64\.zip\.sig$/);
     const x = pickAssets(rel, "darwin", "x64");
@@ -28,10 +28,10 @@ test("pickAssets(): only this platform's archive and its signature", () => {
 test("verifyUpdate(): accepts the publisher's signature, refuses everything else", () => {
     const { publicKey, privateKey } = crypto.generateKeyPairSync("ed25519");
     const pub = publicKey.export({ type: "spki", format: "pem" }), priv = privateKey.export({ type: "pkcs8", format: "pem" });
-    const data = Buffer.from("the new Itera"), sig = signUpdate(data, priv);
+    const data = Buffer.from("the new IcedCoffee"), sig = signUpdate(data, priv);
     assert.equal(verifyUpdate(data, sig, pub), true);
-    assert.equal(verifyUpdate(Buffer.from("the new Itera, tampered"), sig, pub), false);
-    assert.equal(verifyUpdate(data, sig), false);                                  // signed by someone who isn't Itera's publisher
+    assert.equal(verifyUpdate(Buffer.from("the new IcedCoffee, tampered"), sig, pub), false);
+    assert.equal(verifyUpdate(data, sig), false);                                  // signed by someone who isn't IcedCoffee's publisher
     assert.equal(verifyUpdate(data, "", pub), false);
     assert.equal(verifyUpdate(data, "not base64 at all", pub), false);
     assert.equal(verifyUpdate(data, sig.slice(0, 20), pub), false);
