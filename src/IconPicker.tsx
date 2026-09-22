@@ -15,8 +15,9 @@ import type { ColorFmt } from "./use-infospector-look";
 type Entry = { key: string; name: string; lib: "lucide" | "tabler"; Comp: ComponentType<{ color?: string }> };
 const LUCIDE: Entry[] = Object.keys(lucideIcons).filter((n) => !n.endsWith("Icon"))
     .map((n) => ({ key: "l:" + n, name: n, lib: "lucide", Comp: lucideIcons[n as keyof typeof lucideIcons] as ComponentType<{ color?: string }> }));
-const TABLER: Entry[] = Object.keys(tabler).filter((n) => /^Icon[A-Z]/.test(n) && !n.endsWith("Filled") && typeof (tabler as Record<string, unknown>)[n] === "object")
-    .map((n) => ({ key: "t:" + n, name: n.replace(/^Icon/, ""), lib: "tabler", Comp: (tabler as Record<string, ComponentType<{ color?: string }>>)[n] }));
+const tablerMap = tabler as unknown as Record<string, ComponentType<{ color?: string }>>;
+const TABLER: Entry[] = Object.keys(tabler).filter((n) => /^Icon[A-Z]/.test(n) && !n.endsWith("Filled") && typeof (tabler as unknown as Record<string, unknown>)[n] === "object")
+    .map((n) => ({ key: "t:" + n, name: n.replace(/^Icon/, ""), lib: "tabler", Comp: tablerMap[n] }));
 const ALL: Entry[] = [...LUCIDE, ...TABLER].sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()) || a.lib.localeCompare(b.lib));
 const CAP = 300;   // how many cells to render at once (a search narrows well below this)
 
