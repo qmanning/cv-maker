@@ -63,7 +63,7 @@ test("parseSource strips javascript: and other script-scheme URLs (they would ru
 
 test("parseSource strips script schemes disguised with tabs/newlines/controls (browsers strip those before parsing)", () => {
     // each of these reads as `javascript:alert(1)` to a browser's URL parser, so it must not survive
-    const sneaky = ["java\tscript:alert(1)", "java\nscript:alert(1)", "java\rscript:alert(1)", "javascript:alert(1)", " \t javascript:alert(1)", "JAVA\tSCRIPT:alert(1)"];
+    const sneaky = ["java\tscript:alert(1)", "java\nscript:alert(1)", "java\rscript:alert(1)", "\u0001javascript:alert(1)", " \t javascript:alert(1)", "JAVA\tSCRIPT:alert(1)"];
     const doc = new DOMParser().parseFromString('<html><body><div class="cv-page"></div></body></html>', "text/html");
     const page = doc.querySelector(".cv-page");
     sneaky.forEach((href, i) => { const a = doc.createElement("a"); a.id = "a" + i; a.setAttribute("href", href); a.textContent = "x"; page.append(a); });
