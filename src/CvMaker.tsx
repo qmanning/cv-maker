@@ -26,7 +26,7 @@ import { attachColorPicker, toHex, useInfospectorLook } from "./use-infospector-
 import { LookMenu } from "./LookMenu";
 import { applyOps, describeDocument, type CvAssistant, type CvRemote, type CvRemoteHandlers, type CvRemoteStatus, type RemotePage } from "./cv-assistant";
 import { coverage, findRanges, normalizeKeywords, pageText, type KeywordUse } from "./cv-keywords";
-import { FOOTER_PT, GAP_PT, MIN_FIT, PAPERS, PT, type DocKind, type PaperId, type Source, docKind, fullHtml, letterCss, mirrorHeader, pageBoxCss, parseSource, slugify, stepZoom } from "./cv-source";
+import { FOOTER_PT, GAP_PT, MIN_FIT, PAPERS, PT, type DocKind, type PaperId, type Source, docKind, fullHtml, letterCss, migrateCss, mirrorHeader, pageBoxCss, parseSource, slugify, stepZoom } from "./cv-source";
 
 const LOCAL_KEY = "cvm:doc", LETTER_KEY = "cvm:letter", KW_KEY = "cvm:keywords", KW_POS_KEY = "cvm:kw-pos", KW_SIZE_KEY = "cvm:kw-size", START_SIZE_KEY = "cvm:startsize", HOME_KEY = "cvm:home", VIEW_ZOOM_KEY = "cvm:viewzoom";
 const stored = (k: string) => { try { return localStorage.getItem(k) || ""; } catch { return ""; } };
@@ -106,7 +106,7 @@ const REVEAL: Record<string, number> = { glyph: 1, omni: 2, size: 3, paginate: 4
 type TourStep = { at: string; title: string; body: string; side?: "letter" | "brandMenu" | "bgOptions"; place?: "right" };
 const TOUR: TourStep[] = [
     { at: '[data-tour="glyph"]', title: "Enjoy some IcedCoffee!", body: "IcedCoffee is an AI-enabled résumé and CV tool. Point your AI at a job posting and it rewrites the wording and terms of your résumé to match it." },
-    { at: '[data-tour="omni"]', title: "Your document", body: "Edit the sample résumé, or open your own — import a .docx or .html file. Once you've saved a few, reopen recent ones right here." },
+    { at: '[data-tour="omni"]', title: "Your document", body: "Edit the sample résumé, or open your own — every IcedCoffee document is a plain .html file. Once you've saved a few, reopen recent ones right here." },
     { at: '[data-tour="size"]', title: "Size & zoom", body: "IcedCoffee edits at full width by default. Change the paper size or fit here, or press ⌘/Ctrl with + or − to zoom in and out. It remembers the size you set and reopens every document there." },
     { at: '[data-tour="paginate"]', title: "Pagination", body: "Switch between real pages — with page numbers, so you see exactly where each one ends — and one continuous sheet. (Turn on “Fit to one page” under Size to shrink the design onto a single page.)" },
     { at: '[data-tour="spell"]', title: "Spellcheck", body: "Turn the browser's spellcheck on or off for the whole document: red squiggles under unrecognized words while you write, off for a clean view." },
@@ -138,8 +138,19 @@ async function fetchSource(templateUrl: string): Promise<string> {
 
 // PNG with no server: lay the export HTML out in an off-screen iframe and let html-to-image (the build Infospector
 // ships) draw it at 2×. Columns, fonts and the fit-to-page zoom all survive because the browser itself renders it.
+// html-to-image draws by cloning the DOM into an <svg><foreignObject> and copying each node's COMPUTED style
+// onto the clone. For a block the browser has fragmented across a CSS multi-column container (.cv-flow), the
+// computed width/height is that of ONE FRAGMENT — 372px, not the 749px element. Baking that back on as an
+// explicit size makes the clone re-fragment inside the foreignObject and spill a THIRD column off the page.
+// Overriding it on the live document doesn't help: getComputedStyle still reports the used fragment size. So
+// the override has to land in the clone, where a stylesheet beats the copied inline styles (they carry no
+// !important) and the flow lays out from the real CSS again. Electron exports don't go through any of this —
+// they screenshot a real page — which is why this only ever showed up in the browser.
+const UNBAKE_FRAGMENTS = ".cv-flow, .cv-flow * { width: auto !important; height: auto !important; }";
+const SVG_DATA_PREFIX = "data:image/svg+xml;charset=utf-8,";
+
 async function rasterize(html: string, widthPt: number, heightPt: number, libUrl: string): Promise<Blob> {
-    type Lib = { toBlob: (node: HTMLElement, opts: Record<string, unknown>) => Promise<Blob | null> };
+    type Lib = { toSvg: (node: HTMLElement, opts: Record<string, unknown>) => Promise<string> };
     const w = window as unknown as { htmlToImage?: Lib };
     if (!w.htmlToImage) await new Promise<void>((res, rej) => { const sc = document.createElement("script"); sc.src = libUrl; sc.onload = () => res(); sc.onerror = () => rej(new Error("PNG export needs html-to-image.js (or an export server)")); document.head.appendChild(sc); });
     const frame = document.createElement("iframe"), wPx = Math.round(widthPt * PT), hPx = Math.round(heightPt * PT);
@@ -148,10 +159,39 @@ async function rasterize(html: string, widthPt: number, heightPt: number, libUrl
     await new Promise<void>((res) => { frame.onload = () => res(); document.body.appendChild(frame); });
     try {
         const doc = frame.contentDocument!; await doc.fonts?.ready;
-        const blob = await w.htmlToImage!.toBlob(doc.documentElement, { pixelRatio: 2, width: wPx, height: Math.max(hPx, doc.documentElement.scrollHeight), backgroundColor: "#ffffff" });
-        if (!blob) throw new Error("PNG export failed");
-        return blob;
+        const hFull = Math.max(hPx, doc.documentElement.scrollHeight);
+        const svgUrl = await w.htmlToImage!.toSvg(doc.documentElement, { pixelRatio: 2, width: wPx, height: hFull, backgroundColor: "#ffffff" });
+        return await drawSvg(unbake(svgUrl), wPx, hFull);
     } finally { frame.remove(); }
+}
+
+/** put UNBAKE_FRAGMENTS inside the cloned document. If the data URL isn't the shape we expect, leave it alone. */
+function unbake(svgUrl: string): string {
+    if (!svgUrl.startsWith(SVG_DATA_PREFIX)) return svgUrl;
+    try {
+        const svg = new DOMParser().parseFromString(decodeURIComponent(svgUrl.slice(SVG_DATA_PREFIX.length)), "image/svg+xml");
+        const root = svg.querySelector("foreignObject > *");
+        if (!root || svg.querySelector("parsererror")) return svgUrl;
+        const style = svg.createElementNS("http://www.w3.org/1999/xhtml", "style");
+        style.textContent = UNBAKE_FRAGMENTS;
+        (root.querySelector("head") || root).appendChild(style);
+        return SVG_DATA_PREFIX + encodeURIComponent(new XMLSerializer().serializeToString(svg));
+    } catch { return svgUrl; }
+}
+
+/** the step html-to-image's toBlob would have done for us: the SVG onto a 2× canvas, then PNG bytes */
+async function drawSvg(svgUrl: string, wPx: number, hPx: number): Promise<Blob> {
+    const img = new Image();
+    await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = () => rej(new Error("PNG export failed")); img.src = svgUrl; });
+    const canvas = document.createElement("canvas");
+    canvas.width = wPx * 2; canvas.height = hPx * 2;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("PNG export failed");
+    ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/png"));
+    if (!blob) throw new Error("PNG export failed");
+    return blob;
 }
 
 // Inserted rows ([data-cv-added]) always get breathing room: at least MIN_GAP_PT of space to the block above and
@@ -373,7 +413,7 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
                 setName(parsed.name || onDisk.name); setFileName(onDisk.name.replace(/\.html?$/i, "")); setSettings({ ...DEFAULT_SETTINGS, ...(local?.settings || {}), ...paperPatch, zoom: readViewZoom() }); setSource({ css: parsed.css, html: parsed.html }); return;
             }
             if (files && local?.html && local.unsaved) { setDirty(true); say("Restored edits that were never saved to a file"); }
-            if (local?.html) { setName(local.name || "Résumé"); setSettings({ ...DEFAULT_SETTINGS, ...(local.settings || {}), ...paperPatch, zoom: readViewZoom() }); setSource({ css: local.css, html: local.html }); return; }
+            if (local?.html) { setName(local.name || "Résumé"); setSettings({ ...DEFAULT_SETTINGS, ...(local.settings || {}), ...paperPatch, zoom: readViewZoom() }); setSource({ css: migrateCss(local.css), html: local.html }); return; }   // autosave skips parseSource, so migrate here too
             setSettings((st) => ({ ...st, ...paperPatch, zoom: readViewZoom() }));
             const parsed = parseSource(await fetchSource(templateUrl));
             if (dead) return;
@@ -587,7 +627,7 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
         const fresh = (src: Source, n: string, f = "", d = false): Slot => ({ source: src, name: n, fileName: f, dirty: d, undo: [] });
         const onDisk = files && !(local?.html && local.unsaved) ? await files.current(kind).catch(() => null) : null;
         if (onDisk) { const parsed = parseSource(onDisk.text); return fresh({ css: parsed.css, html: parsed.html }, parsed.name || onDisk.name, onDisk.name.replace(/\.html?$/i, "")); }
-        if (local?.html) return fresh({ css: local.css, html: local.html }, local.name || KIND_LABEL[kind], "", !!(files && local.unsaved));
+        if (local?.html) return fresh({ css: migrateCss(local.css), html: local.html }, local.name || KIND_LABEL[kind], "", !!(files && local.unsaved));
         const parsed = parseSource(await (await fetch(kind === "letter" ? letterUrl : templateUrl, { cache: "no-store" })).text());
         return fresh({ css: parsed.css, html: parsed.html }, parsed.name || KIND_LABEL[kind]);
     }, [files, letterUrl, templateUrl]);

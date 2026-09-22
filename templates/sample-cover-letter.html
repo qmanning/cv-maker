@@ -35,7 +35,8 @@
 .cv-page hr { border: 0; border-top: 1px solid var(--cv-rule); margin: 6pt 0; }
 .cv-page ul { list-style: disc outside; }
 .cv-page li { margin-left: 12pt; break-inside: avoid; }
-.cv-page li + li { margin-top: 8pt; }
+/* see sample-resume.html: spacing rides on margin-bottom so a column break never offsets column 2 */
+.cv-page li:not(:last-child) { margin-bottom: 8pt; }
 .cv-page [data-col-break] { break-before: column; }
 
 /* header */
