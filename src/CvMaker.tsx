@@ -1167,6 +1167,8 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
     useEffect(() => {
         const down = (e: MouseEvent) => {
             const t = e.target as HTMLElement;
+            // the tour's own chrome never closes anything: the menu it is pointing at has to survive a press on Next / Done
+            if (t.closest(".cvm-coach, .cvm-tour-scrim")) return;
             if (!t.closest(".pt-menu-pop, .pt-dim-pop, #pt-bar, .pt-cpick")) { setMenu(null); setImgPop(null); }
             if (!t.closest(".cvm-insert, .cvm-insert-menu")) { setInsertMenu(false); insertHold.current = false; }
             if (!t.closest(".cvm-paper, .pt-menu-pop, #pt-bar, #pt-ctx, #pt-confirm, .pt-cpick")) { setActive(null); setPicked(null); (document.activeElement as HTMLElement | null)?.blur?.(); }
@@ -1212,10 +1214,12 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
     useLayoutEffect(() => {
         if (!tour) { setCoach(null); return; }
         const step = TOUR[tour - 1];
+        const W = 330;
         const place = () => {
             const el = step && document.querySelector(step.at) as HTMLElement | null;
-            if (!el) { setCoach(null); return; }
-            const r = el.getBoundingClientRect(), W = 330;
+            // never leave the scrim up without Skip / Done: if the target has gone, the coach-mark stays, centred
+            if (!el) { setCoach({ left: Math.max(12, (window.innerWidth - W) / 2), top: Math.max(12, window.innerHeight / 3), arrow: 0, right: true }); return; }
+            const r = el.getBoundingClientRect();
             if (step.place === "right") {   // beside the menu it's describing, so it never covers it: try right, then left, then below
                 if (r.right + 14 + W <= window.innerWidth - 12) setCoach({ left: r.right + 14, top: Math.max(12, Math.min(r.top, window.innerHeight - 220)), arrow: 0, right: true });
                 else if (r.left - 14 - W >= 12) setCoach({ left: r.left - 14 - W, top: Math.max(12, Math.min(r.top, window.innerHeight - 220)), arrow: 0, right: true });
@@ -1227,9 +1231,10 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
         };
         place();
         const id = window.setInterval(place, 150);
-        window.addEventListener("resize", place);
-        return () => { window.clearInterval(id); window.removeEventListener("resize", place); };
-    }, [tour]);
+        const esc = (e: KeyboardEvent) => { if (e.key === "Escape") endTour(); };
+        window.addEventListener("resize", place); window.addEventListener("keydown", esc);
+        return () => { window.clearInterval(id); window.removeEventListener("resize", place); window.removeEventListener("keydown", esc); };
+    }, [tour]);   // eslint-disable-line react-hooks/exhaustive-deps
 
     /* ---- format bar state, read from what's actually rendered at the caret ---- */
     const fmt = useMemo(() => {

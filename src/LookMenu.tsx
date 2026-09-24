@@ -71,7 +71,7 @@ export function LookMenu({ look, at, startup, say, onClose }: { look: Look; at: 
         setApPos({ left, top });
     }, [apOpen, pos]);
     useEffect(() => {
-        const down = (e: MouseEvent) => { if (!(e.target as HTMLElement).closest("#pt-ctx, .pt-ap-pop, .pt-cpick")) closeRef.current(); };
+        const down = (e: MouseEvent) => { if (!(e.target as HTMLElement).closest("#pt-ctx, .pt-ap-pop, .pt-cpick, .cvm-coach, .cvm-tour-scrim")) closeRef.current(); };   // the tour's Next / Done mustn't close the panel it shows
         const key = (e: KeyboardEvent) => { if (e.key === "Escape") closeRef.current(); };
         document.addEventListener("mousedown", down); document.addEventListener("keydown", key);
         return () => { document.removeEventListener("mousedown", down); document.removeEventListener("keydown", key); };
