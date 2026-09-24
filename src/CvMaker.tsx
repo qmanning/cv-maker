@@ -1206,18 +1206,20 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
         } else if (step.side === "bgOptions") {
             // centred in the window, NOT where the IcedCoffee menu just was — in that spot it read as step 10 repeating
             setMenu(null);
-            setCtx({ x: 0, y: 0, center: true, reserveRight: 330 + 14 });   // coach width + gap: the coach-mark sits beside it
+            setCtx({ x: 0, y: 0, center: true, reserveRight: 330 + 14 + 8 });   // coach width + gap (+ slack for sub-pixel widths): the coach-mark sits beside it
         } else { setMenu(null); setCtx(null); }
     }, [tour]);   // eslint-disable-line react-hooks/exhaustive-deps
     // keep the coach-mark pinned under its target as the toolbar widens / menus open
     useLayoutEffect(() => {
         if (!tour) { setCoach(null); return; }
         const step = TOUR[tour - 1];
-        const W = 330;
+        const W = 330, since = performance.now();
         const place = () => {
             const el = step && document.querySelector(step.at) as HTMLElement | null;
-            // never leave the scrim up without Skip / Done: if the target has gone, the coach-mark stays, centred
-            if (!el) { setCoach({ left: Math.max(12, (window.innerWidth - W) / 2), top: Math.max(12, window.innerHeight / 3), arrow: 0, right: true }); return; }
+            // never leave the scrim up without Skip / Done. A step's menu or panel mounts a beat after the step
+            // changes, so for that beat the coach-mark just stays where it was (and then glides to its target);
+            // only a target that never shows up gets it centred.
+            if (!el) { if (performance.now() - since > 900) setCoach({ left: Math.max(12, (window.innerWidth - W) / 2), top: Math.max(12, window.innerHeight / 3), arrow: 0, right: true }); return; }
             const r = el.getBoundingClientRect();
             if (step.place === "right") {   // beside the menu it's describing, so it never covers it: try right, then left, then below
                 if (r.right + 14 + W <= window.innerWidth - 12) setCoach({ left: r.right + 14, top: Math.max(12, Math.min(r.top, window.innerHeight - 220)), arrow: 0, right: true });
