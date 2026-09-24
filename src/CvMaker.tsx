@@ -345,7 +345,13 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
         // fit to one page: the natural height (in the page's own units) doesn't depend on the scale, so one pass settles it
         const natural = page.getBoundingClientRect().height / k / sc;
         const want = s.fit && natural > p.h ? Math.max(MIN_FIT, Math.floor((p.h / natural) * 1000) / 1000) : 1;
-        if (Math.abs(want - sc) > 0.0005) { setScale(want); return; }               // re-runs once the new scale is applied
+        // "one pass settles it" isn't quite true: at a new zoom the text's rounded metrics shift the height by a hair, so
+        // `want` can land 0.001 either side of the current scale on alternate passes — and chasing it flipped the sheet
+        // between two zooms ~30×/s, redrawing every glyph (the "shimmer"). So only move when it matters: shrink when the
+        // sheet no longer fits, grow when there's real room (>1%), snap to 1 when fitting is off.
+        const fitsNow = natural * sc <= p.h + 0.5;
+        const move = !s.fit ? sc !== 1 : want < sc - 0.0005 ? !fitsNow : want > sc + 0.01;
+        if (move) { setScale(want); return; }                                       // re-runs once the new scale is applied
         const h = natural * sc;
         // everything fits on one sheet: no breaks, and no footer reserve — a one-page résumé carries no page number
         if (!s.paginate || h <= p.h + 0.5) { setContentPt(h); setPages(1); page.style.minHeight = (p.h / sc).toFixed(2) + "pt"; return; }
@@ -712,6 +718,21 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
         const move = (ev: PointerEvent) => setKwPos({ x: Math.max(8, Math.min(window.innerWidth - 120, ev.clientX - dx)), y: Math.max(8, Math.min(window.innerHeight - 60, ev.clientY - dy)) });
         const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); setKwPos((pos) => { if (pos) store(KW_POS_KEY, JSON.stringify(pos)); return pos; }); };
         window.addEventListener("pointermove", move); window.addEventListener("pointerup", up); e.preventDefault();
+    };
+
+    // our own corner grip: the native `resize` corner is unreliable once its ::-webkit-resizer is hidden (and that glyph
+    // clashes with the glass). CSS min/max still clamp it; the ResizeObserver above remembers the size.
+    const resizeKw = (e: React.PointerEvent) => {
+        const el = kwRef.current; if (!el) return;
+        e.preventDefault(); e.stopPropagation();
+        const x0 = e.clientX, y0 = e.clientY, w0 = el.offsetWidth, h0 = el.offsetHeight;
+        const move = (ev: PointerEvent) => { el.style.width = w0 + ev.clientX - x0 + "px"; el.style.height = h0 + ev.clientY - y0 + "px"; };
+        const up = () => {
+            window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up);
+            const size = { w: Math.round(el.offsetWidth), h: Math.round(el.offsetHeight) };   // the clamped size, remembered on release
+            store(KW_SIZE_KEY, JSON.stringify(size)); setKwSize(size);
+        };
+        window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
     };
 
     /* ---- source file: load / reset ---- */
@@ -1452,6 +1473,7 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
                             {kw.keywords.length > 0 && <span className="cvm-kw-tally" data-tip={`Used in the ${KIND_LABEL[tab].toLowerCase()}`}>{used}/{kw.keywords.length}</span>}
                             <button className="cvm-kw-x" aria-label="Close" data-tip="Close · reopen from the IcedCoffee menu" onClick={() => { setKwOpen(false); setKwActive(null); }}><X /></button>
                         </div>
+                        <div className="cvm-kw-grip" onPointerDown={resizeKw} aria-hidden="true" />
                         {kw.job && <div className="cvm-kw-job">{kw.job}</div>}
                         <div className="cvm-kw-add">
                             <input type="text" value={kwDraft} spellCheck={false} placeholder="Add a keyword…" aria-label="Add a keyword" onChange={(e) => setKwDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }} />

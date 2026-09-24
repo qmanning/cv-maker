@@ -226,6 +226,13 @@ body > .pt-cpick { z-index: 4200; }   /* above the icon-picker modal too, so rec
 .cvm-kw-add { flex: none; }
 .cvm-kw-list { flex: 1 1 auto; min-height: 0; }   /* the list is the only thing that scrolls; the panel itself resizes */
 .pt-menu-pop.cvm-kw::-webkit-resizer { display: none; }   /* Chrome's default corner glyph clashes with the glass */
+/* host.css's `.pt-menu-pop.pt-open { display: block }` ties with the rule above and wins on order — without flex the list
+   never gets a bounded height, so it can't scroll (it just gets clipped). Include .pt-open to out-rank it. */
+.pt-menu-pop.cvm-kw.pt-open { display: flex; }
+/* the resize grip: a quiet two-line corner, like a window's, that the glass can wear */
+.cvm-kw-grip { position: absolute; right: 3px; bottom: 3px; width: 16px; height: 16px; cursor: nwse-resize; touch-action: none; z-index: 2; border-radius: 0 0 var(--glass-inner-r, 8px) 0;
+  background: linear-gradient(135deg, transparent 55%, var(--pt-text-faint) 55% 60%, transparent 60% 72%, var(--pt-text-faint) 72% 77%, transparent 77%); opacity: .6; }
+.cvm-kw-grip:hover { opacity: 1; }
 .cvm-kw-head { display: flex; align-items: center; gap: 8px; padding: 4px 4px 6px 8px; cursor: grab; user-select: none; touch-action: none; }
 .cvm-kw-head:active { cursor: grabbing; }
 .cvm-kw-head > svg { width: 16px; height: 16px; color: var(--pt-text-dim); flex: none; }

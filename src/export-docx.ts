@@ -15,7 +15,11 @@ import {
 
 const PX_TO_PT = 0.75;
 const tw = (pt: number) => Math.round(pt * 20);              // points → twips
-const px = (v: string) => (parseFloat(v) || 0) * PX_TO_PT;   // computed px → points
+// "Fit to one page" shrinks the sheet with CSS zoom; computed styles report the UNZOOMED design, and Word has no zoom.
+// So every size is multiplied by the fit (FIT, set per export): type, spacing, widths and margins all shrink together,
+// and the Word page matches the PDF instead of printing the design full-size with its raw, too-tight margins.
+let FIT = 1;
+const px = (v: string) => (parseFloat(v) || 0) * PX_TO_PT * FIT;   // computed px → points, at the fit
 
 type Block = Paragraph | Table;
 interface Flow { columns: number; gapPt: number; children: Block[] }
@@ -32,7 +36,7 @@ function hex(color: string): string | undefined {
 function bottomRule(el: Element): IBorderOptions | undefined {
     const cs = getComputedStyle(el), w = parseFloat(cs.borderBottomWidth) || 0, color = hex(cs.borderBottomColor);
     if (!w || !color || cs.borderBottomStyle === "none") return undefined;
-    return { style: BorderStyle.SINGLE, size: Math.max(2, Math.round(w * PX_TO_PT * 8)), color, space: Math.round(px(cs.paddingBottom)) };
+    return { style: BorderStyle.SINGLE, size: Math.max(2, Math.round(w * PX_TO_PT * FIT * 8)), color, space: Math.round(px(cs.paddingBottom)) };
 }
 
 // space (pt) and rule that follow `el`, including ancestors it is the last child of (up to the page)
@@ -148,7 +152,7 @@ async function imagePara(img: HTMLImageElement): Promise<Paragraph> {
     const canvas = document.createElement("canvas"); canvas.width = Math.round(w * k); canvas.height = Math.round(h * k);
     canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
     const blob: Blob = await new Promise((res, rej) => canvas.toBlob((b) => (b ? res(b) : rej(new Error("image"))), "image/png"));
-    return new Paragraph({ children: [new ImageRun({ type: "png", data: new Uint8Array(await blob.arrayBuffer()), transformation: { width: w, height: h } })] });
+    return new Paragraph({ children: [new ImageRun({ type: "png", data: new Uint8Array(await blob.arrayBuffer()), transformation: { width: w * FIT, height: h * FIT } })] });
 }
 
 const NONE = { style: BorderStyle.NONE, size: 0, color: "FFFFFF" } as const;
@@ -215,9 +219,10 @@ async function collect(el: Element, page: Element, flows: Flow[], inCell: boolea
 }
 
 export async function exportDocx(page: HTMLElement, opts: Opts): Promise<Blob> {
+    const cs = getComputedStyle(page);
+    FIT = Math.min(1, Math.max(0.1, parseFloat(cs.zoom) || 1));
     const flows: Flow[] = [];
     for (const child of Array.from(page.children)) await collect(child, page, flows, false);
-    const cs = getComputedStyle(page);
     const pageProps = {
         size: { width: tw(opts.pageWPt), height: tw(opts.pageHPt) },
         margin: { top: tw(px(cs.paddingTop)), bottom: tw(Math.max(px(cs.paddingBottom), opts.paginate ? 30 : 0)), left: tw(px(cs.paddingLeft)), right: tw(px(cs.paddingRight)), header: 0, footer: tw(10), gutter: 0 },
