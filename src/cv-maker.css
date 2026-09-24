@@ -50,6 +50,9 @@ body > .pt-cpick { z-index: 4200; }   /* above the icon-picker modal too, so rec
 .cvm-bar .pt-omni { flex: 1 1 0; min-width: 72px; }
 .cvm-bar .pt-omni input { text-overflow: ellipsis; padding-right: 36px; }
 .cvm-bar .pt-omni .cvm-import { display: grid; }
+/* ✕ close: sits left of the Open button while a document is showing */
+.cvm-bar .pt-omni .cvm-omni-close { display: grid; right: 34px; }
+.cvm-bar .pt-omni.cvm-can-close input { padding-right: 64px; }
 
 /* recent-documents typeahead (desktop): the results drop UNDER the bar — Infospector positions its own copy
    with JS (position: fixed), but ours is nested in the omni, so anchor it there instead */
@@ -328,6 +331,16 @@ body > .pt-cpick { z-index: 4200; }   /* above the icon-picker modal too, so rec
    shows — then it fades in when the tour reaches the document step. */
 .cvm-paper { transition: opacity .45s ease; }
 .cvm-tour-cover .cvm-paper { opacity: 0; pointer-events: none; }
+/* closing / opening a document: shut snappily toward the middle of the view; come back the same way with a small
+   overshoot (the >1 in the curve is the bounce). "closed" is the blank canvas — the sheet stays mounted, just unseen
+   and out of the scroll height, so reopening is instant and nothing re-measures from scratch. */
+.cvm-paper.cvm-doc-closing, .cvm-paper.cvm-doc-opening { transform-origin: 50% var(--cvm-origin-y, 40vh); pointer-events: none; }
+.cvm-paper.cvm-doc-closing { animation: cvm-doc-out 200ms cubic-bezier(.55, 0, .9, .35) forwards; }
+.cvm-paper.cvm-doc-opening { animation: cvm-doc-in 520ms cubic-bezier(.34, 1.5, .64, 1) both; }
+.cvm-paper.cvm-doc-closed { visibility: hidden; pointer-events: none; height: 0; overflow: hidden; }
+@keyframes cvm-doc-out { to { transform: scale(.5); opacity: 0; } }
+@keyframes cvm-doc-in { from { transform: scale(.5); opacity: 0; } 45% { opacity: 1; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .cvm-paper.cvm-doc-closing, .cvm-paper.cvm-doc-opening { animation-duration: 1ms; } }
 /* the coach-mark that points at the freshly revealed control */
 .cvm-coach { position: fixed; z-index: 3001; width: 330px; box-sizing: border-box; padding: 13px 16px 12px; border-radius: 16px;
   background-color: var(--pt-glass); -webkit-backdrop-filter: var(--pt-blur-webkit); backdrop-filter: var(--pt-blur); color: var(--pt-text);

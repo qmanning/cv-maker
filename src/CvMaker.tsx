@@ -284,6 +284,28 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
     const [fileName, setFileName] = useState("");
     // which of the two documents is on the sheet; the other waits in its slot (null = not loaded yet)
     const [tab, setTab] = useState<DocKind>("resume");
+    // closing a document: the sheet snaps shut toward the middle of the view and leaves the bare canvas; opening
+    // anything (a recent, Open…, the other tab) plays it back in reverse with a little overshoot.
+    // "closing" / "opening" are the two animations; "closed" is the blank canvas.
+    const [docVis, setDocVisState] = useState<"open" | "closing" | "closed" | "opening">("open");
+    const docVisRef = useRef(docVis), docTimer = useRef(0);
+    const setDocVis = useCallback((v: "open" | "closing" | "closed" | "opening") => { docVisRef.current = v; setDocVisState(v); }, []);
+    /** where the sheet shrinks to / grows from: the middle of what's on screen, in the sheet's own (zoomed) units */
+    const aimDocOrigin = useCallback(() => {
+        const wrap = document.getElementById("pt-stagewrap"), paper = wrap?.querySelector<HTMLElement>(".cvm-paper"); if (!wrap || !paper) return;
+        // the middle of the VISIBLE part of the canvas (it can be taller than the window)
+        const z = parseFloat(getComputedStyle(paper).zoom) || 1, top = paper.getBoundingClientRect().top, w = wrap.getBoundingClientRect();
+        const mid = (Math.max(w.top, 0) + Math.min(w.bottom, window.innerHeight || w.bottom)) / 2;
+        paper.style.setProperty("--cvm-origin-y", Math.max(0, (mid - top) / z) + "px");
+    }, []);
+    const revealDoc = useCallback(() => {
+        if (docVisRef.current === "open" || docVisRef.current === "opening") return;
+        window.clearTimeout(docTimer.current);
+        const wrap = document.getElementById("pt-stagewrap"); if (wrap) wrap.scrollTop = 0;
+        setDocVis("opening");
+        requestAnimationFrame(aimDocOrigin);
+        docTimer.current = window.setTimeout(() => setDocVis("open"), 520);
+    }, [setDocVis, aimDocOrigin]);
     const slots = useRef<Record<DocKind, Slot | null>>({ resume: null, letter: null });
     const [exportKind, setExportKind] = useState<"pdf" | "png" | "docx" | "html" | null>(null);
     // ATS keywords: what a job ad is screened for (from the person, or their AI reading the ad) — one list for both documents
@@ -642,11 +664,12 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
         return fresh({ css: parsed.css, html: parsed.html }, parsed.name || KIND_LABEL[kind]);
     }, [files, letterUrl, templateUrl]);
     const switchTab = useCallback(async (to: DocKind) => {
-        if (to === stateRef.current.tab || !stateRef.current.source) return;
+        if (to === stateRef.current.tab || !stateRef.current.source) { if (to === stateRef.current.tab) revealDoc(); return; }
+        revealDoc();
         stash();
         try { show(to, slots.current[to] || await loadSlot(to)); }
         catch { say(`Could not load the ${KIND_LABEL[to].toLowerCase()}`); }
-    }, [stash, show, loadSlot, say]);
+    }, [stash, show, loadSlot, say, revealDoc]);
     switchTabRef.current = switchTab;
     saveAllRef.current = async () => {
         if (stateRef.current.dirty) await save();
@@ -737,6 +760,7 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
 
     /* ---- source file: load / reset ---- */
     const loadSourceText = useCallback((text: string, fallbackName: string, opened?: { note?: string }) => {
+        revealDoc();
         const parsed = parseSource(text), kind = docKind(parsed.html);
         // a cover letter opened from the résumé tab (or the other way round) goes to ITS tab, and the sheet follows
         if (kind !== stateRef.current.tab) stash();
@@ -748,7 +772,7 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
         }
         if (opened?.note) return say(opened.note);
         say(parsed.regions ? `Loaded — ${parsed.regions} editable regions` : "Loaded, but it has no [data-cv-edit] regions — nothing is editable");
-    }, [say, stash, show]);
+    }, [say, stash, show, revealDoc]);
     useEffect(() => files?.onOpen((doc) => loadSourceText(doc.text, doc.name.replace(/\.html?$/i, ""), { note: doc.note })), [files, loadSourceText]);
     const resetSource = useCallback(() => setConfirm({
         msg: "Replace the document with the original source file? Your edits to this document will be lost.", ok: "Replace",
@@ -776,6 +800,19 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
         const q = omniQuery.trim().toLowerCase();
         return (q ? recents.filter((r) => r.name.toLowerCase().includes(q)) : recents).slice(0, 10);
     }, [recents, omniQuery]);
+    const closeDoc = useCallback(() => {
+        const shut = () => {
+            if (docVisRef.current === "closed" || docVisRef.current === "closing") return;
+            window.clearTimeout(docTimer.current);
+            setOmniOpen(false); setActive(null); setPicked(null); setImgPop(null); setInsertAt(null); setInsertMenu(false);
+            (document.activeElement as HTMLElement | null)?.blur?.();
+            aimDocOrigin(); setDocVis("closing");
+            docTimer.current = window.setTimeout(() => setDocVis("closed"), 200);
+        };
+        // on the desktop a closed file reopens from disk, so unsaved edits would be lost — ask first
+        if (files && dirty) setConfirm({ msg: `Close “${name || KIND_LABEL[stateRef.current.tab]}” without saving?\nYour unsaved changes will be lost.`, ok: "Close", run: shut });
+        else shut();
+    }, [files, dirty, name, aimDocOrigin, setDocVis]);
     const chooseRecent = useCallback((path: string) => { setOmniOpen(false); setOmniQuery(""); files?.openPath?.(path); }, [files]);
     const togglePin = useCallback((r: RecentDoc) => { files?.pin?.(r.path, !r.pinned); void files?.recent?.(stateRef.current.tab).then(setRecents).catch(() => {}); }, [files]);
     // type a name no document has and the list offers to save this one under it — that is how a document is renamed / branched
@@ -1095,7 +1132,7 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
     const [insertMenu, setInsertMenu] = useState(false);
     const focusBlock = useRef<number | null>(null), insertHold = useRef(false);
     const onCanvasMove = useCallback((e: React.MouseEvent) => {
-        if (insertMenu || e.buttons) return;                                     // menu open, or a drag-select in progress
+        if (insertMenu || e.buttons || docVisRef.current !== "open") return;                                     // menu open, or a drag-select in progress
         const page = hostRef.current?.querySelector(".cv-page"); if (!page) return;
         const pr = page.getBoundingClientRect(), blocks = topBlocks(page);
         let hit: { after: number; y: number } | null = null;
@@ -1329,17 +1366,20 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
                         <button className="pt-chev" aria-label="Choose a size" onClick={(e) => openMenu("size", e, "left")}>▾</button>
                     </div>
                 </div>}
-                {shown("omni") && <div ref={omniRef} data-tour="omni" className={"pt-omni" + (hasRecents ? " cvm-omni-recent" : "") + ((hasRecents ? (omniOpen ? omniQuery : fileName) : name) ? " pt-has-value" : "")}>
+                {shown("omni") && <div ref={omniRef} data-tour="omni" className={"pt-omni" + (hasRecents ? " cvm-omni-recent" : "") + (docVis === "open" || docVis === "opening" ? " cvm-can-close" : "") + ((hasRecents ? (omniOpen ? omniQuery : fileName) : name) ? " pt-has-value" : "")}>
                     <span className="pt-omni-icon"><FileText /></span>
                     {hasRecents ? (
-                        <input type="text" spellCheck={false} aria-label="Open a recent document" placeholder={fileName || (tab === "letter" ? "Untitled — search recent cover letters" : "Untitled — search recent documents")}
-                            value={omniOpen ? omniQuery : fileName}
+                        <input type="text" spellCheck={false} aria-label="Open a recent document" placeholder={docVis === "closed" || docVis === "closing" ? (tab === "letter" ? "No cover letter open — search recent ones" : "No document open — search recent documents") : fileName || (tab === "letter" ? "Untitled — search recent cover letters" : "Untitled — search recent documents")}
+                            value={omniOpen ? omniQuery : docVis === "closed" || docVis === "closing" ? "" : fileName}
                             onFocus={() => { setOmniOpen(true); setOmniQuery(""); setOmniIdx(0); void files?.recent?.(tab).then(setRecents).catch(() => {}); }}
                             onChange={(e) => { setOmniOpen(true); setOmniQuery(e.target.value); setOmniIdx(0); }}
                             onKeyDown={omniKey} />
                     ) : (
-                        <input type="text" value={name} spellCheck={false} aria-label="Document name" placeholder="Document name" onChange={(e) => { setName(e.target.value); setDirty(true); }} />
+                        docVis === "closed" || docVis === "closing"
+                            ? <input type="text" value="" readOnly aria-label="Reopen the document" placeholder={`Closed — click to reopen “${name}”`} onMouseDown={(e) => { e.preventDefault(); revealDoc(); }} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); revealDoc(); } }} />
+                            : <input type="text" value={name} spellCheck={false} aria-label="Document name" placeholder="Document name" onChange={(e) => { setName(e.target.value); setDirty(true); }} />
                     )}
+                    {(docVis === "open" || docVis === "opening") && <button className="pt-omni-clear cvm-omni-close" aria-label={`Close the ${KIND_LABEL[tab].toLowerCase()}`} data-tip={`Close the ${KIND_LABEL[tab].toLowerCase()}`} onMouseDown={(e) => e.preventDefault()} onClick={closeDoc}><X /></button>}
                     <button className="pt-omni-clear cvm-import" aria-label={files ? `Open a ${KIND_LABEL[tab].toLowerCase()} file` : "Import a source HTML file"} data-tip={files ? `Open a ${KIND_LABEL[tab].toLowerCase()} file · ⌘O` : "Import a source HTML file"} onClick={() => (files ? files.open(tab) : fileRef.current?.click())}><Upload /></button>
                     {hasRecents && omniOpen && (
                         <div className="pt-omni-results pt-open" role="listbox">
@@ -1365,8 +1405,8 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
                 </div>}
                 {shown("paginate") && <button className="pt-rbtn" data-tour="paginate" {...pill(settings.paginate)} aria-label="Pagination" data-tip={settings.paginate ? "Pagination on · pages + page numbers" : "Pagination off · one continuous page"} onClick={() => patch({ paginate: !settings.paginate })}><BookOpen /></button>}
                 {shown("spell") && <button className="pt-rbtn cvm-secondary" data-tour="spell" {...pill(settings.spellcheck)} aria-label="Spellcheck" data-tip={settings.spellcheck ? "Spellcheck on" : "Spellcheck off"} onClick={() => patch({ spellcheck: !settings.spellcheck })}><SpellCheck /></button>}
-                {shown("save") && <button className="pt-rbtn pt-badge-btn" data-tour="save" aria-label="Save" data-tip={files ? "Save · ⌘S   Save As · ⇧⌘S" : "Save in this browser · ⌘S"} onClick={() => save()}><Save />{dirty && <span className="cvm-dirty" />}</button>}
-                {shown("export") && <button className="pt-rbtn pt-badge-btn" data-tour="export" aria-haspopup="true" aria-label="Export" data-tip={busy ? `Exporting ${busy}…` : "Export"} onClick={(e) => openMenu("export", e, "right")}><Download /></button>}
+                {shown("save") && <button className="pt-rbtn pt-badge-btn" data-tour="save" aria-label="Save" disabled={docVis === "closed" || docVis === "closing"} data-tip={files ? "Save · ⌘S   Save As · ⇧⌘S" : "Save in this browser · ⌘S"} onClick={() => save()}><Save />{dirty && <span className="cvm-dirty" />}</button>}
+                {shown("export") && <button className="pt-rbtn pt-badge-btn" data-tour="export" aria-haspopup="true" aria-label="Export" disabled={docVis === "closed" || docVis === "closing"} data-tip={busy ? `Exporting ${busy}…` : "Export"} onClick={(e) => openMenu("export", e, "right")}><Download /></button>}
                 {shown("seg") && <div className="cvm-seg" data-tour="seg" role="tablist" aria-label="Document">
                     <button role="tab" aria-selected={tab === "resume"} aria-label="Résumé" data-tip="Résumé" className={tab === "resume" ? "cvm-on" : ""} onClick={() => void switchTab("resume")}><FileUser /></button>
                     <button role="tab" aria-selected={tab === "letter"} aria-label="Cover Letter" data-tip="Cover Letter" className={tab === "letter" ? "cvm-on" : ""} onClick={() => void switchTab("letter")}><FileText /></button>
@@ -1564,7 +1604,7 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
             {/* canvas — Infospector's #pt-stagewrap + background patterns */}
             <main id="pt-stagewrap" ref={wrapRef} className={`cvm-wrap pt-bg-${look.bg.pattern}`} onMouseMove={onCanvasMove} onMouseLeave={() => { if (!insertHold.current && !insertMenu) setInsertAt(null); }}
                 onContextMenu={(e) => { if (!(e.target as HTMLElement).closest(".cvm-paper")) { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY }); } }}>
-                <div className="cvm-paper" ref={paperRef} style={{ ["--cvm-page-w" as string]: paper.w + "pt", zoom }}>
+                <div className={"cvm-paper" + (docVis === "open" ? "" : " cvm-doc-" + docVis)} ref={paperRef} aria-hidden={docVis === "closed" || undefined} style={{ ["--cvm-page-w" as string]: paper.w + "pt", zoom }}>
                     <div className="cvm-sheets">
                         {settings.paginate
                             ? Array.from({ length: pages }, (_, i) => <div key={i} className="cvm-sheet" style={{ top: i * stride + "pt", height: paper.h + "pt" }}>{pages > 1 && <div className="cvm-pageno">{i + 1}</div>}</div>)
@@ -1585,7 +1625,7 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
                 </div>
             </main>
 
-            <div className="cvm-status">{scale < 1 ? `fit to one page · ${Math.round(scale * 100)}% · ` : ""}{settings.paginate ? `${pages} page${pages > 1 ? "s" : ""}` : `continuous · ${(contentPt / paper.h).toFixed(2)} pages long`} · {paper.name}</div>
+            <div className="cvm-status" hidden={docVis === "closed" || docVis === "closing"}>{scale < 1 ? `fit to one page · ${Math.round(scale * 100)}% · ` : ""}{settings.paginate ? `${pages} page${pages > 1 ? "s" : ""}` : `continuous · ${(contentPt / paper.h).toFixed(2)} pages long`} · {paper.name}</div>
             <div id="pt-tip" ref={tipRef} role="tooltip" hidden />
             <div id="pt-toast" className={toast ? "pt-show" : undefined}>{toast}</div>
             {tour > 0 && (
