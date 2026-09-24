@@ -333,6 +333,7 @@ body > .pt-cpick { z-index: 4200; }   /* above the icon-picker modal too, so rec
 .cvm-coach h4 { margin: 3px 0 6px; font-size: 15px; font-weight: 700; }
 .cvm-coach p { margin: 0; font-size: 12.75px; line-height: 1.5; color: var(--pt-text-dim); }
 .cvm-coach-actions { display: flex; align-items: center; gap: 8px; margin-top: 13px; }
+.cvm-coach-actions .pt-mini { border-radius: 15px; }   /* round like the toolbar's buttons (15px), not the stock 8px */
 .cvm-coach-skip { margin-right: auto; background: none; border: 0; color: var(--pt-text-faint); font: 12px var(--pt-font); cursor: pointer; padding: 4px 2px; }
 .cvm-coach-skip:hover { color: var(--pt-text); }
 
