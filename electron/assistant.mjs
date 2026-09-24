@@ -92,8 +92,8 @@ export function setupAssistant({ origin, editorWindow, mcp, moveToApplications =
     });
     // the no-key way (see mcp.mjs): this window is also where "Connect Claude Desktop" lives
     ipcMain.handle("assistant-settings:mcp-state", (e) => (fromSettings(e) ? mcp.state() : null));
-    ipcMain.handle("assistant-settings:mcp-connect-claude", (e) => { if (!fromSettings(e)) throw new Error("not allowed"); mcp.connectClaude(); return mcp.state(); });
-    ipcMain.handle("assistant-settings:mcp-disconnect-claude", (e) => { if (!fromSettings(e)) throw new Error("not allowed"); mcp.disconnectClaude(); return mcp.state(); });
+    ipcMain.handle("assistant-settings:mcp-connect-claude", async (e) => { if (!fromSettings(e)) throw new Error("not allowed"); await mcp.connectClaude(); return mcp.state(); });
+    ipcMain.handle("assistant-settings:mcp-disconnect-claude", async (e) => { if (!fromSettings(e)) throw new Error("not allowed"); await mcp.disconnectClaude(); return mcp.state(); });
     ipcMain.handle("assistant-settings:mcp-connect-codex", (e) => { if (!fromSettings(e)) throw new Error("not allowed"); mcp.connectCodex(); return mcp.state(); });
     ipcMain.handle("assistant-settings:mcp-disconnect-codex", (e) => { if (!fromSettings(e)) throw new Error("not allowed"); mcp.disconnectCodex(); return mcp.state(); });
     ipcMain.handle("assistant-settings:move-to-applications", (e) => { if (!fromSettings(e)) throw new Error("not allowed"); return moveToApplications(); });

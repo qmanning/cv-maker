@@ -55,11 +55,6 @@ textarea:focus { outline: none; border-color: var(--accent, #A44400); }
     <p>Use the AI app you already have. It reads the résumé that's open here and changes it while you watch. No API key, no account, nothing to pay IcedCoffee.</p>
   </header>
   <main>
-    <section class="card feature">
-      <div class="cardhead"><b>Easiest way — paste this to your AI</b></div>
-      <p class="sub">Copy this and paste it into Claude, ChatGPT, Cursor, or whatever robot you use. It tells your AI what IcedCoffee is, how to connect to it, and how to help with your résumé — so you don't have to explain a thing.</p>
-      <div class="actions"><button class="primary big" id="copy-prompt">📋&nbsp;&nbsp;Copy &amp; paste to your AI</button><span class="copied" id="prompt-copied"></span></div>
-    </section>
     <section class="card warn" id="needs-move" hidden>
       <div class="cardhead"><b>First, install IcedCoffee in Applications</b></div>
       <p class="sub" id="needs-move-text"></p>
@@ -70,7 +65,7 @@ textarea:focus { outline: none; border-color: var(--accent, #A44400); }
       <p class="sub" id="claude-sub"></p>
       <div class="actions"><button class="primary" id="claude-connect">Connect Claude Desktop</button><button class="quiet2" id="claude-disconnect" hidden>Disconnect</button></div>
       <ol class="steps" id="claude-steps" hidden>
-        <li><b>Quit Claude and open it again</b> so it notices IcedCoffee.</li>
+        <li>If Claude was open, IcedCoffee restarted it so it picks up the connection.</li>
         <li>In a Claude chat, ask: <i>“Tailor my résumé to this job description”</i> and paste it in. Claude will ask permission to use IcedCoffee the first time.</li>
         <li>Watch the page here. Every change comes with an <b>Undo</b>.</li>
       </ol>
@@ -90,6 +85,12 @@ textarea:focus { outline: none; border-color: var(--accent, #A44400); }
       <div class="cardhead"><b>Claude Code, Cursor, VS Code, LM Studio…</b><span class="pill" id="live-pill"></span></div>
       <p class="sub">Any app that supports MCP servers can connect. Paste this into its MCP settings, or run the Claude Code command.</p>
       <div class="actions"><button id="copy-json">Copy the settings</button><button id="copy-cc">Copy the Claude Code command</button><span class="copied" id="copied"></span></div>
+    </section>
+
+    <section class="card feature">
+      <div class="cardhead"><b>Then paste this to your AI</b></div>
+      <p class="sub">Once your AI app is connected, paste this into a new chat. It tells your AI what IcedCoffee is and gets it started on your résumé — so you don't have to explain a thing.</p>
+      <div class="actions"><button class="primary big" id="copy-prompt">📋&nbsp;&nbsp;Copy &amp; paste to your AI</button><span class="copied" id="prompt-copied"></span></div>
     </section>
 
     <section class="card">

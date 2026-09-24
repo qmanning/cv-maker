@@ -303,18 +303,18 @@ async function smoke(win) {
     /* one-click connect: both config writers keep whatever else is in those files */
     const claudeFile = path.join(SMOKE_DIR, "claude", "claude_desktop_config.json"), codexHome = path.join(SMOKE_DIR, "codex");
     fs.mkdirSync(path.dirname(claudeFile), { recursive: true }); fs.mkdirSync(codexHome, { recursive: true });
-    fs.writeFileSync(claudeFile, JSON.stringify({ theme: "dark", mcpServers: { other: { command: "npx" }, "cv-maker": { command: "/old/name" } } }));
-    fs.writeFileSync(path.join(codexHome, "config.toml"), 'model = "x"\n\n[mcp_servers.other]\ncommand = "npx"\n\n[mcp_servers.cv-maker]\ncommand = "/old/place"\n\n[mcp_servers.cv-maker.env]\nOLD = "1"\n\n[profiles.p]\nk = 1\n');
+    fs.writeFileSync(claudeFile, JSON.stringify({ theme: "dark", mcpServers: { other: { command: "npx" }, "cv-maker": { command: "/old/name" }, itera: { command: "/older/name" } } }));
+    fs.writeFileSync(path.join(codexHome, "config.toml"), 'model = "x"\n\n[mcp_servers.other]\ncommand = "npx"\n\n[mcp_servers.cv-maker]\ncommand = "/old/place"\n\n[mcp_servers.cv-maker.env]\nOLD = "1"\n\n[mcp_servers.itera]\ncommand = "/Applications/Itera.app"\n\n[profiles.p]\nk = 1\n');
     process.env.CVM_CLAUDE_CONFIG = claudeFile; process.env.CODEX_HOME = codexHome;
-    mcp.connectClaude(); mcp.connectCodex();
+    await mcp.connectClaude(); mcp.connectCodex();
     const cj = JSON.parse(fs.readFileSync(claudeFile, "utf8")), toml = fs.readFileSync(path.join(codexHome, "config.toml"), "utf8");
-    fileSteps.claudeConfigWritten = cj.theme === "dark" && !!cj.mcpServers.other && cj.mcpServers.icedcoffee.env.ELECTRON_RUN_AS_NODE === "1" && !cj.mcpServers["cv-maker"] && fs.existsSync(claudeFile + ".icedcoffee-backup") && mcp.claudeState().current;
-    fileSteps.codexConfigWritten = /model = "x"/.test(toml) && /\[mcp_servers\.other\]/.test(toml) && /\[profiles\.p\]/.test(toml) && !/old\/place|OLD = /.test(toml) && (toml.match(/\[mcp_servers\.icedcoffee\]/g) || []).length === 1 && !/mcp_servers\.cv-maker/.test(toml) && /ELECTRON_RUN_AS_NODE = "1"/.test(toml) && mcp.codexState().current;
+    fileSteps.claudeConfigWritten = cj.theme === "dark" && !!cj.mcpServers.other && cj.mcpServers.icedcoffee.env.ELECTRON_RUN_AS_NODE === "1" && !cj.mcpServers["cv-maker"] && !cj.mcpServers.itera && fs.existsSync(claudeFile + ".icedcoffee-backup") && mcp.claudeState().current;
+    fileSteps.codexConfigWritten = /model = "x"/.test(toml) && /\[mcp_servers\.other\]/.test(toml) && /\[profiles\.p\]/.test(toml) && !/old\/place|OLD = /.test(toml) && (toml.match(/\[mcp_servers\.icedcoffee\]/g) || []).length === 1 && !/mcp_servers\.(cv-maker|itera)/.test(toml) && /ELECTRON_RUN_AS_NODE = "1"/.test(toml) && mcp.codexState().current;
     // the pill under the page follows: it names the connected apps; after disconnecting it invites again; its ✕ sends it away for good
     await until("the pill to name the connected apps", () => js(`/Claude Desktop and ChatGPT \\/ Codex connected/.test(document.querySelector(".cvm-ask-connect")?.textContent || "")`));
     fileSteps.pillShowsConnected = true;
     fs.writeFileSync(path.join(SMOKE_DIR, "pill.png"), (await win.webContents.capturePage()).toPNG());
-    mcp.disconnectClaude(); mcp.disconnectCodex();
+    await mcp.disconnectClaude(); mcp.disconnectCodex();
     fileSteps.configsCleanedUp = !JSON.parse(fs.readFileSync(claudeFile, "utf8")).mcpServers.icedcoffee && !/mcp_servers\.(icedcoffee|cv-maker)/.test(fs.readFileSync(path.join(codexHome, "config.toml"), "utf8"));
     fs.writeFileSync(path.join(SMOKE_DIR, "codex-config.toml"), toml);
     await until("the pill to invite again after disconnecting", () => js(`/Connect your AI/.test(document.querySelector(".cvm-ask-connect")?.textContent || "")`));

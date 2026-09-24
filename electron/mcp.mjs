@@ -8,6 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import readline from "node:readline";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { execFile } from "node:child_process";
 import { renderExport } from "./export.mjs";
 import { normalize } from "./assistant/prompt.mjs";
 
@@ -17,7 +18,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 // is, whether IcedCoffee runs packaged (process.resourcesPath) or from source (here).
 const { INSTRUCTIONS, TOOLS, callTool } = await import(pathToFileURL(app.isPackaged ? path.join(process.resourcesPath, "mcp", "catalog.mjs") : path.join(here, "mcp", "catalog.mjs")).href);
 const SERVER_NAME = "icedcoffee";
-const LEGACY_NAMES = ["cv-maker"];   // what this app called itself until September 2026 — cleaned up whenever we write a config
+const LEGACY_NAMES = ["cv-maker", "itera"];   // what this app has called itself before (CV Maker, then Itera, Sept 2026) — cleaned up whenever we write a config
 
 export function setupMcp({ editorWindow, currentFile, files = () => null, socketPath = "" }) {
     // the person's own house rules for any AI that connects — folded into the MCP instructions IcedCoffee hands out
@@ -177,6 +178,26 @@ export function setupMcp({ editorWindow, currentFile, files = () => null, socket
         fs.writeFileSync(file, JSON.stringify(config, null, 2) + "\n");
         return claudeState();
     }
+    /* Claude Desktop keeps its config in memory and writes it back when it quits, so an entry written while it
+       is running is silently wiped the moment the person quits it — which is exactly what they're told to do
+       next. So: if Claude is running, quit it first, write, then open it again. (macOS only; the test harness
+       points CVM_CLAUDE_CONFIG at a scratch file and never touches the real app.) */
+    const CLAUDE_ID = "com.anthropic.claudefordesktop";
+    const run = (cmd, args) => new Promise((res) => execFile(cmd, args, (err, out) => res(err ? null : String(out))));
+    const claudeRunning = async () => !!(await run("/usr/bin/pgrep", ["-x", "Claude"]))?.trim();
+    async function withClaudeClosed(write) {
+        if (process.platform !== "darwin" || process.env.CVM_CLAUDE_CONFIG) return write();
+        const wasRunning = await claudeRunning();
+        if (wasRunning) {
+            await run("/usr/bin/osascript", ["-e", `tell application id "${CLAUDE_ID}" to quit`]);
+            for (let i = 0; i < 60 && (await claudeRunning()); i++) await new Promise((r) => setTimeout(r, 250));
+            if (await claudeRunning()) throw new Error("Claude didn't quit, so IcedCoffee couldn't connect safely. Quit Claude yourself, then click Connect again.");
+            await new Promise((r) => setTimeout(r, 400));   // let its final settings write land before ours
+        }
+        const out = write();
+        if (wasRunning) await run("/usr/bin/open", ["-b", CLAUDE_ID]);
+        return out;
+    }
     function disconnectClaude() {
         const config = readClaude(); if (!config?.mcpServers?.[SERVER_NAME]) return claudeState();
         delete config.mcpServers[SERVER_NAME]; for (const old of LEGACY_NAMES) delete config.mcpServers[old];
@@ -216,21 +237,21 @@ export function setupMcp({ editorWindow, currentFile, files = () => null, socket
     ipcMain.handle("remote:status", (e) => (e.sender === editorWindow()?.webContents ? editorStatus() : { apps: [], live: 0 }));
     listeners.add(tellEditor);
     const andTell = (fn) => (...args) => { const out = fn(...args); changed(); return out; };
+    const andTellAsync = (fn) => async (...args) => { const out = await fn(...args); changed(); return out; };
 
     return {
         codexState, connectCodex: andTell(connectCodex), disconnectCodex: andTell(disconnectCodex),
-        socket: SOCKET, entry, claudeState, getNotes: readNotes, setNotes: writeNotes, connectClaude: andTell(connectClaude), disconnectClaude: andTell(disconnectClaude), editorStatus,
+        socket: SOCKET, entry, claudeState, getNotes: readNotes, setNotes: writeNotes, connectClaude: andTellAsync(() => withClaudeClosed(connectClaude)), disconnectClaude: andTellAsync(() => withClaudeClosed(disconnectClaude)), editorStatus,
         state: () => {
             const claudeCode = `claude mcp add ${SERVER_NAME} --env ELECTRON_RUN_AS_NODE=1 -- ${JSON.stringify(entry().command)} ${JSON.stringify(entry().args[0])}`;
             const codexCommand = `codex mcp add ${SERVER_NAME} --env ELECTRON_RUN_AS_NODE=1 -- ${JSON.stringify(entry().command)} ${JSON.stringify(entry().args[0])}`;
-            // a plain-language message the person can paste straight into their AI to connect it and put it to work
+            // what the person pastes into their AI once it's connected: what IcedCoffee is and what to do. No setup in
+            // here — connecting is IcedCoffee's job (the Connect buttons), and an AI asked to install things will
+            // rightly refuse.
             const prompt = [
-                "I'm using IcedCoffee — a free résumé and cover-letter editor on my Mac. It has a built-in connection (an MCP server) you can use to see and edit the résumé that's open on my screen right now. Everything stays on this computer: no API key, no account.",
+                "I'm using IcedCoffee, a résumé and cover-letter editor on my Mac, and it's connected to you: you have its tools (get_document, edit_document, set_keywords, export_document and more). They read and change the résumé that's open on my screen, and I watch each change as you make it.",
                 "",
-                "If you can add MCP servers yourself (Claude Code, Cursor, Codex and the like), connect by running:",
-                claudeCode,
-                "",
-                "Once you're connected you'll have tools like get_document, edit_document, set_keywords and export_document. Please help me tailor my résumé to a job: save a copy off my master first and never change the master, keep it to one page, and write in active, results-first language. Tell me when you're connected, then ask me for the job description.",
+                "Please help me tailor my résumé to a job. Start by reading the résumé that's open, then ask me for the job description.",
             ].join("\n");
             return { needsMove: temporaryHome() ? needsMove : "", claude: claudeState(), codex: codexState(), codexCommand, clients, lastSeen, snippet: JSON.stringify({ mcpServers: { [SERVER_NAME]: entry() } }, null, 2), claudeCode, prompt };
         },
