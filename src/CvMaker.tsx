@@ -260,7 +260,7 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
     const [, setTick] = useState(0);
     const [dirty, setDirty] = useState(false);
     const [menu, setMenu] = useState<{ id: "size" | "export" | "more" | "brand"; left?: number; right?: number; top: number } | null>(null);
-    const [ctx, setCtx] = useState<{ x: number; y: number } | null>(null);
+    const [ctx, setCtx] = useState<{ x: number; y: number; center?: boolean; reserveRight?: number } | null>(null);
     const [imgPop, setImgPop] = useState<{ img: HTMLImageElement; left: number; top: number } | null>(null);
     const [iconFor, setIconFor] = useState<HTMLImageElement | null>(null);   // "Choose Icon" target
     const [iconAt, setIconAt] = useState({ left: 0, top: 0 });
@@ -1204,10 +1204,9 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
             const g = document.querySelector('[data-tour="glyph"]') as HTMLElement | null;
             if (g) { const r = g.getBoundingClientRect(); setMenu({ id: "brand", top: r.bottom + 8, left: r.left }); }
         } else if (step.side === "bgOptions") {
+            // centred in the window, NOT where the IcedCoffee menu just was — in that spot it read as step 10 repeating
             setMenu(null);
-            const g = document.querySelector('[data-tour="glyph"]') as HTMLElement | null;
-            const r = g?.getBoundingClientRect();
-            setCtx({ x: (r?.left ?? 40) + 6, y: (r?.bottom ?? 56) + 8 });
+            setCtx({ x: 0, y: 0, center: true, reserveRight: 330 + 14 });   // coach width + gap: the coach-mark sits beside it
         } else { setMenu(null); setCtx(null); }
     }, [tour]);   // eslint-disable-line react-hooks/exhaustive-deps
     // keep the coach-mark pinned under its target as the toolbar widens / menus open

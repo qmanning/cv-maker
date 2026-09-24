@@ -47,7 +47,7 @@ function Range({ label, tip, min, max, step, value, unit, onChange }: { label: s
     );
 }
 
-export function LookMenu({ look, at, startup, say, onClose }: { look: Look; at: { x: number; y: number }; startup: Startup; say: (msg: string) => void; onClose: () => void }) {
+export function LookMenu({ look, at, startup, say, onClose }: { look: Look; at: { x: number; y: number; center?: boolean; reserveRight?: number }; startup: Startup; say: (msg: string) => void; onClose: () => void }) {
     const ref = useRef<HTMLDivElement>(null), apRef = useRef<HTMLDivElement>(null), subRef = useRef<HTMLButtonElement>(null);
     const [pos, setPos] = useState(at), [apOpen, setApOpen] = useState(false), [apPos, setApPos] = useState({ left: 0, top: 0 });
     const [page, setPage] = useState(startup.page);
@@ -56,10 +56,15 @@ export function LookMenu({ look, at, startup, say, onClose }: { look: Look; at: 
     const close = () => { closeColorPicker(); onClose(); };
     const closeRef = useRef(close); closeRef.current = close;
 
+    const [vw, setVw] = useState(0);   // a centred panel stays centred as the window resizes
+    useEffect(() => { if (!at.center) return; const on = () => setVw(window.innerWidth * 10000 + window.innerHeight); window.addEventListener("resize", on); return () => window.removeEventListener("resize", on); }, [at.center]);
     useLayoutEffect(() => {
         const el = ref.current; if (!el) return;
-        setPos({ x: Math.max(8, Math.min(at.x, window.innerWidth - el.offsetWidth - 8)), y: Math.max(8, Math.min(at.y, window.innerHeight - el.offsetHeight - 8)) });
-    }, [at, hasFx]);
+        // centred; `reserveRight` keeps that much room free beside it (the tour's coach-mark), sliding left only if it must
+        const x = at.center ? Math.min((window.innerWidth - el.offsetWidth) / 2, window.innerWidth - 12 - el.offsetWidth - (at.reserveRight || 0)) : at.x;
+        const y = at.center ? (window.innerHeight - el.offsetHeight) / 2 : at.y;
+        setPos({ x: Math.max(8, Math.min(x, window.innerWidth - el.offsetWidth - 8)), y: Math.max(8, Math.min(y, window.innerHeight - el.offsetHeight - 8)) });
+    }, [at, hasFx, vw]);
     // the flyout lands on whichever side of the panel has room, lined up with its trigger, never off-screen (host.js placeApPop)
     useLayoutEffect(() => {
         const pop = apRef.current, ctx = ref.current, sub = subRef.current; if (!apOpen || !pop || !ctx || !sub) return;
