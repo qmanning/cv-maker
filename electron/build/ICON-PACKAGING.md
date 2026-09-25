@@ -7,7 +7,19 @@ A fallback `icon.icns` is also generated for older macOS versions.
 
 `build/IcedCoffee.icon` is the one source. Its `Assets/Artwork.png` is the acrylic
 texture **edge to edge**: `brand/icedcoffee-icon-source.png` (2048²) with its baked
-tile edge cropped away (1648² from 200,200) and resized to 1024². macOS applies its
+tile edge cropped away (4.9% of the tile's side off every edge, which also sets the
+cup's size on the icon) and resized to 1024².
+
+**Dark appearance:** `Assets/ArtworkDark.png` — ebony-dyed walnut (charcoal, satin,
+a flowing walnut figure) with the cup inlaid in warm antique brass. Rendered with
+`brand/3d-icon/build_icon.py --variant ebony --view front --size 2048` (the brass is
+flush with the wood; the overhead softbox is light-linked to the brass only, so the
+wood stays deep instead of mirroring it), then cropped by the same 4.9% so the cup
+is the same size in both. `icon.json` wires it with `image-name-specializations`
+(the default image is the first, unlabelled entry). Clear and Tinted appearances are
+derived by macOS from the light artwork. Preview every appearance with Icon
+Composer's `ictool … --export-image --platform macOS --rendition Dark` (also
+`Default`, `ClearLight`, `ClearDark`, `TintedLight`, `TintedDark`). macOS applies its
 own rounded mask and rim, so the artwork must not carry a tile shape, corners or
 transparency of its own — a baked tile is what produced the clipped bevel (and, as
 a legacy `.icns`, the gray backing plate). No glass, shadow or specular effects are
