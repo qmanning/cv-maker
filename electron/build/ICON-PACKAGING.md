@@ -10,11 +10,13 @@ texture **edge to edge**: `brand/icedcoffee-icon-source.png` (2048²) with its b
 tile edge cropped away (4.9% of the tile's side off every edge, which also sets the
 cup's size on the icon) and resized to 1024².
 
-**Dark appearance:** `Assets/ArtworkDark.png` — walnut (warm chocolate, fine straight
-grain, matte) with the cup inlaid in bright polished brass, like a brass-inlay tabletop.
-Rendered with `brand/3d-icon/build_icon.py --variant walnut --view front --size 2048` (the brass is
-flush with the wood; the overhead softbox is light-linked to the brass only, so the
-wood stays deep instead of mirroring it), then cropped by the same 4.9% so the cup
+**Dark appearance:** `Assets/ArtworkDark.png` — smoked, wire-brushed oak (near-black
+with a cool slate undertone, the grain standing in relief) with the cup inlaid in bright
+polished brass. Rendered with `brand/3d-icon/build_icon.py --variant walnut --view front
+--size 2048` (the variant name predates the oak). The brass is flush with the wood; light
+linking gives each material its own light — an overhead softbox on the brass only (so
+the wood never mirrors it) and a low, cool raking light on the wood only (so the brushed
+grain catches highlights over deep shadow). Then cropped by the same 4.9% so the cup
 is the same size in both. `icon.json` wires it with `image-name-specializations`
 (the default image is the first, unlabelled entry). Clear and Tinted appearances are
 derived by macOS from the light artwork. Preview every appearance with Icon
