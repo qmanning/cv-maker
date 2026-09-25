@@ -61,7 +61,7 @@ async function importBundleText(text) {
 export async function bundleAndImport(entryRelPath, { external = [] } = {}) {
     const entry = path.join(repoRoot, entryRelPath);
     const result = await build({ entryPoints: [entry], ...bundleCommonOpts(external) });
-    const jsFile = result.outputFiles.find((f) => f.path.endsWith(".js"));
+    const jsFile = result.outputFiles.find((f) => f.path.endsWith(".js") || f.path === "<stdout>");   // no outdir: esbuild names it <stdout>
     if (!jsFile) throw new Error(`bundleAndImport: no JS output for ${entryRelPath}`);
     return importBundleText(jsFile.text);
 }

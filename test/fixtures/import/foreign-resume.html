@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Priya Natarajan — Resume</title>
+<style>
+  body { font-family: Georgia, serif; color: #222; margin: 40px 48px; font-size: 14px; line-height: 1.4; }
+  .top { text-align: center; border-bottom: 2px solid #8a1c1c; padding-bottom: 10px; margin-bottom: 18px; }
+  .top h1 { font-size: 30px; margin: 0; letter-spacing: 1px; color: #8a1c1c; }
+  .top .contact { font-family: Arial, sans-serif; font-size: 12px; color: #555; }
+  .grid { display: grid; grid-template-columns: 180px 1fr; gap: 28px; }
+  aside h2, main h2 { font-family: Arial, sans-serif; font-size: 13px; text-transform: uppercase; letter-spacing: 2px; color: #8a1c1c; margin: 0 0 6px; }
+  aside ul { list-style: none; padding: 0; margin: 0 0 16px; font-size: 13px; }
+  .job { margin-bottom: 14px; }
+  .row { display: flex; justify-content: space-between; }
+  .role { font-weight: bold; }
+  .when { font-style: italic; color: #666; }
+  .job ul { margin: 4px 0 0 18px; padding: 0; }
+</style>
+</head>
+<body>
+  <div class="top">
+    <h1>Priya Natarajan</h1>
+    <div class="contact">priya@natarajan.dev · (415) 555-0199 · github.com/priyan</div>
+  </div>
+  <div class="grid">
+    <aside>
+      <h2>Skills</h2>
+      <ul><li>Distributed systems</li><li>Go, Rust, TypeScript</li><li>Postgres internals</li></ul>
+      <h2>Education</h2>
+      <ul><li>M.S. Computer Science, UIUC</li></ul>
+    </aside>
+    <main>
+      <h2>Experience</h2>
+      <div class="job">
+        <div class="row"><span class="role">Principal Engineer, Tidewell</span><span class="when">2020 – Present</span></div>
+        <ul><li>Designed the replication layer serving 40k writes/sec.</li><li>Mentored six engineers into senior roles.</li></ul>
+      </div>
+      <div class="job">
+        <div class="row"><span class="role">Senior Engineer, Brightline Data</span><span class="when">2015 – 2020</span></div>
+        <ul><li>Cut query latency 70% with a new planner.</li></ul>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

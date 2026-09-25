@@ -11,6 +11,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { execFile } from "node:child_process";
 import { renderExport } from "./export.mjs";
 import { normalize } from "./assistant/prompt.mjs";
+import { importable, isNative } from "./files.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 // catalog.mjs ships LOOSE beside mcp/server.mjs (extraResources), not inside the asar — the app and the stdio server share
@@ -88,6 +89,20 @@ export function setupMcp({ editorWindow, currentFile, files = () => null, socket
             return { document: named(nk), created: true, ...d };
         }
         if (method === "open") {
+            // a Word file, a PDF, Markdown, text, somebody else's HTML: imported by the editor's rules as a new, unsaved document
+            const q = String(params?.name ?? "").trim();
+            if (path.isAbsolute(q) && fs.existsSync(q) && (importable(q) || /\.x?html?$/i.test(q) && !isNative(fs.readFileSync(q, "utf8")))) {
+                if (fs.statSync(q).size > 25 * 1024 * 1024) throw new Error("That file is too large to be a résumé.");
+                const out = await editor("importFile", [path.basename(q), fs.readFileSync(q).toString("base64")]);
+                const r = out.report || {};
+                return {
+                    imported: path.basename(q), document: named(out.document), unsaved: true,
+                    found: { sections: r.sections, entries: r.entries, images: r.images, tables: r.tables, columns: r.columns, editable_regions: r.regions },
+                    warnings: r.warnings || [], ...(r.needsAi ? { needs_you: r.needsAi } : {}),
+                    ...(r.rough ? { rough: "The import rules found little structure (no section headings or dated entries). Read it with get_document; you can reorganise it with edit_document — move and regroup, never reword or invent." } : {}),
+                    note: "This is a new, unsaved document converted from that file (the file itself is untouched). Call get_document now; save_document with save_as to keep it.",
+                };
+            }
             const out = shellFiles().openRemote(params?.name ?? params?.document, params?.name != null ? (want || "") : "");
             if (!out.already_open) await new Promise((r) => setTimeout(r, 900));   // let the editor mount it before the next get_resume
             return out;

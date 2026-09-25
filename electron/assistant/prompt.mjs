@@ -45,6 +45,9 @@ export const TOOL = {
     },
 };
 
+/** a scanned PDF: the model only READS it. IcedCoffee's import rules turn the Markdown into the document. */
+export const TRANSCRIBE = `You are reading scanned pages of a résumé or cover letter for IcedCoffee, a résumé editor. Transcribe exactly what the pages say, as Markdown, in reading order: "# " for the person's name, "## " for each section heading, "**bold**" and "*italic*" where the page uses them, "- " for bullets, and for a line with dates at the right margin write the left part, then " | ", then the dates. Keep every word, number and date exactly as printed — never correct, summarise, reorder or add anything. If something is unreadable write [unreadable]. Reply with the Markdown only.`;
+
 export const userContent = ({ prompt, document, keywords }) => `${prompt}\n\n<resume>\n${JSON.stringify(document)}\n</resume>${Array.isArray(keywords) && keywords.length ? `\n\n<keywords_now>\n${JSON.stringify(keywords)}\n</keywords_now>` : ""}`;
 
 /** whatever came back, in the one shape the editor expects */

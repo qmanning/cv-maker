@@ -27,7 +27,7 @@
     "license": "MIT",
     "type": "module",
     "engines": {
-        "node": ">=20"
+        "node": ">=22.13"
     },
     "scripts": {
         "build": "node build.mjs",
@@ -49,6 +49,7 @@
         "esbuild": "^0.25.9",
         "jsdom": "^26.1.0",
         "lucide-react": "^0.523.0",
+        "pdfjs-dist": "^6.3.289",
         "react": "^19.1.1",
         "react-dom": "^19.1.1",
         "typescript": "^5.9.2"

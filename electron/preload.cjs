@@ -15,6 +15,9 @@ contextBridge.exposeInMainWorld("cvMakerFiles", {
     save: (html, opts) => ipcRenderer.invoke("files:save", String(html), { as: !!(opts && opts.as), suggested: String((opts && opts.suggested) || "resume.html"), kind: opts && opts.kind }),
     open: (kind) => ipcRenderer.send("files:open", kind),
     onOpen: subscribe("files:opened"),
+    onImport: subscribe("files:import"),
+    claim: (kind, remote) => ipcRenderer.invoke("files:claim", kind, !!remote)
+        .catch((e) => { throw new Error(String(e && e.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, "")); }),
     onCommand: subscribe("files:command"),
     setDirty: (dirty, kind) => ipcRenderer.send("files:dirty", !!dirty, kind),
     setActive: (kind) => ipcRenderer.send("files:active", kind),
@@ -37,6 +40,8 @@ contextBridge.exposeInMainWorld("cvMakerAssistant", {
     status: () => ipcRenderer.invoke("assistant:status"),
     configure: () => ipcRenderer.send("assistant:configure"),
     onStatus: subscribe("assistant:status-changed"),
+    transcribe: (request) => ipcRenderer.invoke("assistant:transcribe", { images: Array.isArray(request && request.images) ? request.images.filter((i) => typeof i === "string").slice(0, 8) : [] })
+        .catch((e) => { throw new Error(String(e && e.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, "")); }),
     run: (request) => ipcRenderer.invoke("assistant:run", { prompt: String(request && request.prompt || ""), document: request && request.document, keywords: request && request.keywords })
         .catch((e) => { throw new Error(String(e && e.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, "")); }),
 });

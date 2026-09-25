@@ -10,6 +10,15 @@ import { fileURLToPath } from "node:url";
 
 const MAX_FILE = 25 * 1024 * 1024;
 const FILTERS = [{ name: "Résumé (HTML)", extensions: ["html", "htm"] }];
+// Open takes anything the editor can import (src/import/): an IcedCoffee file opens as itself, the rest is converted
+// in the editor into a NEW, unsaved document — the Word file / PDF on disk is only ever read, never written over.
+const IMPORTS = ["docx", "docm", "dotx", "rtf", "pdf", "md", "markdown", "mdown", "mkd", "txt", "text", "xhtml"];
+const OPEN_FILTERS = [{ name: "Résumé or cover letter", extensions: ["html", "htm", ...IMPORTS] }, ...FILTERS, { name: "Word, PDF, RTF, Markdown, text", extensions: IMPORTS }];
+// formats with no reader, handed over anyway so the editor can say what to do instead (save as .docx …)
+const ELSEWHERE = ["doc", "pages", "odt", "gdoc", "webarchive"];
+export const importable = (file) => new RegExp(`\\.(${[...IMPORTS, ...ELSEWHERE].join("|")})$`, "i").test(file);
+/** an IcedCoffee document (its template's editable regions) — any other HTML is imported, not opened in place */
+export const isNative = (text) => /\bdata-cv-edit\b/.test(text);
 const hash = (text) => crypto.createHash("sha1").update(text).digest("hex");
 
 const KINDS = ["resume", "letter"];                      // the two documents the editor holds, one per tab
@@ -77,9 +86,16 @@ export function setupFiles({ templatePath, letterTemplatePath = "", smokeDir = "
     };
     const forget = (file) => { for (const k of KINDS) docs[k].recent = docs[k].recent.filter((p) => p !== file); persist(); buildMenu(); KINDS.forEach(emitRecent); };
     // a file says what it is (a cover letter marks itself), so it always lands in its own slot — and the editor's sheet follows
+    function importPath(file) {
+        let data; try { if (fs.statSync(file).size > MAX_FILE) throw new Error("That file is too large to be a résumé."); data = fs.readFileSync(file); }
+        catch (e) { dialog.showErrorBox("Could not open the file", String(e?.message || e)); return; }
+        send("files:import", { name: path.basename(file), data: new Uint8Array(data) });   // the editor converts, then claims a slot (files:claim)
+    }
     function openPath(file) {
+        if (importable(file)) return importPath(file);
         if (!/\.html?$/i.test(file)) return;
         let text; try { text = readDoc(file); } catch (e) { forget(file); dialog.showErrorBox("Could not open the file", String(e?.message || e)); return; }
+        if (!isNative(text)) return importPath(file);   // somebody else's HTML: import a copy, keep theirs as it is
         const kind = kindOfText(text);
         if (!okToReplace(kind, "Open")) return;
         docs[kind].dirty = false; setCurrent(kind, file, text);
@@ -128,7 +144,7 @@ export function setupFiles({ templatePath, letterTemplatePath = "", smokeDir = "
         // aim the native panel at a fast, relevant local folder — this document's folder, else the other's, else Documents —
         // instead of letting macOS reuse its last location (which may be a slow network/SMB mount)
         const near = docs[asKind(kind)].current || KINDS.map((o) => docs[o].current).find(Boolean) || "";
-        const r = await dialog.showOpenDialog(win, { defaultPath: near ? path.dirname(near) : app.getPath("documents"), properties: ["openFile"], filters: FILTERS });
+        const r = await dialog.showOpenDialog(win, { defaultPath: near ? path.dirname(near) : app.getPath("documents"), properties: ["openFile"], filters: OPEN_FILTERS });
         if (!r.canceled && r.filePaths[0]) openPath(r.filePaths[0]);
     }
     function newDocument(kind = active) {
@@ -171,6 +187,15 @@ export function setupFiles({ templatePath, letterTemplatePath = "", smokeDir = "
     });
     ipcMain.on("files:open", (e, kind) => { if (fromEditor(e)) openDialog(asKind(kind || active)); });
     ipcMain.on("files:dropped", (e, file) => { if (fromEditor(e) && typeof file === "string" && file) openPath(file); });
+    // an import is ready to take a tab: the same guard as Open, then that tab has no file until it is saved
+    ipcMain.handle("files:claim", (e, kind, remote) => {
+        if (!fromEditor(e)) return false;
+        const k = asKind(kind);
+        if (remote && docs[k].dirty) throw new Error(`The open ${LABEL[k]} has unsaved changes. Call save_document first (or ask the person) — importing would replace it.`);
+        if (!remote && !okToReplace(k, "Import")) return false;
+        docs[k].dirty = false; setCurrent(k, "", null);
+        return true;
+    });
     ipcMain.on("files:dirty", (e, flag, kind) => {
         if (!fromEditor(e)) return;
         docs[asKind(kind || active)].dirty = !!flag; title();
