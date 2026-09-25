@@ -20,7 +20,8 @@ import {
 } from "lucide-react";
 import { FontSize } from "@/components/ui/font-size-extension";
 import { FontWeight } from "@/components/ui/font-weight-extension";
-import { BlockLineHeight, ColumnBreak, LetterSpacing } from "./cv-extensions";
+import { BlockLineHeight, ColumnBreak, ImportedTextStyle, LetterSpacing } from "./cv-extensions";
+import type { ImportReport } from "./import";
 import { BLOCK_KINDS, UNIT, insertBlock, topBlocks, type BlockKind } from "./cv-blocks";
 import { attachColorPicker, toHex, useInfospectorLook } from "./use-infospector-look";
 import { LookMenu } from "./LookMenu";
@@ -28,6 +29,8 @@ import { applyOps, describeDocument, type CvAssistant, type CvRemote, type CvRem
 import { coverage, findRanges, normalizeKeywords, pageText, type KeywordUse } from "./cv-keywords";
 import { FOOTER_PT, GAP_PT, MIN_FIT, PAPERS, PT, type DocKind, type PaperId, type Source, docKind, fullHtml, letterCss, migrateCss, mirrorHeader, scopeCss, pageBoxCss, parseSource, slugify, stepZoom } from "./cv-source";
 
+// kept in step with src/import/index.ts ACCEPT (that module loads lazily, so the picker can't import it)
+const IMPORT_ACCEPT = ".html,.htm,.xhtml,.docx,.docm,.dotx,.rtf,.pdf,.md,.markdown,.mdown,.mkd,.txt,.text";
 const LOCAL_KEY = "cvm:doc", LETTER_KEY = "cvm:letter", KW_KEY = "cvm:keywords", KW_POS_KEY = "cvm:kw-pos", KW_SIZE_KEY = "cvm:kw-size", START_SIZE_KEY = "cvm:startsize", HOME_KEY = "cvm:home", VIEW_ZOOM_KEY = "cvm:viewzoom";
 const stored = (k: string) => { try { return localStorage.getItem(k) || ""; } catch { return ""; } };
 const store = (k: string, v: string) => { try { if (v) localStorage.setItem(k, v); else localStorage.removeItem(k); } catch { /* ignore */ } };
@@ -55,6 +58,11 @@ export interface CvFiles {
     open(kind?: DocKind): void;
     /** the shell hands over a document: File → Open, a recent or dropped file, a reload after it changed on disk */
     onOpen(handler: (doc: { text: string; name: string; note?: string; kind?: DocKind }) => void): () => void;
+    /** …or a file to IMPORT (Word, PDF, RTF, Markdown, text, somebody else's HTML): the editor converts it, then claims a slot */
+    onImport?(handler: (file: { name: string; data: Uint8Array }) => void): () => void;
+    /** an import is about to replace this document: the shell checks for unsaved work (asks, or refuses when `remote`),
+     *  then forgets the file that was open — the import is a new, unsaved document. false = the person said no. */
+    claim?(kind: DocKind, remote?: boolean): Promise<boolean>;
     /** the shell's own File menu asks for a save (its ⌘S / ⇧⌘S never reach the page as key presses) */
     onCommand(handler: (command: "save" | "saveAs" | "saveAll") => void): () => void;
     /** unsaved edits? — the shell's title bar and close guard */
@@ -460,7 +468,7 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
         host.innerHTML = source.html;
         const extensions = [
             StarterKit.configure({ heading: false, codeBlock: false, code: false, blockquote: false, trailingNode: false, link: { openOnClick: false, autolink: true, HTMLAttributes: { rel: null, target: null } } }),
-            TextStyle, Color, FontSize, FontWeight, LetterSpacing, BlockLineHeight, ColumnBreak, TextAlign.configure({ types: ["paragraph"] }),
+            TextStyle, Color, FontSize, FontWeight, LetterSpacing, ImportedTextStyle, BlockLineHeight, ColumnBreak, TextAlign.configure({ types: ["paragraph"] }),
         ];
         const editors = Array.from(host.querySelectorAll<HTMLElement>("[data-cv-edit]")).map((el) => {
             const content = el.innerHTML; el.innerHTML = "";
@@ -854,7 +862,7 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
     /* ---- ask your AI (desktop shells only): words in → operations out → applied as ONE undoable step ---- */
     const [ask, setAsk] = useState(""), [askFocus, setAskFocus] = useState(false);
     const [aiBusy, setAiBusy] = useState(""), [aiStatus, setAiStatus] = useState<{ ready: boolean; label: string } | null>(null);
-    const [aiReply, setAiReply] = useState<{ message: string; undo: Source | null; note: string } | null>(null);
+    const [aiReply, setAiReply] = useState<{ message: string; undo: Source | null; note: string; action?: { label: string; run: () => void } } | null>(null);
     const askRef = useRef<HTMLTextAreaElement>(null);
     useEffect(() => {
         if (!assistant) return;
@@ -992,6 +1000,13 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
             if (src) { try { localStorage.setItem(keyOf(stateRef.current.tab), JSON.stringify({ name: n, css: src.css, html: serialize(), settings: s, savedAt: new Date().toISOString(), unsaved: false })); } catch { /* ignore */ } }
             setFileName(file.replace(/\.html?$/i, "")); setDirty(false); say(`Saved — ${file}`);
         },
+        importFile: async (name, base64) => {
+            const bin = atob(base64), data = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) data[i] = bin.charCodeAt(i);
+            const out = await importRef.current({ name, data }, { remote: true });
+            if (!out) throw new Error("The import was cancelled.");
+            await settle();
+            return { document: out.kind, report: out.report };
+        },
     };
     // the pill under the page: it knows whether an outside AI app is connected, and it can be sent away for good —
     // connecting is never required, and the shell's AI menu is always there
@@ -1004,6 +1019,38 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
     }, [remote]);
     const hidePill = useCallback(() => { setPillHidden(true); store("cvm:ai-pill", "hidden"); say("Hidden. It's still under the AI menu."); }, [say]);
     const openConnect = useCallback(() => (remote?.configure ?? assistant?.configure)?.(), [assistant, remote]);
+
+    /* ---- import: Word, PDF, RTF, Markdown, plain text, anyone's HTML → an IcedCoffee document. Rules, not AI (src/import/);
+       the person's AI is offered only for what rules can't do — reading a scan, or sorting out a page with no structure ---- */
+    const importFile = useCallback(async (file: { name: string; data: ArrayBuffer | Uint8Array | string }, opts: { remote?: boolean; replacing?: boolean } = {}): Promise<{ kind: DocKind; report: ImportReport | null } | null> => {
+        const { importDocument, describeImport, TIDY_PROMPT } = await import("./import");
+        say(`Importing ${file.name}…`);
+        let out;
+        try { out = await importDocument(file); }
+        catch (e) { const msg = e instanceof Error ? e.message : String(e); if (opts.remote) throw new Error(msg); setAiReply({ message: `Couldn't import ${file.name}. ${msg}`, undo: null, note: "" }); say("Import failed"); return null; }
+        if (!opts.replacing && files?.claim && !(await files.claim(out.kind, opts.remote))) return null;
+        loadSourceText(out.text, out.name);
+        const r = out.report; if (!r) return { kind: out.kind, report: null };
+        if (r.paper && r.paper !== stateRef.current.settings.paper) patch({ paper: r.paper });
+        say(describeImport(r, file.name));
+        // only when the rules fell short: say so plainly, and offer the person's AI if there is one
+        const ready = !!aiStatus?.ready, canSee = !!assistant?.transcribe;
+        const scans = () => Array.from(hostRef.current?.querySelectorAll<HTMLImageElement>(".cv-page img") || []).map((i) => i.getAttribute("src") || "").filter((s) => s.startsWith("data:image/"));
+        const readScan = async () => {
+            if (!assistant?.transcribe) return;
+            setAiBusy("Reading the scan…");
+            try { const { markdown } = await assistant.transcribe({ images: scans() }); await importFile({ name: file.name.replace(/\.[a-z0-9]+$/i, "") + ".md", data: markdown }, { replacing: true }); }
+            catch (e) { setAiReply({ message: e instanceof Error ? e.message : "Your AI could not read it.", undo: null, note: "" }); }
+            finally { setAiBusy(""); }
+        };
+        const note = [r.warnings.slice(0, 3).join(" "), r.regions ? `${r.regions} editable regions` : ""].filter(Boolean);
+        if (r.needsAi) setAiReply({ message: r.needsAi, undo: null, note: note.join(" · "), action: ready && canSee ? { label: "Read it with AI", run: readScan } : assistant ? { label: "Connect your AI", run: openConnect } : undefined });
+        else if (r.rough) setAiReply({ message: `Imported ${file.name}, but IcedCoffee couldn't find much structure in it (a name, section headings, dated entries), so it came in as plain blocks. Everything is editable as it is.`, undo: null, note: note.join(" · "), action: ready ? { label: "Tidy with AI", run: () => runAssistant(TIDY_PROMPT) } : assistant ? { label: "Connect your AI", run: openConnect } : undefined });
+        else if (r.warnings.length) setAiReply({ message: `Imported ${file.name}. ${r.warnings.slice(0, 3).join(" ")}`, undo: null, note: `${r.sections.length} sections · ${r.entries} entries` });
+        return { kind: out.kind, report: r };
+    }, [say, files, loadSourceText, patch, aiStatus, assistant, openConnect, runAssistant]);
+    useEffect(() => files?.onImport?.((f) => { void importFile(f); }), [files, importFile]);
+    const importRef = useRef(importFile); importRef.current = importFile;
 
     useEffect(() => remote?.serve({
         showDocument: (kind) => remoteRef.current!.showDocument(kind),
@@ -1020,6 +1067,7 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
         getKeywords: () => remoteRef.current!.getKeywords(),
         sourceHtml: () => remoteRef.current!.sourceHtml(),
         markSaved: (file) => remoteRef.current!.markSaved(file),
+        importFile: (name, base64) => remoteRef.current!.importFile(name, base64),
     }), [remote]);
 
     /* ---- rows: move / duplicate / delete whichever block holds the caret (a job, the summary, a dual list…) ---- */
@@ -1380,7 +1428,7 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
                             : <input type="text" value={name} spellCheck={false} aria-label="Document name" placeholder="Document name" onChange={(e) => { setName(e.target.value); setDirty(true); }} />
                     )}
                     {(docVis === "open" || docVis === "opening") && <button className="pt-omni-clear cvm-omni-close" aria-label={`Close the ${KIND_LABEL[tab].toLowerCase()}`} data-tip={`Close the ${KIND_LABEL[tab].toLowerCase()}`} onMouseDown={(e) => e.preventDefault()} onClick={closeDoc}><X /></button>}
-                    <button className="pt-omni-clear cvm-import" aria-label={files ? `Open a ${KIND_LABEL[tab].toLowerCase()} file` : "Import a source HTML file"} data-tip={files ? `Open a ${KIND_LABEL[tab].toLowerCase()} file · ⌘O` : "Import a source HTML file"} onClick={() => (files ? files.open(tab) : fileRef.current?.click())}><Upload /></button>
+                    <button className="pt-omni-clear cvm-import" aria-label={files ? `Open or import a ${KIND_LABEL[tab].toLowerCase()}` : "Import a résumé: Word, PDF, RTF, HTML, Markdown or text"} data-tip={files ? `Open or import a ${KIND_LABEL[tab].toLowerCase()} — Word, PDF, RTF, HTML, Markdown, text · ⌘O` : "Import a résumé: Word, PDF, RTF, HTML, Markdown or text"} onClick={() => (files ? files.open(tab) : fileRef.current?.click())}><Upload /></button>
                     {hasRecents && omniOpen && (
                         <div className="pt-omni-results pt-open" role="listbox">
                             {omniRows === 0 ? (
@@ -1684,6 +1732,7 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
                             <p>{aiReply.message}</p>
                             <div className="cvm-ask-actions">
                                 {aiReply.note && <span className="cvm-hint">{aiReply.note}</span>}
+                                {aiReply.action && <button className="pt-rbtn cvm-ask-btn" onClick={() => { const run = aiReply.action!.run; setAiReply(null); run(); }}><Bot />{aiReply.action.label}</button>}
                                 {aiReply.undo && <button className="pt-rbtn cvm-ask-btn" onClick={undoAssistant}><Undo2 />Undo</button>}
                                 <button className="pt-rbtn cvm-ask-btn" onClick={() => setAiReply(null)}><Check />{aiReply.undo ? "Keep" : "OK"}</button>
                             </div>
@@ -1723,7 +1772,7 @@ export default function CvMaker({ templateUrl, letterTemplateUrl, exportUrl, bac
                     )}
                 </div>
             )}
-            <input ref={fileRef} type="file" accept=".html,.htm,text/html" hidden onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) loadSourceText(await f.text(), f.name.replace(/\.html?$/i, "")); }} />
+            <input ref={fileRef} type="file" accept={IMPORT_ACCEPT} hidden onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void importFile({ name: f.name, data: await f.arrayBuffer() }); }} />
             <input ref={imgFileRef} type="file" accept="image/*" hidden onChange={onImgFile} />
         </div>
     );

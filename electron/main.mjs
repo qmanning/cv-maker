@@ -445,7 +445,7 @@ async function smoke(win) {
     const fresh = (await tool("new_document", { document: "cover_letter" })).value;
     fileSteps.mcpNewDocument = fresh.document === "cover_letter" && fresh.created === true && fresh.blocks.length >= 5 && files.state("letter").current === "" && (await js(`document.querySelector(".cvm-seg .cvm-on")?.getAttribute("aria-label") === "Cover Letter"`));
     fileSteps.mcpRequiresDocument = (await tool("get_document", {})).isError && (await tool("edit_document", { summary: "x", ops: [{ op: "set_text", target: "r0", html: "<p>x</p>" }] })).isError;
-    child.kill();
+    // (the MCP client stays up for the import steps after the final save)
 
     /* the welcome sheet: it loads, and its primary button dismisses it */
     showWelcome(win);
@@ -459,6 +459,24 @@ async function smoke(win) {
     // the AI and MCP steps above left unsaved edits (correctly restored as unsaved on the next launch) — save, so the relaunch check sees a clean file
     win.webContents.send("files:command", "save");
     await until("the final save", () => !files.state().dirty && fs.readFileSync(savedFile, "utf8").includes("Edited By Another Program"));
+
+    /* import (rules, no AI): a PDF through open_document becomes a new, unsaved, structured résumé — pdf.js's worker
+       and the canvas that crops its pictures running under this window's CSP — and never over unsaved work */
+    const fixture = (f) => path.join(here, "..", "test", "fixtures", "import", f);
+    const imported = await tool("open_document", { name: fixture("sample-resume.pdf") });
+    fileSteps.mcpImportedPdf = !imported.isError && imported.value.unsaved === true && imported.value.document === "resume" && imported.value.found.entries >= 3
+        && files.state("resume").current === "" && (await tool("get_document", { document: "resume" })).value.blocks.some((b) => b.kind === "job")
+        && (await js(`document.querySelector(".cv-page")?.getAttribute("data-cv-imported") === "pdf" && document.querySelectorAll(".cv-page img").length > 0`));
+    fileSteps.mcpImportGuarded = (await tool("open_document", { name: fixture("sample-resume.textutil.docx") })).isError;
+    // Open / drop takes the same road; over unsaved work it asks (the smoke answers Cancel), and the sheet stays as it was
+    files.openPath(fixture("sample-resume.textutil.docx"));
+    await new Promise((r) => setTimeout(r, 2500));
+    fileSteps.importAsksFirst = await js(`document.querySelector(".cv-page")?.getAttribute("data-cv-imported") === "pdf"`);
+    // put the saved file back, so the relaunch check finds it (an import leaves the tab with no file until it is saved)
+    await js(`window.cvMakerFiles.setDirty(false, "resume")`); await new Promise((r) => setTimeout(r, 200));
+    files.openPath(savedFile); await new Promise((r) => setTimeout(r, 1500));
+    fileSteps.importRestored = files.state("resume").current === savedFile;
+    child.kill();
 
     const info = await js(`({ pages: document.querySelectorAll(".cvm-pageno").length, origin: location.origin, stored: !!localStorage })`);
     return { saved, problems, info, fileSteps, electron: process.versions.electron, chrome: process.versions.chrome };

@@ -1,0 +1,35 @@
+JORDAN OKAFOR
+Chicago, IL 60614
+jordan.okafor@example.com | (312) 555-0187
+linkedin.com/in/jordanokafor
+
+SUMMARY
+Operations analyst with eight years of experience turning messy logistics data
+into decisions that warehouse teams actually use. Comfortable in SQL, happier
+on the floor.
+
+Experience
+==========
+
+Senior Operations Analyst, Brightline Parcel          2020 – Present
+  • Built the daily dock-capacity model that cut overtime by 18% across
+    three sites.
+  • Ran 40+ ride-alongs with drivers to find where scans were missed.
+      ◦ Turned findings into a two-screen scanner flow.
+  • Trained 12 supervisors on the new reporting dashboard.
+
+Operations Analyst, Lakeshore Freight	2016 – 2020
+- Reconciled carrier invoices, recovering $240K in overbilling.
+- Automated the weekly lane report.
+
+EDUCATION
+---------
+B.S. Industrial Engineering, University of Illinois          2016
+
+Certifications
+1. Six Sigma Green Belt
+2. APICS CPIM
+
+----------------------------------------
+    References available on request.
+Notes	Tabbed	Columns

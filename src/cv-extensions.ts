@@ -128,3 +128,28 @@ export const ColumnBreak = Extension.create({
         };
     },
 });
+
+// what an IMPORTED document's runs carry beyond size / weight / colour / spacing: a font per run (a Word résumé
+// sets the name in one face and the body in another), a highlight, small caps written as capitals. Parsed from the
+// span's own style and written back the same way, so a region keeps them through every edit.
+const styleAttr = (prop: "fontFamily" | "backgroundColor" | "textTransform", css: string) => ({
+    default: null,
+    parseHTML: (element: HTMLElement) => element.style[prop] || null,
+    renderHTML: (attributes: Record<string, string | null>) => (attributes[prop] ? { style: `${css}: ${attributes[prop]}` } : {}),
+});
+export const ImportedTextStyle = Extension.create({
+    name: "cvImportedTextStyle",
+
+    addGlobalAttributes() {
+        return [
+            {
+                types: ["textStyle"],
+                attributes: {
+                    fontFamily: styleAttr("fontFamily", "font-family"),
+                    backgroundColor: styleAttr("backgroundColor", "background-color"),
+                    textTransform: styleAttr("textTransform", "text-transform"),
+                },
+            },
+        ];
+    },
+});

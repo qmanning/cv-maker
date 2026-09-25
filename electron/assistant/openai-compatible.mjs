@@ -1,7 +1,7 @@
 // electron/assistant/openai-compatible.mjs — any server that speaks the OpenAI chat-completions shape:
 // OpenAI, Gemini's and OpenRouter's compatible endpoints, and local models (Ollama, LM Studio).
 // There is no single SDK for "whatever you point it at", so this is plain fetch. Main process only.
-import { SYSTEM, TOOL, normalize, userContent } from "./prompt.mjs";
+import { SYSTEM, TOOL, TRANSCRIBE, normalize, userContent } from "./prompt.mjs";
 
 export const PRESETS = [
     { id: "openai", label: "OpenAI", baseUrl: "https://api.openai.com/v1", needsKey: true },
@@ -18,6 +18,24 @@ export function checkBaseUrl(baseUrl) {
     const local = ["localhost", "127.0.0.1", "[::1]"].includes(u.hostname);
     if (u.protocol !== "https:" && !(u.protocol === "http:" && local)) throw new Error("Use an https:// address (plain http:// is only allowed for a model on this computer).");
     return u.href.replace(/\/+$/, "");
+}
+
+/** pictures of pages → Markdown (a scanned PDF). Only vision models can; a text-only model says so in its error. */
+export async function transcribeOpenAiCompatible({ apiKey, baseUrl, model }, images) {
+    const url = checkBaseUrl(baseUrl) + "/chat/completions";
+    let res;
+    try {
+        res = await fetch(url, {
+            method: "POST", signal: AbortSignal.timeout(300000),
+            headers: { "content-type": "application/json", ...(apiKey ? { authorization: "Bearer " + apiKey } : {}) },
+            body: JSON.stringify({ model, messages: [{ role: "system", content: TRANSCRIBE }, { role: "user", content: [...images.map((u) => ({ type: "image_url", image_url: { url: u } })), { type: "text", text: "Transcribe these pages." }] }] }),
+        });
+    } catch (e) { throw new Error(e?.name === "TimeoutError" ? "Your AI took too long to read the scan." : `Couldn't reach ${new URL(url).host}. Is it running?`); }
+    const body = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(`Your AI couldn't read the scan (${res.status}): ${body?.error?.message || "does this model accept images?"}`);
+    const text = String(body?.choices?.[0]?.message?.content || "").replace(/^```(?:markdown)?\s*|\s*```\s*$/g, "").trim();
+    if (!text) throw new Error("Your AI sent back nothing for the scan. Does this model accept images?");
+    return { markdown: text };
 }
 
 export async function runOpenAiCompatible({ apiKey, baseUrl, model }, request) {

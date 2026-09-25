@@ -15,6 +15,7 @@ import fs from "node:fs";
 import { build } from "esbuild";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { createRequire } from "node:module";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -67,7 +68,11 @@ export async function runBuild(opts) {
     // chunk names carry a content hash, so every build would otherwise leave the previous build's chunks behind —
     // and dist/ is committed and shipped. Start from an empty output folder.
     fs.rmSync(options.outdir, { recursive: true, force: true });
-    return build(options);
+    const result = await build(options);
+    // pdf.js parses in a Web Worker loaded by URL, not bundled: ship it next to the bundle, where
+    // src/import/pdf.ts points GlobalWorkerOptions.workerSrc (dist/pdf.worker.min.mjs)
+    fs.copyFileSync(createRequire(import.meta.url).resolve("pdfjs-dist/build/pdf.worker.min.mjs"), path.join(options.outdir, "pdf.worker.min.mjs"));
+    return result;
 }
 
 const isMain = (() => {

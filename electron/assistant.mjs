@@ -6,8 +6,8 @@ import { BrowserWindow, ipcMain, safeStorage, app, shell, clipboard } from "elec
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { ANTHROPIC_DEFAULT, ANTHROPIC_MODELS, runAnthropic } from "./assistant/anthropic.mjs";
-import { PRESETS, checkBaseUrl, runOpenAiCompatible } from "./assistant/openai-compatible.mjs";
+import { ANTHROPIC_DEFAULT, ANTHROPIC_MODELS, runAnthropic, transcribeAnthropic } from "./assistant/anthropic.mjs";
+import { PRESETS, checkBaseUrl, runOpenAiCompatible, transcribeOpenAiCompatible } from "./assistant/openai-compatible.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -50,6 +50,19 @@ export function setupAssistant({ origin, editorWindow, mcp, moveToApplications =
             console.log(`[assistant] ${settings.provider}/${settings.model} — ${out.ops.length} op(s) in ${Date.now() - started}ms`);
             return out;
         } catch (err) { console.log(`[assistant] failed: ${err?.message || err}`); throw new Error(String(err?.message || err)); }   // a plain Error crosses IPC cleanly
+    });
+
+    // importing a scanned PDF: the one import step rules can't do. The AI only reads; the editor's rules build the page.
+    ipcMain.handle("assistant:transcribe", async (e, request) => {
+        if (!fromEditor(e)) throw new Error("not allowed");
+        if (!status().ready) throw new Error("Connect your AI first (AI Settings).");
+        const images = (Array.isArray(request?.images) ? request.images : []).filter((i) => typeof i === "string" && /^data:image\/(png|jpeg|gif|webp);base64,/.test(i)).slice(0, 8);
+        if (!images.length) throw new Error("There are no page images to read.");
+        const cfg = { ...settings, apiKey: apiKey() };
+        try {
+            return cfg.provider === "anthropic" ? await transcribeAnthropic({ apiKey: cfg.apiKey, model: cfg.model || ANTHROPIC_DEFAULT }, images)
+                : await transcribeOpenAiCompatible({ apiKey: cfg.apiKey, baseUrl: cfg.baseUrl, model: cfg.model }, images);
+        } catch (err) { throw new Error(String(err?.message || err)); }
     });
 
     /* ---- the settings window's side ---- */

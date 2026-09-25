@@ -13,13 +13,13 @@ import { installJsdom, bundleSourceAndImport } from "./_helpers.mjs";
 
 installJsdom();
 
-const { Editor, StarterKit, TextStyle, FontSize, FontWeight, BlockLineHeight, ColumnBreak, LetterSpacing } = await bundleSourceAndImport(`
+const { Editor, StarterKit, TextStyle, FontSize, FontWeight, BlockLineHeight, ColumnBreak, LetterSpacing, ImportedTextStyle } = await bundleSourceAndImport(`
     export { Editor } from "@tiptap/core";
     export { StarterKit } from "@tiptap/starter-kit";
     export { TextStyle } from "@tiptap/extension-text-style";
     export { FontSize } from "@/components/ui/font-size-extension";
     export { FontWeight } from "@/components/ui/font-weight-extension";
-    export { BlockLineHeight, ColumnBreak, LetterSpacing } from "./src/cv-extensions";
+    export { BlockLineHeight, ColumnBreak, LetterSpacing, ImportedTextStyle } from "./src/cv-extensions";
 `);
 
 // mirrors the extensions array built in CvMaker.tsx's mount effect (minus Color/TextAlign, which need
@@ -31,7 +31,7 @@ function makeEditor(content) {
                 heading: false, codeBlock: false, code: false, blockquote: false, trailingNode: false,
                 link: { openOnClick: false, autolink: true, HTMLAttributes: { rel: null, target: null } },
             }),
-            TextStyle, FontSize, FontWeight, LetterSpacing, BlockLineHeight, ColumnBreak,
+            TextStyle, FontSize, FontWeight, LetterSpacing, ImportedTextStyle, BlockLineHeight, ColumnBreak,
         ],
         content,
         injectCSS: false,
@@ -39,6 +39,15 @@ function makeEditor(content) {
 }
 
 /* ---------------- (i) round trip ---------------- */
+
+test("an imported run's font, highlight and capitals survive setContent -> getHTML", () => {
+    const ed = makeEditor('<p><span style="font-family: Georgia, serif; background-color: #ffff00; text-transform: uppercase">x</span></p>');
+    const html = ed.getHTML();
+    assert.match(html, /font-family: Georgia, serif/);
+    assert.match(html, /background-color: (#ffff00|rgb\(255, 255, 0\))/);
+    assert.match(html, /text-transform: uppercase/);
+    ed.destroy();
+});
 
 test("a paragraph's line-height style survives setContent -> getHTML", () => {
     const ed = makeEditor('<p style="line-height: 1.53">x</p>');

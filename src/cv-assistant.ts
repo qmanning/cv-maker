@@ -26,6 +26,9 @@ export interface CvAssistant {
     onStatus(handler: (status: { ready: boolean; label: string }) => void): () => void;
     /** one request: the person's words + the document → what to say back and what to change */
     run(request: { prompt: string; document: AiDocument; keywords?: string[] }): Promise<{ message: string; ops: AiOp[]; keywords?: string[]; job?: string }>;
+    /** read pictures of pages (a scanned PDF) and write out what they say, as Markdown — the import's rules then do the
+     *  structure and the look, exactly as for a Markdown file. Only providers that can see images; absent otherwise. */
+    transcribe?(request: { images: string[] }): Promise<{ markdown: string }>;
 }
 
 /** The other direction: an AI app OUTSIDE the editor drives it (the desktop shell runs an MCP server for Claude
@@ -58,6 +61,8 @@ export interface CvRemoteHandlers {
     sourceHtml(): { html: string; suggested: string };
     /** the shell wrote the file: it is now this document's identity and nothing is unsaved */
     markSaved(file: string): void;
+    /** import a file an AI app pointed at (Word, PDF, RTF, Markdown, text, foreign HTML) as a new, unsaved document */
+    importFile(name: string, base64: string): Promise<{ document: "resume" | "letter"; report: unknown }>;
 }
 export interface RemotePage { paper: string; paperLabel: string; papers: string[]; fit: boolean; paginate: boolean; zoom: number | "width" | "height"; zoomPercent: number; pages: number; fitScale: number }
 export interface RemoteImage { id: string; alt: string; width: number; height: number; kilobytes: number; embedded: boolean }
