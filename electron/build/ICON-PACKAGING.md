@@ -5,10 +5,19 @@ it using Xcode's `actool`, embeds `Assets.car`, and sets `CFBundleIconName` to `
 This avoids the gray backing macOS adds to the previous legacy-only icon.
 A fallback `icon.icns` is also generated for older macOS versions.
 
-The artwork is the approved `brand/icedcoffee-icon-source.png`, resized to 1024px.
-`npm run icon` refreshes both `build/icon.png` (Windows/web artwork) and
-`build/IcedCoffee.icon/Assets/Artwork.png`. No additional background or glass
-effects are requested in the Icon Composer manifest.
+`build/IcedCoffee.icon` is the one source. Its `Assets/Artwork.png` is the acrylic
+texture **edge to edge**: `brand/icedcoffee-icon-source.png` (2048²) with its baked
+tile edge cropped away (1648² from 200,200) and resized to 1024². macOS applies its
+own rounded mask and rim, so the artwork must not carry a tile shape, corners or
+transparency of its own — a baked tile is what produced the clipped bevel (and, as
+a legacy `.icns`, the gray backing plate). No glass, shadow or specular effects are
+requested in the manifest.
+
+Edit the package in Icon Composer (`/Applications/Xcode.app/Contents/Applications/`):
+it has per-appearance (Default / Dark / Clear / Tinted) controls for fill, opacity,
+translucency, blur, shadow and specular. Then run `npm run icon`: it compiles the
+package with `actool` and writes Apple's flattened render to `build/icon.png`
+(Windows, older macOS) and `brand/icedcoffee-icon.png` (the favicon).
 
 ## Building
 
