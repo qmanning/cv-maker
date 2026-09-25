@@ -38,6 +38,10 @@ app.whenReady().then(async () => {
     const y = Math.max(0, Math.min(size.height - edge, Math.floor((top + bottom + 1 - edge) / 2)));
     const png = icon.crop({ x, y, width: edge, height: edge }).resize({ width: 1024, height: 1024, quality: "best" }).toPNG();
     fs.writeFileSync(path.join(here, "icon.png"), png);
+    // Keep the modern macOS package on the exact same artwork as the legacy icon.
+    const composerAssets = path.join(here, "IcedCoffee.icon", "Assets");
+    fs.mkdirSync(composerAssets, { recursive: true });
+    fs.writeFileSync(path.join(composerAssets, "Artwork.png"), png);
     fs.writeFileSync(path.resolve(here, "../../brand/icedcoffee-icon.png"), png);
     console.log(`Cropped ${size.width} to ${edge} square at ${x},${y}`);
     // drawn at 2× (CSS zoom) so the Retina background is sharp; the 1× file is that, halved

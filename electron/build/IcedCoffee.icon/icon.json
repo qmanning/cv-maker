@@ -1,0 +1,27 @@
+{
+  "fill": "none",
+  "groups": [
+    {
+      "name": "Approved acrylic artwork",
+      "layers": [
+        {
+          "name": "Artwork",
+          "image-name": "Artwork.png",
+          "fill": "none",
+          "glass": false,
+          "opacity": 1,
+          "blend-mode": "normal",
+          "position": {
+            "scale": 1,
+            "translation-in-points": [0, 0]
+          }
+        }
+      ],
+      "specular": false,
+      "blur-material": 0,
+      "translucency": { "enabled": false, "value": 0 },
+      "shadow": { "kind": "none", "opacity": 0 }
+    }
+  ],
+  "supported-platforms": { "squares": "shared" }
+}

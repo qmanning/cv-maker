@@ -19,7 +19,8 @@
         "dist": "node build/dist.mjs --mac",
         "dist:win": "node build/dist.mjs --win",
         "leaks": "node leaks.mjs",
-        "dist:test": "node build/dist.mjs --mac --arm64"
+        "dist:test": "node build/dist.mjs --mac --arm64",
+        "dist:icon-composer": "node build/dist.mjs --mac --arm64 --config.mac.icon=build/IcedCoffee.icon"
     },
     "devDependencies": {
         "electron": "^44.4.3",
@@ -102,7 +103,8 @@
             "identity": "-",
             "hardenedRuntime": false,
             "gatekeeperAssess": false,
-            "artifactName": "IcedCoffee-${version}-mac-${arch}.${ext}"
+            "artifactName": "IcedCoffee-${version}-mac-${arch}.${ext}",
+            "icon": "build/IcedCoffee.icon"
         },
         "dmg": {
             "title": "IcedCoffee ${version}",
