@@ -10,9 +10,9 @@ texture **edge to edge**: `brand/icedcoffee-icon-source.png` (2048²) with its b
 tile edge cropped away (4.9% of the tile's side off every edge, which also sets the
 cup's size on the icon) and resized to 1024².
 
-**Dark appearance:** `Assets/ArtworkDark.png` — ebony-dyed walnut (charcoal, satin,
-a flowing walnut figure) with the cup inlaid in warm antique brass. Rendered with
-`brand/3d-icon/build_icon.py --variant ebony --view front --size 2048` (the brass is
+**Dark appearance:** `Assets/ArtworkDark.png` — walnut (warm chocolate, fine straight
+grain, matte) with the cup inlaid in bright polished brass, like a brass-inlay tabletop.
+Rendered with `brand/3d-icon/build_icon.py --variant walnut --view front --size 2048` (the brass is
 flush with the wood; the overhead softbox is light-linked to the brass only, so the
 wood stays deep instead of mirroring it), then cropped by the same 4.9% so the cup
 is the same size in both. `icon.json` wires it with `image-name-specializations`
