@@ -13,6 +13,10 @@ contextBridge.exposeInMainWorld("cvAssistantSettings", {
         check: () => ipcRenderer.send("assistant-settings:updates-check"),
     },
     onShow: (handler) => { ipcRenderer.on("assistant-settings:show", (_e, section) => handler(section)); },
+    notes: {
+        get: () => ipcRenderer.invoke("assistant-settings:notes-get"),
+        set: (text) => ipcRenderer.invoke("assistant-settings:notes-set", String(text || "")),
+    },
     mcp: {
         state: () => ipcRenderer.invoke("assistant-settings:mcp-state"),
         connectClaude: () => ipcRenderer.invoke("assistant-settings:mcp-connect-claude"),

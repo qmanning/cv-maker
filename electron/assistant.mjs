@@ -46,7 +46,7 @@ export function setupAssistant({ origin, editorWindow, mcp, moveToApplications =
         if (!prompt.trim() || !request?.document || typeof request.document !== "object") throw new Error("Nothing to ask.");
         const started = Date.now();
         try {
-            const out = await run({ ...settings, apiKey: apiKey() }, { prompt, document: request.document });
+            const out = await run({ ...settings, apiKey: apiKey() }, { prompt, document: request.document, keywords: Array.isArray(request.keywords) ? request.keywords.filter((k) => typeof k === "string").slice(0, 60) : [] });
             console.log(`[assistant] ${settings.provider}/${settings.model} — ${out.ops.length} op(s) in ${Date.now() - started}ms`);
             return out;
         } catch (err) { console.log(`[assistant] failed: ${err?.message || err}`); throw new Error(String(err?.message || err)); }   // a plain Error crosses IPC cleanly
@@ -92,12 +92,14 @@ export function setupAssistant({ origin, editorWindow, mcp, moveToApplications =
     });
     // the no-key way (see mcp.mjs): this window is also where "Connect Claude Desktop" lives
     ipcMain.handle("assistant-settings:mcp-state", (e) => (fromSettings(e) ? mcp.state() : null));
-    ipcMain.handle("assistant-settings:mcp-connect-claude", (e) => { if (!fromSettings(e)) throw new Error("not allowed"); mcp.connectClaude(); return mcp.state(); });
-    ipcMain.handle("assistant-settings:mcp-disconnect-claude", (e) => { if (!fromSettings(e)) throw new Error("not allowed"); mcp.disconnectClaude(); return mcp.state(); });
+    ipcMain.handle("assistant-settings:mcp-connect-claude", async (e) => { if (!fromSettings(e)) throw new Error("not allowed"); await mcp.connectClaude(); return mcp.state(); });
+    ipcMain.handle("assistant-settings:mcp-disconnect-claude", async (e) => { if (!fromSettings(e)) throw new Error("not allowed"); await mcp.disconnectClaude(); return mcp.state(); });
     ipcMain.handle("assistant-settings:mcp-connect-codex", (e) => { if (!fromSettings(e)) throw new Error("not allowed"); mcp.connectCodex(); return mcp.state(); });
     ipcMain.handle("assistant-settings:mcp-disconnect-codex", (e) => { if (!fromSettings(e)) throw new Error("not allowed"); mcp.disconnectCodex(); return mcp.state(); });
     ipcMain.handle("assistant-settings:move-to-applications", (e) => { if (!fromSettings(e)) throw new Error("not allowed"); return moveToApplications(); });
-    ipcMain.handle("assistant-settings:mcp-copy", (e, what) => { if (!fromSettings(e)) return false; const m = mcp.state(); clipboard.writeText(what === "claude-code" ? m.claudeCode : what === "codex" ? m.codexCommand : m.snippet); return true; });
+    ipcMain.handle("assistant-settings:mcp-copy", (e, what) => { if (!fromSettings(e)) return false; const m = mcp.state(); clipboard.writeText(what === "prompt" ? m.prompt : what === "claude-code" ? m.claudeCode : what === "codex" ? m.codexCommand : m.snippet); return true; });
+    ipcMain.handle("assistant-settings:notes-get", (e) => (fromSettings(e) ? mcp.getNotes() : ""));
+    ipcMain.handle("assistant-settings:notes-set", (e, text) => { if (!fromSettings(e)) throw new Error("not allowed"); return mcp.setNotes(text); });
     mcp.onChange(() => { if (win && !win.isDestroyed()) win.webContents.send("assistant-settings:mcp-changed", mcp.state()); });
     // Updates live in the same Settings window
     const updateState = () => ({ available: !!updates, auto: !!updates?.auto(), version: app.getVersion() });
@@ -124,7 +126,7 @@ export function setupAssistant({ origin, editorWindow, mcp, moveToApplications =
 
     return {
         openSettings, status,
-        /** app://itera/__assistant/* — the settings page's own files */
+        /** app://icedcoffee/__assistant/* — the settings page's own files */
         serve(pathname) {
             const name = { "/__assistant/settings.html": "settings.html", "/__assistant/settings.js": "settings.js" }[pathname];
             if (!name) return null;

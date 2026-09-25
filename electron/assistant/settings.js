@@ -52,18 +52,18 @@
         const c = m.claude, pill = $("claude-pill");
         pill.textContent = c.connected ? (c.current ? "Connected" : "Needs reconnecting") : ""; pill.className = "pill" + (c.connected && c.current ? " on" : "");
         $("claude-sub").textContent = !c.installed ? "Claude Desktop isn't installed on this computer. Get it free at claude.ai/download, then come back."
-            : c.connected && c.current ? "Claude Desktop knows about Itera."
-            : c.connected ? "Itera has moved since you connected (an update, or a different folder). Connect again to fix it."
-            : "One click adds Itera to Claude's settings (a backup of the file is kept next to it).";
+            : c.connected && c.current ? "Claude Desktop knows about IcedCoffee."
+            : c.connected ? "IcedCoffee has moved since you connected (an update, or a different folder). Connect again to fix it."
+            : "One click adds IcedCoffee to Claude's settings and restarts Claude if it's open (a backup of the file is kept next to it).";
         $("claude-connect").hidden = c.connected && c.current; $("claude-connect").disabled = !c.installed;
         $("claude-connect").textContent = c.connected ? "Reconnect Claude Desktop" : "Connect Claude Desktop";
         $("claude-disconnect").hidden = !c.connected; $("claude-steps").hidden = !(c.connected && c.current);
         const x = m.codex, xp = $("codex-pill");
         xp.textContent = x.connected ? (x.current ? "Connected" : "Needs reconnecting") : ""; xp.className = "pill" + (x.connected && x.current ? " on" : "");
         $("codex-sub").textContent = !x.installed ? "Not set up on this computer yet. Open the ChatGPT desktop app's Codex (or install the Codex CLI) once, then come back."
-            : x.connected && x.current ? "ChatGPT and Codex know about Itera. They share one settings file."
-            : x.connected ? "Itera has moved since you connected. Connect again to fix it."
-            : "One click adds Itera to the settings file the ChatGPT app, Codex CLI and the IDE extension share (a backup is kept).";
+            : x.connected && x.current ? "ChatGPT and Codex know about IcedCoffee. They share one settings file."
+            : x.connected ? "IcedCoffee has moved since you connected. Connect again to fix it."
+            : "One click adds IcedCoffee to the settings file the ChatGPT app, Codex CLI and the IDE extension share (a backup is kept).";
         $("codex-connect").hidden = x.connected && x.current; $("codex-connect").disabled = !x.installed;
         $("codex-connect").textContent = x.connected ? "Reconnect ChatGPT / Codex" : "Connect ChatGPT / Codex";
         $("codex-disconnect").hidden = !x.connected; $("codex-steps").hidden = !(x.connected && x.current);
@@ -72,8 +72,19 @@
     }
     const flash = (t) => { $("copied").textContent = t; setTimeout(() => { $("copied").textContent = ""; }, 1800); };
     paintMcp(await api.mcp.state()); api.mcp.onChange(paintMcp);
+
+    // Notes to your AI: house rules folded into the MCP instructions for every connection
+    const notes = $("ai-notes");
+    if (notes && api.notes) {
+        notes.value = await api.notes.get();
+        let notesTimer;
+        notes.addEventListener("input", () => { clearTimeout(notesTimer); notesTimer = setTimeout(async () => { await api.notes.set(notes.value); const el = $("notes-saved"); if (el) { el.textContent = "Saved"; setTimeout(() => (el.textContent = ""), 1200); } }, 500); });
+    }
     $("move-now").addEventListener("click", () => api.mcp.moveToApplications());
-    $("claude-connect").addEventListener("click", async () => { try { paintMcp(await api.mcp.connectClaude()); } catch (e) { $("claude-sub").textContent = clean(e); } });
+    $("claude-connect").addEventListener("click", async () => {
+        const b = $("claude-connect"), was = b.textContent; b.disabled = true; b.textContent = "Connecting — Claude will restart…";
+        try { paintMcp(await api.mcp.connectClaude()); } catch (e) { $("claude-sub").textContent = clean(e); } finally { b.disabled = false; if (b.textContent.startsWith("Connecting")) b.textContent = was; }
+    });
     $("claude-disconnect").addEventListener("click", async () => paintMcp(await api.mcp.disconnectClaude()));
     $("codex-connect").addEventListener("click", async () => { try { paintMcp(await api.mcp.connectCodex()); } catch (e) { $("codex-sub").textContent = clean(e); } });
     $("codex-disconnect").addEventListener("click", async () => paintMcp(await api.mcp.disconnectCodex()));
@@ -90,4 +101,5 @@
     show(decodeURIComponent(location.hash.slice(1))); api.onShow(show);
 
     $("copy-cc").addEventListener("click", async () => { await api.mcp.copy("claude-code"); flash("Copied"); });
+    $("copy-prompt").addEventListener("click", async () => { await api.mcp.copy("prompt"); const el = $("prompt-copied"); el.textContent = "Copied — now paste it to your AI"; setTimeout(() => { el.textContent = ""; }, 3500); });
 })();

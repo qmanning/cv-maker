@@ -46,6 +46,7 @@ export async function renderExport(body) {
                 printBackground: true,
                 preferCSSPageSize: true,
                 margins: { marginType: "none" },
+                scale: Math.min(2, Math.max(0.1, body.fit || 1)),   // fit-to-one-page: printToPDF honours scale, CSS zoom it ignores
             });
             return { buffer: pdf, contentType: "application/pdf" };
         }

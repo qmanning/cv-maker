@@ -1,4 +1,4 @@
-/* Itera — only what Infospector's host.css (loaded at runtime) doesn't already give us.
+/* IcedCoffee — only what Infospector's host.css (loaded at runtime) doesn't already give us.
    Everything here leans on its --pt-* / glass tokens, so the two tools always look alike. */
 
 .cvm-root {
@@ -7,14 +7,39 @@
   color: var(--pt-text); font: 13px/1.5 var(--pt-font); -webkit-font-smoothing: antialiased;
 }
 .cvm-root[data-ready="false"] { visibility: hidden; }
+/* placeholders (the search bar, the start-up Page field, any menu input) would otherwise fall back to the
+   browser's fixed cool gray, which clashes with a warm/tinted background. Route them to the adaptive ink
+   instead — white or black by mode, faded — so they always source from the chosen background. Covers the
+   toolbar and every glass menu, whether it renders inside .cvm-root or portals to <body>. */
+.cvm-root ::placeholder,
+#pt-bar ::placeholder,
+.pt-ctx ::placeholder,
+.pt-dim-pop ::placeholder,
+.pt-menu-pop ::placeholder,
+.pt-omni-results ::placeholder { color: var(--pt-text-faint); opacity: 1; }
 /* concentric chrome, by Infospector's formula: its Radius + Padding dials (--glass-radius / --glass-pad) drive
    every corner here too. Our 30px controls round to the dialed radius, capped at a full circle (15px). */
 .cvm-root { --cvm-ctl-r: min(var(--glass-radius, 40px), 15px); }
 /* Infospector's color picker mounts on <body>; lift it above this full-screen tool */
-body > .pt-cpick { z-index: 2100; }
+body > .pt-cpick { z-index: 4200; }   /* above the icon-picker modal too, so recolouring works there */
 
 /* the bar: Infospector's #pt-bar, centered and sized to its contents */
 #pt-bar.cvm-bar { left: 50%; transform: translateX(-50%); width: min(860px, calc(100vw - 24px)); transition: none; }
+/* desktop shell (Electron, hidden OS title bar): a transparent strip across the top where the title bar
+   would be, so the frameless window still drags. It is see-through, so it always shows the chosen
+   background through it and never clashes with it. Only active in the desktop shell (.cvm-desktop). */
+.cvm-titlebar { display: none; }
+.cvm-desktop .cvm-titlebar { display: block; position: fixed; top: 0; left: 0; right: 0; height: 40px;
+   z-index: 100; -webkit-app-region: drag; app-region: drag; }
+/* the floating bar sits above the strip and is also a drag handle, but its own controls stay clickable */
+.cvm-desktop #pt-bar.cvm-bar { -webkit-app-region: drag; app-region: drag; }
+.cvm-desktop #pt-bar.cvm-bar button,
+.cvm-desktop #pt-bar.cvm-bar input,
+.cvm-desktop #pt-bar.cvm-bar a,
+.cvm-desktop #pt-bar.cvm-bar label,
+.cvm-desktop #pt-bar.cvm-bar .pt-omni,
+.cvm-desktop #pt-bar.cvm-bar [role="button"] { -webkit-app-region: no-drag; app-region: no-drag; }
+@media (max-width: 1000px) { .cvm-desktop #pt-bar.cvm-bar { top: 46px; } }
 /* the buttons are never pushed off-screen: they keep their size, and the two fields (paper size, document
    name) give up width and truncate instead */
 .cvm-bar > .pt-rbtn { flex: none; }
@@ -25,6 +50,40 @@ body > .pt-cpick { z-index: 2100; }
 .cvm-bar .pt-omni { flex: 1 1 0; min-width: 72px; }
 .cvm-bar .pt-omni input { text-overflow: ellipsis; padding-right: 36px; }
 .cvm-bar .pt-omni .cvm-import { display: grid; }
+/* ✕ close: sits left of the Open button while a document is showing */
+.cvm-bar .pt-omni .cvm-omni-close { display: grid; right: 34px; }
+.cvm-bar .pt-omni.cvm-can-close input { padding-right: 64px; }
+
+/* recent-documents typeahead (desktop): the results drop UNDER the bar — Infospector positions its own copy
+   with JS (position: fixed), but ours is nested in the omni, so anchor it there instead */
+.cvm-bar .pt-omni-results { position: absolute; top: calc(100% + 8px); left: 0; right: 0; width: auto; }
+.cvm-omni-item .pt-oi-title { flex: 1 1 auto; margin-right: auto; }
+.cvm-omni-item > svg { flex: none; width: 15px; height: 15px; color: var(--pt-text-dim); }   /* the "Save as …" row's icon */
+.cvm-omni-pin { flex: none; width: 24px; height: 24px; margin-left: 6px; display: grid; place-items: center; border: none;
+  border-radius: 50%; background: transparent; color: var(--pt-text-faint); cursor: pointer; opacity: 0; transition: opacity .12s; }
+.cvm-omni-item:hover .cvm-omni-pin, .cvm-omni-item.pt-active .cvm-omni-pin, .cvm-omni-pin.pt-active { opacity: 1; }
+.cvm-omni-pin:hover { background: var(--pt-glass); color: var(--pt-text); }
+.cvm-omni-pin.pt-active { color: var(--pt-accent); }
+.cvm-omni-pin svg { width: 15px; height: 15px; }
+
+/* the IcedCoffee mark, far left — a quick-menu trigger in the brand accent that animates on hover */
+.cvm-bar .cvm-brand { flex: none; display: grid; place-items: center; width: 34px; height: 36px; padding: 0; border: none; background: none; cursor: pointer;
+  color: var(--pt-text); border-radius: var(--cvm-ctl-r); }   /* ghost: no ring, no fill — the mark floats (white on the dark bar) */
+.cvm-bar .cvm-brand .cvm-brand-glyph { width: 27px; height: 27px; stroke-width: 1.3; }
+.cvm-bar .cvm-brand:focus-visible { outline: 2px solid var(--pt-accent); outline-offset: 1px; }
+.cvm-brand-glyph { transition: transform .25s cubic-bezier(.2, .7, .2, 1); transform-origin: 50% 55%; }
+.cvm-bar .cvm-brand:hover .cvm-brand-glyph { transform: rotate(-8deg) scale(1.12); }
+.cvm-bar .cvm-brand:active .cvm-brand-glyph { transform: rotate(-8deg) scale(1.02); }
+@media (prefers-reduced-motion: reduce) { .cvm-brand-glyph { transition: none; } }
+/* résumé | cover letter — a two-segment picker at the far right of the bar */
+.cvm-seg { flex: none; display: flex; align-items: center; gap: 2px; height: 36px; padding: 3px; box-sizing: border-box; border-radius: var(--glass-item-r, 18px);
+  border: 1px solid var(--pt-glass-brd); background: var(--pt-glass-2); }
+.cvm-seg button { display: grid; place-items: center; width: 32px; height: 28px; padding: 0; border: none; border-radius: calc(var(--glass-item-r, 18px) - 4px); background: transparent;
+  color: var(--pt-text-dim); cursor: pointer; transition: background 140ms, color 140ms; }
+.cvm-seg button:hover { color: var(--pt-text); }
+.cvm-seg button.cvm-on { background: var(--pt-accent); color: #fff; }
+.cvm-seg svg { width: 16px; height: 16px; stroke-width: 2; }
+.pt-menu-item.cvm-back { color: var(--pt-text-dim); font-weight: 600; }
 .cvm-narrow-only { display: none !important; }
 @media (max-width: 520px) { .cvm-bar .cvm-secondary { display: none; } .pt-menu-item.cvm-narrow-only { display: flex !important; } #pt-bar.cvm-bar { gap: 4px; } }
 @media (max-width: 620px) { .cvm-bar .cvm-label, .cvm-bar .pt-dim-scale { display: none; } .cvm-bar { gap: 5px; } }
@@ -33,7 +92,15 @@ body > .pt-cpick { z-index: 2100; }
 .cvm-dirty { width: 7px; height: 7px; border-radius: 50%; background: var(--pt-open); flex: none; }
 .pt-menu-item.cvm-row { display: flex; align-items: center; gap: 9px; }
 .pt-menu-item.cvm-row .cvm-hint { margin-left: auto; color: var(--pt-text-faint); font-size: 11.5px; }
-.pt-menu-item.cvm-credit { text-decoration: none; justify-content: space-between; box-sizing: border-box; }
+/* "Made by Q" — a pill filled with the chosen page background, its label + logo in the adaptive ink so it
+   reads on any theme (concentric radius, like the rest of the chrome) */
+.pt-menu-item.cvm-credit { display: flex; justify-content: center; align-items: center; box-sizing: border-box; width: 100%;
+    margin: 16px 0 8px; padding: 9px 16px; border-radius: var(--glass-inner-r); text-decoration: none;   /* concentric with the menu (radius − padding), 16px above / ~16px below */
+    background: var(--pt-ground); color: var(--pt-text); font: 600 13px var(--pt-font); transition: filter .12s; }
+.pt-menu-item.cvm-credit:hover { background: var(--pt-ground); filter: brightness(1.2); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pt-text) 22%, transparent); }
+.pt-menu-item.cvm-credit:active { filter: brightness(1.08); }
+.cvm-credit .cvm-credit-in { display: inline-flex; align-items: center; gap: 5px; }
+.cvm-credit .cvm-qlogo { width: 17px; height: 17px; }   /* Q logo, inherits the label colour */
 .pt-menu-item.cvm-active { background: var(--pt-accent-soft); }
 
 /* the canvas: Infospector's #pt-stagewrap, but it scrolls (a page is taller than a window) */
@@ -121,9 +188,9 @@ body > .pt-cpick { z-index: 2100; }
 /* ---- ask your AI: a glass prompt bar docked at the bottom (desktop shells only) ---- */
 .cvm-ask-wrap { position: fixed; left: 50%; bottom: 34px; transform: translateX(-50%); z-index: 121; width: min(640px, calc(100vw - 24px)); display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
 /* prose sits on this glass (not just icons), often over the white sheet — so it gets a tint of its own under the text */
-.cvm-root { --cvm-ask-tint: rgba(14, 16, 22, .52); }
-[data-pt-theme="light"] .cvm-root { --cvm-ask-tint: rgba(255, 255, 255, .55); }
-.cvm-ask, .cvm-ask-reply { background: linear-gradient(var(--cvm-ask-tint), var(--cvm-ask-tint)), var(--pt-glass); -webkit-backdrop-filter: var(--pt-blur-webkit); backdrop-filter: var(--pt-blur); border: 1px solid var(--pt-glass-brd); box-shadow: var(--pt-shadow); border-radius: var(--glass-bar-r); padding: var(--glass-pad, 8px); }
+/* the AI prompt / connect bars are the same real glass as the menus (they're in host.css's reflex+backing
+   group), so they just need the base fill + blur + geometry here. */
+.cvm-ask, .cvm-ask-reply { background-color: var(--pt-glass); -webkit-backdrop-filter: var(--pt-blur-webkit); backdrop-filter: var(--pt-blur); border-radius: var(--glass-bar-r); padding: var(--glass-pad, 8px); }
 .cvm-ask { display: flex; align-items: flex-end; gap: 8px; }
 .cvm-ask textarea { flex: 1 1 auto; min-width: 0; min-height: 36px; max-height: 168px; field-sizing: content; resize: none; box-sizing: border-box; padding: 8px 12px; border-radius: var(--glass-item-r); border: 1px solid var(--pt-glass-brd); background: var(--pt-glass-2); color: var(--pt-text); font: 13px/1.45 var(--pt-font); outline: none; }
 .cvm-ask textarea:focus { border-color: var(--pt-accent, #3666f8); }
@@ -145,13 +212,172 @@ body > .pt-cpick { z-index: 2100; }
 .cvm-root:has(.cvm-ask, .cvm-ask-connect) #pt-toast { bottom: 100px; }   /* toasts rise clear of the prompt bar */
 .cvm-root:has(.cvm-ask, .cvm-ask-connect) #pt-stagewrap.cvm-wrap { padding-bottom: 128px; }   /* the last lines of the sheet can scroll clear of the bar */
 .cvm-ask-connect { align-self: center; display: inline-flex; align-items: center; height: 40px; padding: 0 5px 0 0; border-radius: 999px; color: var(--pt-text); font: 13px var(--pt-font);
-  background: linear-gradient(var(--cvm-ask-tint), var(--cvm-ask-tint)), var(--pt-glass); -webkit-backdrop-filter: var(--pt-blur-webkit); backdrop-filter: var(--pt-blur); border: 1px solid var(--pt-glass-brd); box-shadow: var(--pt-shadow); }
+  background-color: var(--pt-glass); -webkit-backdrop-filter: var(--pt-blur-webkit); backdrop-filter: var(--pt-blur); }
 .cvm-ask-connect:hover { border-color: var(--pt-accent, #3666f8); }
 .cvm-ask-connect-main { display: inline-flex; align-items: center; gap: 8px; height: 100%; padding: 0 8px 0 14px; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; border-radius: 999px 0 0 999px; }
-.cvm-ask-connect svg { width: 17px; height: 17px; stroke-width: 2; color: var(--pt-accent, #3666f8); }
+.cvm-ask-connect svg { width: 17px; height: 17px; stroke-width: 2; color: var(--pt-text); }
 .cvm-ask-connect b { font-weight: 650; } .cvm-ask-connect span { color: var(--pt-text-faint); font-size: 12px; }
 .cvm-ask-connect-x { width: 28px; height: 28px; display: grid; place-items: center; border: 0; border-radius: 50%; background: none; cursor: pointer; }
 .cvm-ask-connect-x svg { width: 14px; height: 14px; color: var(--pt-text-faint); } .cvm-ask-connect-x:hover { background: var(--pt-glass-2); } .cvm-ask-connect-x:hover svg { color: var(--pt-text); }
 .cvm-dot { width: 8px; height: 8px; border-radius: 50%; background: #3ecf8e; box-shadow: 0 0 0 3px rgba(62, 207, 142, .18); flex: none; }
 .cvm-live .cvm-dot { animation: cvm-ask-pulse 1.4s ease-in-out infinite; }
 @media (max-width: 560px) { .cvm-ask-connect span { display: none; } }
+
+/* ATS keywords — a small floating glass panel (drag its header; reopen from the IcedCoffee menu) */
+.pt-menu-pop.cvm-kw { position: fixed; z-index: 190; width: 288px; height: 440px; min-width: 240px; min-height: 220px; max-width: 520px; max-height: 84vh;
+  display: flex; flex-direction: column; padding: var(--glass-pad, 8px); overflow: hidden; resize: both; }
+.cvm-kw-add { flex: none; }
+.cvm-kw-list { flex: 1 1 auto; min-height: 0; }   /* the list is the only thing that scrolls; the panel itself resizes */
+.pt-menu-pop.cvm-kw::-webkit-resizer { display: none; }   /* Chrome's default corner glyph clashes with the glass */
+/* host.css's `.pt-menu-pop.pt-open { display: block }` ties with the rule above and wins on order — without flex the list
+   never gets a bounded height, so it can't scroll (it just gets clipped). Include .pt-open to out-rank it. */
+.pt-menu-pop.cvm-kw.pt-open { display: flex; }
+/* the resize grip: a quiet two-line corner, like a window's, that the glass can wear */
+.cvm-kw-grip { position: absolute; right: 3px; bottom: 3px; width: 16px; height: 16px; cursor: nwse-resize; touch-action: none; z-index: 2; border-radius: 0 0 var(--glass-inner-r, 8px) 0;
+  background: linear-gradient(135deg, transparent 55%, var(--pt-text-faint) 55% 60%, transparent 60% 72%, var(--pt-text-faint) 72% 77%, transparent 77%); opacity: .6; }
+.cvm-kw-grip:hover { opacity: 1; }
+.cvm-kw-head { display: flex; align-items: center; gap: 8px; padding: 4px 4px 6px 8px; cursor: grab; user-select: none; touch-action: none; }
+.cvm-kw-head:active { cursor: grabbing; }
+.cvm-kw-head > svg { width: 16px; height: 16px; color: var(--pt-text-dim); flex: none; }
+.cvm-kw-head b { font-weight: 600; font-size: 12.5px; margin-right: auto; }
+.cvm-kw-tally { font: 600 11px var(--pt-font); color: var(--pt-text-dim); border: 1px solid var(--pt-glass-brd-strong); border-radius: 999px; padding: 1px 7px; }
+.cvm-kw-x, .cvm-kw-del { flex: none; display: grid; place-items: center; width: 22px; height: 22px; padding: 0; border: none; border-radius: 50%; background: transparent; color: var(--pt-text-faint); cursor: pointer; }
+.cvm-kw-x:hover, .cvm-kw-del:hover { background: var(--pt-glass); color: var(--pt-text); }
+.cvm-kw-x svg, .cvm-kw-del svg { width: 13px; height: 13px; }
+.cvm-kw-job { padding: 0 8px 6px; color: var(--pt-text-faint); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cvm-kw-empty { margin: 2px 8px 8px; color: var(--pt-text-faint); font-size: 12px; line-height: 1.45; }
+.cvm-kw-list { overflow: auto; display: flex; flex-direction: column; gap: 1px; }
+.cvm-kw-row { display: flex; align-items: center; gap: 8px; padding: 6px 4px 6px 8px; border-radius: 10px; color: var(--pt-text-faint); cursor: default; }
+.cvm-kw-row.cvm-used { color: var(--pt-text); cursor: pointer; }
+.cvm-kw-row.cvm-used:hover, .cvm-kw-row.pt-active { background: var(--pt-accent-soft); }
+.cvm-kw-row > svg { flex: none; width: 15px; height: 15px; }
+.cvm-kw-row.cvm-used > svg { color: var(--pt-ok, #35c77a); }
+.cvm-kw-term { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; }
+.cvm-kw-n { flex: none; font: 600 11px var(--pt-font); color: var(--pt-text-dim); }
+.cvm-kw-else { flex: none; font-size: 10.5px; color: var(--pt-text-faint); }
+.cvm-kw-del { opacity: 0; } .cvm-kw-row:hover .cvm-kw-del { opacity: 1; }
+.cvm-kw-add { display: flex; gap: 6px; padding: 2px 2px 8px; }
+.cvm-kw-add input { flex: 1 1 auto; min-width: 0; height: 30px; padding: 0 10px; border-radius: var(--cvm-ctl-r); border: 1px solid var(--pt-glass-brd); background: var(--pt-glass-2); color: var(--pt-text); font: 12.5px var(--pt-font); outline: none; }
+.cvm-kw-add input:focus { border-color: var(--pt-accent); }
+.cvm-kw-clear { flex: none; height: 30px; padding: 0 10px; border-radius: var(--cvm-ctl-r); border: 1px solid var(--pt-glass-brd); background: transparent; color: var(--pt-text-dim); font: 12px var(--pt-font); cursor: pointer; }
+.cvm-kw-clear:hover { color: var(--pt-text); }
+/* (the ::highlight(cvm-kw) rule is injected by CvMaker at runtime: CSS compilers don't all parse ::highlight() yet) */
+
+/* a selected OBJECT (a block, not its text): Infospector's selection language — accent box, square white-ringed handles, a name tab */
+.cvm-selbox { position: fixed; z-index: 150; pointer-events: none; box-sizing: border-box; border: 1.5px solid var(--pt-accent); border-radius: 1px;
+  box-shadow: 0 0 0 1px color-mix(in srgb, #fff 55%, transparent); }
+.cvm-selbox.cvm-fixed { border-style: dashed; }
+.cvm-h { position: absolute; width: 9px; height: 9px; box-sizing: border-box; background: var(--pt-accent); border: 1.5px solid #fff; border-radius: 2px; box-shadow: 0 1px 3px rgba(0, 0, 0, .35); }
+.cvm-fixed .cvm-h { display: none; }
+.cvm-h-nw { left: -5px; top: -5px; } .cvm-h-n { left: calc(50% - 4.5px); top: -5px; } .cvm-h-ne { right: -5px; top: -5px; }
+.cvm-h-e { right: -5px; top: calc(50% - 4.5px); } .cvm-h-se { right: -5px; bottom: -5px; } .cvm-h-s { left: calc(50% - 4.5px); bottom: -5px; }
+.cvm-h-sw { left: -5px; bottom: -5px; } .cvm-h-w { left: -5px; top: calc(50% - 4.5px); }
+.cvm-seltab { position: absolute; left: -1.5px; bottom: calc(100% + 1px); display: flex; align-items: center; gap: 3px; height: 19px; padding: 0 7px 0 3px; pointer-events: auto; cursor: grab;
+  background: var(--pt-accent); color: #fff; font: 600 10.5px/1 var(--pt-font); border-radius: 4px 4px 0 0; white-space: nowrap; user-select: none; touch-action: none; }
+.cvm-fixed .cvm-seltab { cursor: default; padding-left: 7px; }
+.cvm-seltab svg { width: 12px; height: 12px; opacity: .85; }
+.cvm-grip { cursor: grab; touch-action: none; }
+.cvm-drop-line { position: fixed; z-index: 151; height: 3px; border-radius: 2px; background: var(--pt-accent); pointer-events: none; }
+
+/* web build: a call to the free desktop app where the AI bar would be, and its popup */
+.cvm-getapp-cta { display: flex; align-items: stretch; width: 100%; overflow: hidden;
+  border-radius: var(--glass-radius, 22px); color: var(--pt-text);
+  background-color: var(--pt-glass); -webkit-backdrop-filter: var(--pt-blur-webkit); backdrop-filter: var(--pt-blur); }
+.cvm-getapp-cta-main { flex: 1 1 auto; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; cursor: pointer;
+  background: none; border: 0; color: inherit; padding: 11px 12px 11px 46px; position: relative; }
+.cvm-getapp-cta-main > svg { position: absolute; left: 18px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: var(--pt-text); }
+.cvm-getapp-cta-main b { font-weight: 600; font-size: 13px; }
+.cvm-getapp-cta-main span { color: var(--pt-text-faint); font-size: 11.5px; }
+.cvm-getapp-x { flex: none; width: 40px; display: grid; place-items: center; background: none; border: 0; border-left: 1px solid var(--pt-glass-brd);
+  color: var(--pt-text-faint); cursor: pointer; transition: color .12s, background .12s; }
+.cvm-getapp-x:hover { color: var(--pt-text); background: var(--pt-glass-2); }
+.cvm-getapp-x svg { width: 15px; height: 15px; }
+.pt-confirm.cvm-getapp { position: fixed; inset: 0; z-index: 2200; display: grid; place-items: center; background: rgba(0, 0, 0, .32); }
+/* these must out-specify host.css's .pt-confirm-card { padding } and .pt-confirm-card p { margin: 0 } */
+.pt-confirm-card.cvm-getapp-card { max-width: 380px; text-align: center; padding: 24px; border-radius: var(--glass-radius); }
+.cvm-getapp-card .cvm-getapp-mark { display: grid; place-items: center; width: 66px; height: 66px; margin: 0 auto 16px; border-radius: 17px; background: linear-gradient(180deg, #A44400, #502202); color: #fff; }
+.cvm-getapp-card .cvm-getapp-mark .cvm-brand-glyph { width: 40px; height: 40px; stroke-width: 2; }
+.cvm-getapp-card h3 { margin: 0 0 5px; font: 700 18px var(--pt-font); }
+.pt-confirm-card .cvm-getapp-free { margin: 0 0 16px; color: var(--pt-text-faint); font: 600 12px var(--pt-font); letter-spacing: .3px; }
+.pt-confirm-card .cvm-getapp-body { margin: 0 0 24px; color: var(--pt-text-dim); font: 400 13px/1.6 var(--pt-font); }
+.cvm-getapp-actions { display: flex; justify-content: center; gap: 10px; }
+/* rounded pill controls, driven by the Radius dial (full pill for a 40px button at the top of the range) */
+.cvm-getapp-actions .pt-mini { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 40px; padding: 0 22px; border-radius: min(var(--glass-radius), 20px); font: 600 13px var(--pt-font); }
+.cvm-getapp-actions .pt-mini.pt-primary { background: #3a1f0d; border-color: transparent; color: #fff; }
+.cvm-getapp-actions .pt-mini.pt-primary:hover { background: #542a0c; filter: none; }
+
+/* a visible grip so people know the ATS panel resizes (the native handle is invisible over glass) */
+.pt-menu-pop.cvm-kw::after { content: ""; position: absolute; right: 3px; bottom: 3px; width: 12px; height: 12px; pointer-events: none;
+  background: linear-gradient(135deg, transparent 0 45%, var(--pt-text-faint) 45% 55%, transparent 55% 70%, var(--pt-text-faint) 70% 80%, transparent 80%); opacity: .6; }
+
+/* a selected image: same accent box + square handles as a selected block, with working corner-resize handles */
+.cvm-imgbox { position: fixed; z-index: 150; pointer-events: none; box-sizing: border-box; border: 1.5px solid var(--pt-accent); border-radius: 1px; }
+.cvm-imgbox .cvm-h-nw { left: -5px; top: -5px; } .cvm-imgbox .cvm-h-ne { right: -5px; top: -5px; }
+.cvm-imgbox .cvm-h-se { right: -5px; bottom: -5px; } .cvm-imgbox .cvm-h-sw { left: -5px; bottom: -5px; }
+
+/* ---- first-run tour ---- */
+/* the bar width-fits during the tour so it visibly widens as each control is revealed */
+#pt-bar.cvm-bar.cvm-bar-tour { width: auto; transition: width .34s cubic-bezier(.2,.7,.2,1); }
+/* each control slides + fades in as it's revealed (it mounts fresh, so the animation plays once) */
+.cvm-bar-tour > * { animation: cvm-tour-pop .42s cubic-bezier(.2,.7,.2,1) both; }
+@keyframes cvm-tour-pop { from { opacity: 0; transform: translateX(-10px) scale(.9); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .cvm-bar-tour > *, .cvm-coach { animation: none; } }
+/* a transparent catcher so stray clicks don't derail the walk-through (Next / Skip drive it) */
+.cvm-tour-scrim { position: fixed; inset: 0; z-index: 3000; background: transparent; }
+/* the coach-mark and ghost float over anything — the dark canvas OR the white sheet — so they can't lean on
+   translucency alone (over white, glass goes pale and white text vanishes). Back them with a near-opaque
+   warm tint sourced from the theme, so they read the same everywhere. */
+/* step 1 of the tour: hide the real sheet entirely (it stays mounted, just invisible) so the empty canvas
+   shows — then it fades in when the tour reaches the document step. */
+.cvm-paper { transition: opacity .45s ease; }
+.cvm-tour-cover .cvm-paper { opacity: 0; pointer-events: none; }
+/* closing / opening a document: shut snappily toward the middle of the view; come back the same way with a small
+   overshoot (the >1 in the curve is the bounce). "closed" is the blank canvas — the sheet stays mounted, just unseen
+   and out of the scroll height, so reopening is instant and nothing re-measures from scratch. */
+.cvm-paper.cvm-doc-closing, .cvm-paper.cvm-doc-opening { transform-origin: 50% var(--cvm-origin-y, 40vh); pointer-events: none; }
+.cvm-paper.cvm-doc-closing { animation: cvm-doc-out 200ms cubic-bezier(.55, 0, .9, .35) forwards; }
+.cvm-paper.cvm-doc-opening { animation: cvm-doc-in 520ms cubic-bezier(.34, 1.5, .64, 1) both; }
+.cvm-paper.cvm-doc-closed { visibility: hidden; pointer-events: none; height: 0; overflow: hidden; }
+@keyframes cvm-doc-out { to { transform: scale(.5); opacity: 0; } }
+@keyframes cvm-doc-in { from { transform: scale(.5); opacity: 0; } 45% { opacity: 1; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .cvm-paper.cvm-doc-closing, .cvm-paper.cvm-doc-opening { animation-duration: 1ms; } }
+/* the coach-mark that points at the freshly revealed control */
+.cvm-coach { position: fixed; z-index: 3001; width: 330px; box-sizing: border-box; padding: 13px 16px 12px; border-radius: 16px;
+  background-color: var(--pt-glass); -webkit-backdrop-filter: var(--pt-blur-webkit); backdrop-filter: var(--pt-blur); color: var(--pt-text);
+  transition: left .3s cubic-bezier(.2,.7,.2,1), top .3s cubic-bezier(.2,.7,.2,1); animation: cvm-tour-pop .22s cubic-bezier(.2,.7,.2,1); }
+/* a clean triangle pointing UP at the revealed control (solid, so no rotated-border seam over the text) */
+.cvm-coach-arrow { position: absolute; top: -8px; width: 0; height: 0; transform: translateX(-50%);
+  border-left: 9px solid transparent; border-right: 9px solid transparent;
+  border-bottom: 9px solid color-mix(in srgb, var(--c-glass, var(--pt-ground, #251200)) 92%, #000 14%); }
+.cvm-coach-step { font: 600 11px var(--pt-font); color: var(--pt-text-faint); letter-spacing: .3px; text-transform: uppercase; }
+.cvm-coach h4 { margin: 3px 0 6px; font-size: 15px; font-weight: 700; }
+.cvm-coach p { margin: 0; font-size: 12.75px; line-height: 1.5; color: var(--pt-text-dim); }
+.cvm-coach-actions { display: flex; align-items: center; gap: 8px; margin-top: 13px; }
+.cvm-coach-actions .pt-mini { border-radius: 15px; }   /* round like the toolbar's buttons (15px), not the stock 8px */
+.cvm-coach-skip { margin-right: auto; background: none; border: 0; color: var(--pt-text-faint); font: 12px var(--pt-font); cursor: pointer; padding: 4px 2px; }
+.cvm-coach-skip:hover { color: var(--pt-text); }
+
+/* ---- Choose Icon: typeahead over the Lucide library, recolourable ---- */
+/* no dark overlay — just a transparent catcher so an outside click closes it, and the document stays visible
+   behind (so the icon colour reads against the real background) */
+.cvm-iconpick-scrim { position: fixed; inset: 0; z-index: 3500; background: transparent; }
+/* .pt-open (host.css) forces display:block at equal specificity — include it here so flex wins. Positioned
+   next to the image via the inline left/top. */
+.cvm-iconpick.pt-menu-pop.pt-open { position: fixed; width: min(300px, 92vw); height: min(400px, 85vh); display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+.cvm-iconpick-div { flex: none; height: 1px; margin: 2px 12px 6px; background: var(--pt-glass-brd); }
+.cvm-iconpick-head { display: flex; align-items: center; gap: 8px; padding: 12px 12px 8px; }
+/* match the Background menu's inputs (shared with Infospector): same 7px radius as .pt-ctx-color inputs */
+.cvm-iconpick-search { flex: 1 1 auto; height: 38px; padding: 0 14px; border-radius: 7px; border: 1px solid var(--pt-glass-brd); background: var(--pt-glass-2); color: var(--pt-text); font: 14px var(--pt-font); outline: none; }
+.cvm-iconpick-search:focus { border-color: var(--pt-accent); box-shadow: 0 0 0 3px var(--pt-accent-soft); }
+.cvm-iconpick-search::placeholder { color: var(--pt-text-faint); opacity: 1; }
+.cvm-iconpick-x { flex: none; width: 34px; height: 34px; display: grid; place-items: center; border: 0; border-radius: 50%; background: none; color: var(--pt-text-faint); cursor: pointer; }
+.cvm-iconpick-x:hover { background: var(--pt-glass-2); color: var(--pt-text); }
+.cvm-iconpick-x svg { width: 16px; height: 16px; }
+.cvm-iconpick-color { padding: 0 12px 8px; }
+.cvm-iconpick-grid { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 8px 12px 12px; display: grid; grid-template-columns: repeat(auto-fill, minmax(46px, 1fr)); gap: 4px; align-content: start; }
+.cvm-iconpick-cell { display: grid; place-items: center; height: 46px; border: 1px solid transparent; border-radius: var(--glass-item-r); background: none; color: var(--pt-text); cursor: pointer; transition: background .1s, border-color .1s; }
+.cvm-iconpick-cell:hover { background: var(--pt-glass-2); border-color: var(--pt-glass-brd); }
+.cvm-iconpick-cell.cvm-on { background: var(--pt-accent-soft); border-color: var(--pt-accent); }
+.cvm-iconpick-cell svg { width: 22px; height: 22px; }
+.cvm-iconpick-empty { grid-column: 1 / -1; padding: 28px; text-align: center; color: var(--pt-text-faint); }
+.cvm-iconpick-foot { padding: 8px 14px; border-top: 1px solid var(--pt-glass-brd); color: var(--pt-text-faint); font-size: 11.5px; text-align: center; }

@@ -1,4 +1,4 @@
-// src/components/labs/itera/cv-assistant.ts
+// src/components/labs/icedcoffee/cv-assistant.ts
 // The editor's side of "ask your AI to change this résumé". Pure DOM in, DOM out — no network, no keys:
 // a desktop shell supplies the `CvAssistant` that actually talks to the person's own model.
 //
@@ -8,9 +8,10 @@
 // CSS are never the model's to touch — which is what keeps the layout intact.
 import { buildBlock, topBlocks, type BlockKind } from "./cv-blocks";
 
-export interface AiRegion { id: string; html: string; list: boolean }
+/** `columns`: the region's copy flows across this many columns on the page (2 → an even number of bullets balances) */
+export interface AiRegion { id: string; html: string; list: boolean; columns?: number }
 export interface AiBlock { id: string; kind: string; regions: AiRegion[] }
-export interface AiDocument { name: string; paper: string; pages: number; fitScale: number; blocks: AiBlock[]; other: AiRegion[] }
+export interface AiDocument { name: string; paper: string; pages: number; fitScale: number; blocks: AiBlock[]; other: AiRegion[]; document?: "resume" | "letter" }
 
 export type AiOpName = "set_text" | "insert_block" | "duplicate_block" | "delete_block" | "move_block";
 export interface AiOp { op: AiOpName; target: string; html: string; kind: "" | BlockKind; fill: string[]; to: string }
@@ -24,21 +25,42 @@ export interface CvAssistant {
     /** the shell tells the editor when those settings change */
     onStatus(handler: (status: { ready: boolean; label: string }) => void): () => void;
     /** one request: the person's words + the document → what to say back and what to change */
-    run(request: { prompt: string; document: AiDocument }): Promise<{ message: string; ops: AiOp[] }>;
+    run(request: { prompt: string; document: AiDocument; keywords?: string[] }): Promise<{ message: string; ops: AiOp[]; keywords?: string[]; job?: string }>;
 }
 
 /** The other direction: an AI app OUTSIDE the editor drives it (the desktop shell runs an MCP server for Claude
  *  Desktop and friends — no key involved at all). The shell calls in; the editor answers with these. */
 export interface CvRemoteHandlers {
+    /** put the résumé or the cover letter on the sheet (every other call acts on what is showing); resolves to what is showing once it has laid out */
+    showDocument(kind: "resume" | "letter" | null): Promise<"resume" | "letter">;
     /** the document as a model should see it, right now */
     describe(): AiDocument;
     /** apply operations as one undoable step; resolves once the page has re-laid itself out, so the caller learns whether it still fits */
     apply(ops: AiOp[], message: string, by: string): Promise<{ applied: number; skipped: string[]; pagesBefore: number; pagesAfter: number; fitScale: number }>;
     /** take back the most recent remote edit; false when there is nothing to undo */
     undo(): boolean;
-    /** what the export pipeline needs to render this document (PDF / PNG happen in the shell) */
-    exportPayload(): { html: string; widthPt: number; heightPt: number; name: string };
+    /** what the export pipeline needs to render this document (PDF / PNG happen in the shell); settles the layout first */
+    exportPayload(): Promise<{ html: string; widthPt: number; heightPt: number; name: string }>;
+    /** the formats the editor renders itself: Word and the re-loadable Source HTML (docx travels as base64) */
+    exportFile(kind: "docx" | "html"): Promise<{ name: string; data: string; base64: boolean }>;
+    /** the toolbar's size menu, as data: paper, fit-to-one-page, pagination, zoom — and what they currently produce */
+    getPage(): RemotePage;
+    /** change any of them; resolves once the page has re-laid itself out */
+    setPage(patch: { paper?: string; fit?: boolean; paginate?: boolean; zoom?: number | "width" | "height" }): Promise<RemotePage>;
+    /** every <img> in the document, in order (i0, i1, …) */
+    listImages(): RemoteImage[];
+    /** swap one image for a data: URI (the shell read the file) — one undoable step, like an edit */
+    setImage(id: string, dataUri: string, alt: string | null, by: string): Promise<{ replaced: boolean; pagesBefore: number; pagesAfter: number }>;
+    /** ATS keywords: replace the list (an AI read them off a job ad) and show the panel; resolves to how often each document uses each one */
+    setKeywords(keywords: string[], job: string | null): { job: string; keywords: { keyword: string; resume: number; letter: number }[] };
+    getKeywords(): { job: string; keywords: { keyword: string; resume: number; letter: number }[] };
+    /** the full Source HTML to write to disk, and the name a new file should get — the shell does the writing */
+    sourceHtml(): { html: string; suggested: string };
+    /** the shell wrote the file: it is now this document's identity and nothing is unsaved */
+    markSaved(file: string): void;
 }
+export interface RemotePage { paper: string; paperLabel: string; papers: string[]; fit: boolean; paginate: boolean; zoom: number | "width" | "height"; zoomPercent: number; pages: number; fitScale: number }
+export interface RemoteImage { id: string; alt: string; width: number; height: number; kilobytes: number; embedded: boolean }
 /** which outside AI apps know about this editor, and whether one is attached at this moment */
 export interface CvRemoteStatus { apps: string[]; live: number }
 export interface CvRemote {

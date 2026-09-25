@@ -1,21 +1,25 @@
 {
-    "name": "itera-desktop",
-    "productName": "Itera",
-    "version": "0.1.0",
-    "description": "Itera as a desktop app — the same prebuilt folder, wrapped in Electron. One-click PDF/PNG, no export server.",
+    "name": "icedcoffee-desktop",
+    "productName": "IcedCoffee",
+    "version": "0.3.0",
+    "description": "IcedCoffee as a desktop app — the same prebuilt folder, wrapped in Electron. One-click PDF/PNG, no export server.",
     "author": "Q Manning (https://qmanning.com)",
-    "homepage": "https://qmanning.com/labs/itera",
+    "homepage": "https://qmanning.com/labs/icedcoffee",
     "private": true,
     "license": "MIT",
     "type": "module",
     "main": "main.mjs",
+    "engines": {
+        "node": ">=20"
+    },
     "scripts": {
         "start": "electron .",
         "smoke": "node smoke.mjs",
         "icon": "electron build/make-icon.mjs",
-        "dist": "electron-builder --mac",
-        "dist:win": "electron-builder --win",
-        "leaks": "node leaks.mjs"
+        "dist": "node build/dist.mjs --mac",
+        "dist:win": "node build/dist.mjs --win",
+        "leaks": "node leaks.mjs",
+        "dist:test": "node build/dist.mjs --mac --arm64"
     },
     "devDependencies": {
         "electron": "^44.4.3",
@@ -23,8 +27,8 @@
         "pdfjs-dist": "^6.3.289"
     },
     "build": {
-        "appId": "com.qmanning.itera",
-        "productName": "Itera",
+        "appId": "com.qmanning.icedcoffee",
+        "productName": "IcedCoffee",
         "copyright": "MIT © 2026 Q Manning",
         "directories": {
             "output": "out",
@@ -42,6 +46,7 @@
             "updater-core.mjs",
             "assistant/**",
             "package.json",
+            "build-info.json",
             {
                 "from": "..",
                 "to": "web",
@@ -59,6 +64,10 @@
             {
                 "from": "mcp/server.mjs",
                 "to": "mcp/server.mjs"
+            },
+            {
+                "from": "mcp/catalog.mjs",
+                "to": "mcp/catalog.mjs"
             }
         ],
         "fileAssociations": [
@@ -93,10 +102,10 @@
             "identity": "-",
             "hardenedRuntime": false,
             "gatekeeperAssess": false,
-            "artifactName": "Itera-${version}-mac-${arch}.${ext}"
+            "artifactName": "IcedCoffee-${version}-mac-${arch}.${ext}"
         },
         "dmg": {
-            "title": "Itera ${version}",
+            "title": "IcedCoffee ${version}",
             "background": "build/background.png",
             "iconSize": 92,
             "iconTextSize": 12,
@@ -127,7 +136,7 @@
                     ]
                 }
             ],
-            "artifactName": "Itera-${version}-win-${arch}.${ext}"
+            "artifactName": "IcedCoffee-${version}-win-${arch}.${ext}"
         },
         "nsis": {
             "oneClick": false,

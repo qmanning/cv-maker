@@ -1,8 +1,8 @@
 // electron/updater-core.mjs — the parts of the updater that need no Electron, so plain `node --test` can cover them:
-// which version is newer, which release files are ours, and whether a download is really from Itera's publisher.
+// which version is newer, which release files are ours, and whether a download is really from IcedCoffee's publisher.
 import crypto from "node:crypto";
 
-// The PUBLIC half of Itera's update-signing key (Ed25519). The private half signs every release in CI
+// The PUBLIC half of IcedCoffee's update-signing key (Ed25519). The private half signs every release in CI
 // (secret ITERA_UPDATE_KEY) and never lives in this repo. An update whose signature this key doesn't verify is refused.
 export const UPDATE_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
 MCowBQYDK2VwAyEA/Ib2aUzxIsFblaf0O0ikSMRlFvYwgQe36i3XyukKO2E=
@@ -20,7 +20,7 @@ export function newer(a, b) {
 /** from a GitHub release: the update archive for this platform + arch, and its detached signature */
 export function pickAssets(release, platform, arch) {
     const version = String(release?.tag_name || "").replace(/^v/, "");
-    const want = platform === "darwin" ? `Itera-${version}-mac-${arch}.zip` : platform === "win32" ? `Itera-${version}-win-${arch}.exe` : "";
+    const want = platform === "darwin" ? `IcedCoffee-${version}-mac-${arch}.zip` : platform === "win32" ? `IcedCoffee-${version}-win-${arch}.exe` : "";
     const assets = Array.isArray(release?.assets) ? release.assets : [];
     const file = assets.find((a) => a?.name === want), sig = assets.find((a) => a?.name === want + ".sig");
     return { version, name: want, url: file?.browser_download_url || "", sigUrl: sig?.browser_download_url || "", size: file?.size || 0, notesUrl: release?.html_url || "" };

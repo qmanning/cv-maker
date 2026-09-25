@@ -1,12 +1,12 @@
 <!doctype html>
-<!-- electron/welcome.html — the desktop app's first-run sheet (also Help ▸ Welcome to Itera).
-     No scripts: the two buttons are links the shell intercepts (app://itera/__welcome/…). -->
+<!-- electron/welcome.html — the desktop app's first-run sheet (also Help ▸ Welcome to IcedCoffee).
+     No scripts: the two buttons are links the shell intercepts (app://icedcoffee/__welcome/…). -->
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Welcome to Itera</title>
+<title>Welcome to IcedCoffee</title>
 <style>
-  :root { color-scheme: dark; --ink: #f2f3f6; --dim: rgba(242,243,246,.66); --line: rgba(255,255,255,.10); --blue: #004DFF; }
+  :root { color-scheme: dark; --ink: #f2f3f6; --dim: rgba(242,243,246,.66); --line: rgba(255,255,255,.10); --blue: #A44400; }
   html, body { margin: 0; height: 100%; }
   body { background: #14161c; color: var(--ink); font: 13.5px/1.45 -apple-system, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; display: flex; flex-direction: column; user-select: none; cursor: default; }
   header { padding: 26px 30px 0; }
@@ -16,7 +16,7 @@
   ol { list-style: none; margin: 18px 0 0; padding: 0 30px; counter-reset: n; flex: 1; }
   li { counter-increment: n; position: relative; padding: 11px 0 11px 40px; border-top: 1px solid var(--line); }
   li:first-child { border-top: 0; }
-  li::before { content: counter(n); position: absolute; left: 0; top: 12px; width: 24px; height: 24px; border-radius: 50%; background: rgba(54,102,248,.18); color: #9db4ff; font-weight: 700; font-size: 12px; line-height: 24px; text-align: center; }
+  li::before { content: counter(n); position: absolute; left: 0; top: 12px; width: 24px; height: 24px; border-radius: 50%; background: rgba(164,68,0,.22); color: #f0b483; font-weight: 700; font-size: 12px; line-height: 24px; text-align: center; }
   li b { display: block; font-weight: 650; }
   li span { color: var(--dim); }
   li b.in { display: inline; color: var(--ink); }
@@ -32,20 +32,22 @@
 </head>
 <body>
   <header>
-    <div class="brand"><svg class="mark" width="40" height="40" viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="5.4" fill="#004DFF"/><path d="M6 6V5C5.44772 5 5 5.44772 5 6L6 6ZM14.6667 14.6667V15.6667C15.219 15.6667 15.6667 15.219 15.6667 14.6667H14.6667ZM6 14.6667H5C5 14.9319 5.10536 15.1862 5.29289 15.3738C5.48043 15.5613 5.73478 15.6667 6 15.6667V14.6667ZM10.3333 10.3333V9.33333C9.78105 9.33333 9.33333 9.78105 9.33333 10.3333H10.3333ZM19 19V20C19.5523 20 20 19.5523 20 19H19ZM19 10.3333H20C20 9.78105 19.5523 9.33333 19 9.33333V10.3333ZM10.3333 15.5333H9.33333V15.5333H10.3333ZM13.8 19V20V20V19ZM11.2 12.0667V11.0667H10.2V12.0667H11.2ZM12.9333 12.0667H13.9333V11.0667H12.9333V12.0667ZM12.9333 13.8V14.8H13.9333V13.8H12.9333ZM11.2 13.8H10.2V14.8H11.2V13.8ZM12.0667 11.2V10.2H11.0667V11.2H12.0667ZM13.8 11.2H14.8V10.2H13.8V11.2ZM13.8 12.9333V13.9333H14.8V12.9333H13.8ZM12.0667 12.9333H11.0667V13.9333H12.0667V12.9333ZM11.2 11.2V10.2H10.2V11.2H11.2ZM12.9333 11.2H13.9333V10.2H12.9333V11.2ZM12.9333 12.9333V13.9333H13.9333V12.9333H12.9333ZM11.2 12.9333H10.2V13.9333H11.2V12.9333ZM12.0667 12.0667V11.0667H11.0667V12.0667H12.0667ZM13.8 12.0667H14.8V11.0667H13.8V12.0667ZM13.8 13.8V14.8H14.8V13.8H13.8ZM12.0667 13.8H11.0667V14.8H12.0667V13.8ZM6 6V7H11.2V6V5H6V6ZM14.6667 9.46667H13.6667V14.6667H14.6667H15.6667V9.46667H14.6667ZM14.6667 14.6667V13.6667H6V14.6667V15.6667H14.6667V14.6667ZM6 14.6667H7V6L6 6L5 6V14.6667H6ZM11.2 6V7C12.5623 7 13.6667 8.10436 13.6667 9.46667H14.6667H15.6667C15.6667 6.9998 13.6669 5 11.2 5V6ZM10.3333 10.3333H9.33333L9.33333 15.5333H10.3333H11.3333L11.3333 10.3333H10.3333ZM13.8 19V20H19V19V18H13.8V19ZM19 19H20V10.3333H19H18V19H19ZM19 10.3333V9.33333L10.3333 9.33333V10.3333V11.3333L19 11.3333V10.3333ZM10.3333 15.5333H9.33333C9.33333 18.0002 11.3331 20 13.8 20V19V18C12.4377 18 11.3333 16.8956 11.3333 15.5333H10.3333ZM11.2 12.0667V13.0667H12.9333V12.0667V11.0667H11.2V12.0667ZM12.9333 12.0667H11.9333V13.8H12.9333H13.9333V12.0667H12.9333ZM12.9333 13.8V12.8H11.2V13.8V14.8H12.9333V13.8ZM11.2 13.8H12.2V12.0667H11.2H10.2V13.8H11.2ZM12.0667 11.2V12.2H13.8V11.2V10.2H12.0667V11.2ZM13.8 11.2H12.8V12.9333H13.8H14.8V11.2H13.8ZM13.8 12.9333V11.9333H12.0667V12.9333V13.9333H13.8V12.9333ZM12.0667 12.9333H13.0667V11.2H12.0667H11.0667V12.9333H12.0667ZM11.2 11.2V12.2H12.9333V11.2V10.2H11.2V11.2ZM12.9333 11.2H11.9333V12.9333H12.9333H13.9333V11.2H12.9333ZM12.9333 12.9333V11.9333H11.2V12.9333V13.9333H12.9333V12.9333ZM11.2 12.9333H12.2V11.2H11.2H10.2V12.9333H11.2ZM12.0667 12.0667V13.0667H13.8V12.0667V11.0667H12.0667V12.0667ZM13.8 12.0667H12.8V13.8H13.8H14.8V12.0667H13.8ZM13.8 13.8V12.8H12.0667V13.8V14.8H13.8V13.8ZM12.0667 13.8H13.0667V12.0667H12.0667H11.0667V13.8H12.0667Z" fill="#fff"/></svg><h1>Welcome to Itera</h1></div>
+    <div class="brand"><svg class="mark" width="40" height="40" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="9" fill="url(#icecup)"/><path d="M12 16.9341H29M24.5854 6L21.7835 16.4567M12.8095 16.9341L15.5238 33H25.4762L28.1905 16.9341C27.8889 14.7064 25.9286 10.251 20.5 10.251C15.0714 10.251 13.1111 14.7064 12.8095 16.9341ZM18.2381 27.4361L19.8052 28.3908L18.9004 30.0444L17.3333 29.0897L18.2381 27.4361ZM21.8571 24.1114L23.605 23.6172L24.0733 25.4615L22.3255 25.9558L21.8571 24.1114ZM17.3333 21.6426L17.8017 19.7983L19.5495 20.2925L19.0812 22.1368L17.3333 21.6426Z" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="icecup" x1="20" y1="0" x2="20" y2="40" gradientUnits="userSpaceOnUse"><stop stop-color="#A44400"/><stop offset="1" stop-color="#502202"/></linearGradient></defs></svg>
+<h1>Welcome to IcedCoffee</h1></div>
     <p>Your résumé, laid out as a real page, with your own AI sitting beside it. Tell it what you want and watch the page change. It opens with a made-up person, Mara Quill, so you can try it straight away.</p>
   </header>
   <ol>
-    <li><b>Connect the AI app you already use. One click, no API key.</b><span>Claude Desktop, the ChatGPT app and Codex, Claude Code, Cursor and others. Itera has no account and takes no keys: your AI app talks to it on this computer only.</span></li>
+    <li><b>Connect the AI app you already use. One click, no API key.</b><span>Claude Desktop, the ChatGPT app and Codex, Claude Code, Cursor and others. IcedCoffee has no account and takes no keys: your AI app talks to it on this computer only.</span></li>
     <li><b>Ask it, in that app, for what you want.</b><span>“Tailor my résumé to this job description.” “Tighten it to one page.” “Make the Halcyon bullets lead with results.” It reads the résumé that's open here.</span></li>
-    <li><b>It edits the page, not a chat window.</b><span>Changes land on the sheet as one step, with <b class="in">Undo</b> right there. The design can't break: your AI rewrites words and sections, never the layout. If an edit spills onto a second page, Itera tells your AI so it can tighten up.</span></li>
+    <li><b>It edits the page, not a chat window.</b><span>Changes land on the sheet as one step, with <b class="in">Undo</b> right there. The design can't break: your AI rewrites words and sections, never the layout. If an edit spills onto a second page, IcedCoffee tells your AI so it can tighten up.</span></li>
     <li><b>Or just type.</b><span>Click any text to edit it by hand. Hover between sections for <kbd>+</kbd>. The arrows and trash beside a section move or remove it.</span></li>
-    <li><b>The résumé is a file, and it's yours.</b><span><kbd>⌘S</kbd> saves a plain <kbd>.html</kbd> file. <b class="in">Export</b> makes a PDF with real text, a Word document, or a PNG.</span></li>
+    <li><b>There's a cover letter too.</b><span>The two buttons at the right end of the bar switch between your résumé and its cover letter. The letter always wears the résumé's header, so you only write the letter. Your AI can work on either one: “Write a cover letter for this job.” Paste it a job ad and ask for the ATS keywords: they appear in a panel that shows which ones you already use, and where.</span></li>
+    <li><b>They are files, and they're yours.</b><span><kbd>⌘S</kbd> saves a plain <kbd>.html</kbd> file for each. Click the document's name in the bar to reopen a recent one, or type a new name to save a copy. <b class="in">Export</b> makes a PDF with real text, a Word document, or a PNG, of the résumé, the letter, or both.</span></li>
   </ol>
   <footer>
-    <a class="more" href="https://github.com/qmanning/itera#make-your-own-template">Make your own template ↗</a>
-    <a class="btn" href="app://itera/__welcome/start">Look around first</a>
-    <a class="btn primary" href="app://itera/__welcome/connect">Connect my AI…</a>
+    <a class="more" href="https://github.com/qmanning/icedcoffee#make-your-own-template">Make your own template ↗</a>
+    <a class="btn" href="app://icedcoffee/__welcome/start">Look around first</a>
+    <a class="btn primary" href="app://icedcoffee/__welcome/connect">Connect my AI…</a>
   </footer>
 </body>
 </html>

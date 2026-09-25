@@ -17,4 +17,4 @@ http.createServer((req, res) => {
   res.writeHead(200, { 'content-type': types[path.extname(file)] || 'application/octet-stream', 'cache-control': 'no-store', 'x-frame-options': 'SAMEORIGIN' });
   if (req.method === 'HEAD') { res.end(); return; }
   fs.createReadStream(file).pipe(res);
-}).listen(port, '127.0.0.1', () => console.log(`itera: http://localhost:${port}/`));
+}).listen(port, '127.0.0.1', () => console.log(`icedcoffee: http://localhost:${port}/`));

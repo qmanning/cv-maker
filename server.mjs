@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// server.mjs — optional local export server for Itera.
+// server.mjs — optional local export server for IcedCoffee.
 //
 // Renders the editor's export HTML in headless Chrome (via puppeteer) to produce a real-text,
 // selectable PDF or a PNG screenshot. Point config.js's `exportServer` at this (e.g.
-// "http://localhost:7332/export") for one-click exports; without it, Itera still works — PDF falls
+// "http://localhost:7332/export") for one-click exports; without it, IcedCoffee still works — PDF falls
 // back to the browser's print dialog and PNG to an in-browser render.
 //
 // Usage:  node server.mjs [port]      (default 7332)
@@ -81,7 +81,12 @@ async function renderExport(body) {
         err.payload = { error: "Headless Chrome is not available here. Run `npm i puppeteer` next to server.mjs, then restart it." };
         throw err;
     }
-    const browser = await puppeteer.launch({ headless: true, args: ["--no-sandbox", "--font-render-hinting=none"] });
+    // Chrome's own sandbox stays ON: this renders document HTML, and the belt-and-braces below (JS disabled,
+    // every request aborted) is not a reason to give that up. --no-sandbox is added only where Chrome refuses
+    // to start without it — running as root, typically in a container.
+    const asRoot = typeof process.getuid === "function" && process.getuid() === 0;
+    const args = ["--font-render-hinting=none", ...(asRoot ? ["--no-sandbox"] : [])];
+    const browser = await puppeteer.launch({ headless: true, args });
     try {
         const page = await browser.newPage();
         await page.setJavaScriptEnabled(false);
@@ -122,7 +127,7 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === "GET" && url.pathname === "/") {
         res.writeHead(200, { "content-type": "application/json" });
-        res.end(JSON.stringify({ ok: true, service: "itera export server", port: PORT }));
+        res.end(JSON.stringify({ ok: true, service: "icedcoffee export server", port: PORT }));
         return;
     }
 
@@ -156,5 +161,5 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, "127.0.0.1", () => {
-    console.log(`itera export server: http://127.0.0.1:${PORT}/`);
+    console.log(`icedcoffee export server: http://127.0.0.1:${PORT}/`);
 });

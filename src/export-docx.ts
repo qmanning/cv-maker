@@ -1,8 +1,10 @@
-// src/components/labs/itera/export-docx.ts
+// src/components/labs/icedcoffee/export-docx.ts
 // DOCX export. Word can't be pixel-matched, so this aims at a clean, ATS-readable document that
 // keeps the design's structure: it walks the LIVE page and reads computed styles, so it works for
-// any source HTML — real paragraphs and bullets, native Word columns for .cv-flow regions (the copy
-// flows there too), borderless tables for side-by-side columns, live hyperlinks, page-number footer.
+// any source HTML — real paragraphs and bullets, borderless tables for anything side by side (flex rows AND
+// multi-column .cv-flow regions, split where the copy actually breaks on screen), live hyperlinks, page-number
+// footer. Flowing regions used to be native Word section columns, but most readers that aren't Word (Quick Look,
+// Pages, TextEdit, many ATS parsers) ignore the columns and draw every section break as an empty square.
 
 import {
     AlignmentType, BorderStyle, Document, ExternalHyperlink, Footer, ImageRun, LineRuleType, Packer,
@@ -13,7 +15,11 @@ import {
 
 const PX_TO_PT = 0.75;
 const tw = (pt: number) => Math.round(pt * 20);              // points → twips
-const px = (v: string) => (parseFloat(v) || 0) * PX_TO_PT;   // computed px → points
+// "Fit to one page" shrinks the sheet with CSS zoom; computed styles report the UNZOOMED design, and Word has no zoom.
+// So every size is multiplied by the fit (FIT, set per export): type, spacing, widths and margins all shrink together,
+// and the Word page matches the PDF instead of printing the design full-size with its raw, too-tight margins.
+let FIT = 1;
+const px = (v: string) => (parseFloat(v) || 0) * PX_TO_PT * FIT;   // computed px → points, at the fit
 
 type Block = Paragraph | Table;
 interface Flow { columns: number; gapPt: number; children: Block[] }
@@ -30,7 +36,7 @@ function hex(color: string): string | undefined {
 function bottomRule(el: Element): IBorderOptions | undefined {
     const cs = getComputedStyle(el), w = parseFloat(cs.borderBottomWidth) || 0, color = hex(cs.borderBottomColor);
     if (!w || !color || cs.borderBottomStyle === "none") return undefined;
-    return { style: BorderStyle.SINGLE, size: Math.max(2, Math.round(w * PX_TO_PT * 8)), color, space: Math.round(px(cs.paddingBottom)) };
+    return { style: BorderStyle.SINGLE, size: Math.max(2, Math.round(w * PX_TO_PT * FIT * 8)), color, space: Math.round(px(cs.paddingBottom)) };
 }
 
 // space (pt) and rule that follow `el`, including ancestors it is the last child of (up to the page)
@@ -87,7 +93,9 @@ function paraProps(p: Element): Partial<IParagraphOptions> & { spacing: { before
     };
 }
 
-function regionBlocks(region: Element, page: Element): Block[] {
+/** `columns` > 1: the region's paragraphs come back grouped by the on-screen column they sit in, with no trailing
+ *  space/rule on the last one (the caller puts those under the table it builds) */
+function regionBlocks(region: Element, page: Element, columns = 1): Block[][] {
     const specs: { el: Element; bullet: boolean; rule?: boolean }[] = [];
     const collect = (parent: Element) => {
         for (const child of Array.from(parent.children)) {
@@ -98,7 +106,7 @@ function regionBlocks(region: Element, page: Element): Block[] {
     };
     collect(region);
     if (!specs.length) return [];
-    const lead = leading(region), trail = trailing(region, page);
+    const tabled = columns > 1, lead = leading(region), trail = tabled ? { after: 0, rule: undefined } : trailing(region, page);
 
     // a flex-row region (contact links) is one line in Word
     if (getComputedStyle(region).display.includes("flex") && !getComputedStyle(region).flexDirection.startsWith("column")) {
@@ -106,14 +114,28 @@ function regionBlocks(region: Element, page: Element): Block[] {
         specs.forEach((s, i) => { if (i) children.push(new TextRun({ text: "     ", size: Math.round(px(getComputedStyle(s.el).fontSize) * 2) })); children.push(...runsOf(s.el)); });
         const base = paraProps(specs[0].el);
         const jc = getComputedStyle(region).justifyContent;
-        return [new Paragraph({ ...base, alignment: jc.includes("end") ? AlignmentType.RIGHT : jc === "center" ? AlignmentType.CENTER : base.alignment, spacing: { ...base.spacing, before: tw(lead), after: tw(trail.after) }, border: trail.rule ? { bottom: trail.rule } : undefined, children })];
+        return [[new Paragraph({ ...base, alignment: jc.includes("end") ? AlignmentType.RIGHT : jc === "center" ? AlignmentType.CENTER : base.alignment, spacing: { ...base.spacing, before: tw(lead), after: tw(trail.after) }, border: trail.rule ? { bottom: trail.rule } : undefined, children })]];
     }
 
-    return specs.map((s, i) => {
-        const first = i === 0, last = i === specs.length - 1;
+    // which on-screen column each paragraph sits in: read it off the live layout, so a manual column break, a
+    // balanced flow and a widow pushed across all land where the person sees them
+    const box = region.getBoundingClientRect(), colW = box.width / columns;
+    const colOf = (el: Element) => (tabled ? Math.min(columns - 1, Math.max(0, Math.floor((el.getBoundingClientRect().left - box.left + colW * 0.25) / colW))) : 0);
+    const groups: Block[][] = Array.from({ length: columns }, () => []);
+    let prevCol = 0;
+    specs.forEach((s, i) => {
+        const col = Math.max(prevCol, colOf(s.el)), firstInCol = i === 0 || col !== prevCol; prevCol = col;
+        groups[col].push(build(s, i, firstInCol));
+    });
+    return groups;
+
+    function build(s: (typeof specs)[number], i: number, firstInCol: boolean): Block {
+        const first = firstInCol, last = !tabled && i === specs.length - 1;
         if (s.rule) { const r = getComputedStyle(s.el); return new Paragraph({ spacing: { before: tw(px(r.marginTop)), after: tw(px(r.marginBottom)) }, border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: hex(r.borderTopColor) || "DDDDDD", space: 0 } } }); }
         const base = paraProps(s.el), li = s.bullet ? s.el.closest("li") : null, liCs = li ? getComputedStyle(li) : null;
-        const before = base.spacing.before + (liCs && s.el === li!.firstElementChild ? tw(Math.max(0, px(liCs.marginTop))) : 0) + (first ? tw(lead) : 0);
+        // the bullet that opens a later column sits level with the first column's: it drops its between-items margin
+        const liGap = liCs && s.el === li!.firstElementChild && !(tabled && firstInCol && i > 0) ? tw(Math.max(0, px(liCs.marginTop))) : 0;
+        const before = (tabled && firstInCol && i > 0 ? 0 : base.spacing.before) + liGap + (first ? tw(lead) : 0);
         const after = base.spacing.after + (last ? tw(trail.after) : 0);
         const indent = liCs ? Math.max(8, px(liCs.marginLeft)) : 0;
         return new Paragraph({
@@ -122,7 +144,7 @@ function regionBlocks(region: Element, page: Element): Block[] {
             keepLines: true, border: last && trail.rule ? { bottom: trail.rule } : undefined,
             children: runsOf(s.el),
         });
-    });
+    }
 }
 
 async function imagePara(img: HTMLImageElement): Promise<Paragraph> {
@@ -130,7 +152,7 @@ async function imagePara(img: HTMLImageElement): Promise<Paragraph> {
     const canvas = document.createElement("canvas"); canvas.width = Math.round(w * k); canvas.height = Math.round(h * k);
     canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
     const blob: Blob = await new Promise((res, rej) => canvas.toBlob((b) => (b ? res(b) : rej(new Error("image"))), "image/png"));
-    return new Paragraph({ children: [new ImageRun({ type: "png", data: new Uint8Array(await blob.arrayBuffer()), transformation: { width: w, height: h } })] });
+    return new Paragraph({ children: [new ImageRun({ type: "png", data: new Uint8Array(await blob.arrayBuffer()), transformation: { width: w * FIT, height: h * FIT } })] });
 }
 
 const NONE = { style: BorderStyle.NONE, size: 0, color: "FFFFFF" } as const;
@@ -146,7 +168,19 @@ async function collect(el: Element, page: Element, flows: Flow[], inCell: boolea
     if (cs.display === "none") return;
     if (el.matches("[data-cv-edit]")) {
         const cols = inCell ? 1 : parseInt(cs.columnCount, 10) || 1;
-        return push(cols, px(cs.columnGap), regionBlocks(el, page));
+        if (cols < 2) return push(1, 0, regionBlocks(el, page).flat());
+        // a flowing multi-column region → one borderless table row, a cell per column (see the note at the top)
+        const groups = regionBlocks(el, page, cols); if (!groups.length) return;
+        const pageCs = getComputedStyle(page), contentPt = px(pageCs.width) - px(pageCs.paddingLeft) - px(pageCs.paddingRight);
+        const gap = tw(px(cs.columnGap)), widths = groups.map(() => Math.round(tw(contentPt) / cols));
+        const rule = bottomRule(el), trail = trailing(el, page);
+        return push(1, 0, [
+            new Table({
+                rows: [new TableRow({ children: groups.map((g, i) => new TableCell({ children: g.length ? g : [new Paragraph({})], width: { size: widths[i], type: WidthType.DXA }, borders: NO_BORDERS, verticalAlign: VerticalAlign.TOP, margins: { top: 0, bottom: 0, left: 0, right: i < groups.length - 1 ? gap : 0 } })) })],
+                width: { size: tw(contentPt), type: WidthType.DXA }, columnWidths: widths, layout: TableLayoutType.FIXED, borders: NO_BORDERS,
+            }),
+            new Paragraph({ spacing: { before: 0, after: tw(Math.max(0, trail.after - 2)), line: 40, lineRule: LineRuleType.EXACT }, border: trail.rule ? { top: { ...trail.rule, space: Math.round(px(cs.paddingBottom)) } } : rule ? { top: rule } : undefined }),
+        ]);
     }
     if (el instanceof HTMLImageElement) return push(1, 0, [await imagePara(el)]);
     if (el instanceof HTMLHRElement) {                      // a divider block: a bottom-ruled empty paragraph
@@ -185,9 +219,10 @@ async function collect(el: Element, page: Element, flows: Flow[], inCell: boolea
 }
 
 export async function exportDocx(page: HTMLElement, opts: Opts): Promise<Blob> {
+    const cs = getComputedStyle(page);
+    FIT = Math.min(1, Math.max(0.1, parseFloat(cs.zoom) || 1));
     const flows: Flow[] = [];
     for (const child of Array.from(page.children)) await collect(child, page, flows, false);
-    const cs = getComputedStyle(page);
     const pageProps = {
         size: { width: tw(opts.pageWPt), height: tw(opts.pageHPt) },
         margin: { top: tw(px(cs.paddingTop)), bottom: tw(Math.max(px(cs.paddingBottom), opts.paginate ? 30 : 0)), left: tw(px(cs.paddingLeft)), right: tw(px(cs.paddingRight)), header: 0, footer: tw(10), gutter: 0 },
@@ -198,6 +233,6 @@ export async function exportDocx(page: HTMLElement, opts: Opts): Promise<Blob> {
         ...(opts.paginate ? { footers: { default: footer } } : {}),
         children: f.children,
     }));
-    const doc = new Document({ title: opts.name, creator: "Itera", styles: { default: { document: { run: { font: "Helvetica", size: 18 }, paragraph: { spacing: { before: 0, after: 0 } } } } }, sections });
+    const doc = new Document({ title: opts.name, creator: "IcedCoffee", styles: { default: { document: { run: { font: "Helvetica", size: 18 }, paragraph: { spacing: { before: 0, after: 0 } } } } }, sections });
     return Packer.toBlob(doc);
 }

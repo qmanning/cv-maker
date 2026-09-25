@@ -1,6 +1,6 @@
 <!doctype html>
 <!--
-  Itera source file — a fictional sample résumé.  Swap it from the Itera menu (⋯ → Load source
+  IcedCoffee source file — a fictional sample résumé.  Swap it from the IcedCoffee menu (⋯ → Load source
   HTML…), or point config.js's `home` at your own file built the same way.
 
   Conventions the editor understands:
@@ -35,7 +35,11 @@
 .cv-page hr { border: 0; border-top: 1px solid var(--cv-rule); margin: 6pt 0; }
 .cv-page ul { list-style: disc outside; }
 .cv-page li { margin-left: 12pt; break-inside: avoid; }
-.cv-page li + li { margin-top: 8pt; }
+/* Spacing BETWEEN items rides on margin-bottom, never margin-top: in a .cv-flow the browser breaks the
+   list across columns, and a margin-top on the item that lands at the top of column 2 pushes it down so
+   the two columns no longer line up (worst with a lone item — it reads as vertically centred). A column
+   top has nothing above it, so margin-bottom is unaffected by where the break falls. */
+.cv-page li:not(:last-child) { margin-bottom: 8pt; }
 .cv-page [data-col-break] { break-before: column; }
 
 /* header */
@@ -130,6 +134,7 @@
         <li><p>Designed the fleet dashboard that let one operator supervise 40 warehouse robots instead of 12.</p></li>
         <li><p>Spent two weeks a quarter on warehouse floors watching how people actually reacted to a robot rolling toward them.</p></li>
         <li data-col-break><p>Turned near-miss incident logs into a design pattern that cut false alarms by more than half without hiding real ones.</p></li>
+        <li><p>Rewrote the robot status messages with the people who read them at 3am, which took a third of the "why has it stopped" calls off the night shift.</p></li>
       </ul>
     </div>
   </section>

@@ -1,6 +1,6 @@
 // Checks that templates/sample-resume.html still follows the conventions documented in its own header
 // comment ([data-cv-edit], .cv-flow, [data-cv-block], etc.) — a regression test for the template file
-// itself, not for Itera's code. Also guards against the fictional sample leaking any of the real
+// itself, not for IcedCoffee's code. Also guards against the fictional sample leaking any of the real
 // author's identifying info.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -96,4 +96,31 @@ test("PRIVACY GUARD: the fictional sample contains none of the real author's ide
     for (const needle of ["Manning", "qmanning"]) {
         assert.doesNotMatch(html, new RegExp(needle.replace(/[.]/g, "\\.")), `template unexpectedly contains "${needle}"`);
     }
+});
+
+/* ---- templates/sample-cover-letter.html: the default letter ---- */
+const letterHtml = fs.readFileSync(path.join(repoRoot, "templates", "sample-cover-letter.html"), "utf8");
+const letter = new DOMParser().parseFromString(letterHtml, "text/html");
+
+test("cover letter: marks itself, and its header is the résumé's — mirrored, so nothing in it is editable", () => {
+    assert.equal(letter.querySelector(".cv-page")?.getAttribute("data-cv-kind"), "letter");
+    const header = letter.querySelector('.cv-page > header[data-cv-mirror="header"]');
+    assert.ok(header, "a [data-cv-mirror=header] slot");
+    assert.equal(header.querySelectorAll("[data-cv-edit]").length, 0);
+    assert.equal(header.textContent.replace(/\s+/g, " ").trim(), doc.querySelector(".cv-page > header").textContent.replace(/\s+/g, " ").trim());
+});
+
+test("cover letter: date, recipient, greeting, body, sign-off are editable top-level blocks; its own css follows the marker", () => {
+    const page = letter.querySelector(".cv-page");
+    for (const cls of ["cl-date", "cl-recipient", "cl-greeting", "cl-body", "cl-close"]) {
+        const el = page.querySelector("." + cls);
+        assert.ok(el?.hasAttribute("data-cv-edit") && el.hasAttribute("data-cv-block") && el.parentElement === page, cls);
+    }
+    const css = letter.querySelector("style").textContent, at = css.indexOf("/* icedcoffee:letter");
+    assert.ok(at > 0 && css.indexOf(".cl-body", at) > at && css.lastIndexOf(".cv-header", at) >= 0);
+    assert.doesNotMatch(letterHtml, /<script/i);
+});
+
+test("PRIVACY GUARD: the fictional cover letter contains none of the real author's identifying strings", () => {
+    for (const needle of ["Manning", "qmanning"]) assert.doesNotMatch(letterHtml, new RegExp(needle));
 });

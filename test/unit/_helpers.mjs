@@ -1,4 +1,4 @@
-// test/unit/_helpers.mjs — shared helpers for Itera's node:test unit suite.
+// test/unit/_helpers.mjs — shared helpers for IcedCoffee's node:test unit suite.
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -43,7 +43,7 @@ const bundleCommonOpts = (external) => ({
  * can't resolve bare specifiers — Node has already bundled them away here, but the file still needs a
  * real path to import from), dynamic-imports it, then removes the temp file. */
 async function importBundleText(text) {
-    const tmpFile = path.join(os.tmpdir(), `itera-test-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}.mjs`);
+    const tmpFile = path.join(os.tmpdir(), `icedcoffee-test-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}.mjs`);
     fs.writeFileSync(tmpFile, text, "utf8");
     try {
         return await import(pathToFileURL(tmpFile).href);

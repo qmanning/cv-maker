@@ -1,8 +1,8 @@
 // electron/build/make-icon.mjs — renders the build artwork with Electron's own Chromium, so the repo needs
-// no image tooling:  icon.svg → icon.png (1024², transparent; electron-builder makes the .icns / .ico)
+// no image tooling:  brand/iced-coffee-icon-yellow-1.png → icon.png (1024²; electron-builder makes .icns / .ico)
 //                    dmg-background.html → background.png + background@2x.png (the installer window)
 //   npm run icon
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, nativeImage } from "electron";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -20,8 +20,26 @@ async function shot(url, width, height, outputs, transparent) {
 }
 
 app.whenReady().then(async () => {
-    const svg = fs.readFileSync(path.join(here, "icon.svg"), "utf8");
-    await shot("data:text/html;charset=utf-8," + encodeURIComponent(`<body style="margin:0;background:transparent">${svg}</body>`), 1024, 1024, [["icon.png", 1024]], true);
+    const source = path.resolve(here, "../../brand/iced-coffee-icon-yellow-1.png");
+    const icon = nativeImage.createFromPath(source);
+    const size = icon.getSize();
+    if (icon.isEmpty() || size.width !== size.height) throw new Error("The app icon must be a square PNG: " + source);
+    // Preserve every visible shadow pixel; remove the empty border in the smallest square.
+    const pixels = icon.toBitmap();
+    let left = size.width, top = size.height, right = -1, bottom = -1;
+    for (let y = 0; y < size.height; y++) for (let x = 0; x < size.width; x++) {
+        if (!pixels[(y * size.width + x) * 4 + 3]) continue;
+        left = Math.min(left, x); top = Math.min(top, y);
+        right = Math.max(right, x); bottom = Math.max(bottom, y);
+    }
+    if (right < left) throw new Error("The icon is transparent");
+    const edge = Math.max(right - left + 1, bottom - top + 1);
+    const x = Math.max(0, Math.min(size.width - edge, Math.floor((left + right + 1 - edge) / 2)));
+    const y = Math.max(0, Math.min(size.height - edge, Math.floor((top + bottom + 1 - edge) / 2)));
+    const png = icon.crop({ x, y, width: edge, height: edge }).resize({ width: 1024, height: 1024, quality: "best" }).toPNG();
+    fs.writeFileSync(path.join(here, "icon.png"), png);
+    fs.writeFileSync(path.resolve(here, "../../brand/icedcoffee-icon.png"), png);
+    console.log(`Cropped ${size.width} to ${edge} square at ${x},${y}`);
     // drawn at 2× (CSS zoom) so the Retina background is sharp; the 1× file is that, halved
     const bg = fs.readFileSync(path.join(here, "dmg-background.html"), "utf8").replace("<html>", '<html style="zoom: 2">');
     await shot("data:text/html;charset=utf-8," + encodeURIComponent(bg), 1320, 960, [["background@2x.png", 1320], ["background.png", 660]], false);

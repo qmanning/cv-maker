@@ -8,3 +8,7 @@ electron/.smoke-packaged/
 electron/.install-test/
 electron/.update-test/
 electron/.leaks/
+electron/build-info.json
+
+# Blender writes this beside every save: a copy of the previous version
+*.blend1

@@ -1,4 +1,4 @@
-// Unit tests for Itera's TipTap extensions (src/cv-extensions.ts): letter-spacing, per-paragraph
+// Unit tests for IcedCoffee's TipTap extensions (src/cv-extensions.ts): letter-spacing, per-paragraph
 // line-height, and column breaks, plus the shared font-size/font-weight extensions build.mjs remaps in
 // from src/shared/. Builds a headless TipTap Editor with the SAME StarterKit configuration
 // src/CvMaker.tsx uses (read there: trailingNode: false, plus TextStyle/Color/FontSize/FontWeight/

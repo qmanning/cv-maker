@@ -6,7 +6,7 @@ import { installJsdom, importTransformed } from "./_helpers.mjs";
 
 installJsdom();
 
-const { slugify, fullHtml, parseSource, pageBoxCss, PAPERS, MIN_FIT, stepZoom } = await importTransformed("src/cv-source.ts");
+const { slugify, fullHtml, parseSource, migrateCss, scopeCss, pageBoxCss, PAPERS, MIN_FIT, stepZoom } = await importTransformed("src/cv-source.ts");
 
 /* ---------------- parseSource ---------------- */
 
@@ -41,6 +41,139 @@ test("parseSource strips on* attributes across multiple elements, case-insensiti
     assert.doesNotMatch(parsed.html, /onmouseover/i);
     assert.doesNotMatch(parsed.html, /onfocus/i);
     assert.match(parsed.html, /data-keep="1"/);
+});
+
+test("parseSource strips javascript: and other script-scheme URLs (they would run in the app's own origin)", () => {
+    const text = `<html><body><div class="cv-page">
+        <a id="js" href="javascript:alert(1)">x</a>
+        <a id="jsmix" href="  JaVaScRiPt:alert(1)">x</a>
+        <a id="vb" href="vbscript:msgbox">x</a>
+        <a id="datahtml" href="data:text/html,<script>alert(1)</script>">x</a>
+        <form id="f" action="javascript:alert(1)"><button formaction="javascript:alert(1)" id="b">go</button></form>
+        <img id="js-src" src="javascript:alert(1)">
+    </div></body></html>`;
+    const parsed = parseSource(text);
+    const doc = new DOMParser().parseFromString(parsed.html, "text/html");
+    for (const id of ["js", "jsmix", "vb", "datahtml"]) assert.equal(doc.getElementById(id).hasAttribute("href"), false, `#${id} kept its href`);
+    assert.equal(doc.getElementById("f").hasAttribute("action"), false);
+    assert.equal(doc.getElementById("b").hasAttribute("formaction"), false);
+    assert.equal(doc.getElementById("js-src").hasAttribute("src"), false);
+    assert.doesNotMatch(parsed.html, /javascript:|vbscript:/i);
+});
+
+test("parseSource strips script schemes disguised with tabs/newlines/controls (browsers strip those before parsing)", () => {
+    // each of these reads as `javascript:alert(1)` to a browser's URL parser, so it must not survive
+    const sneaky = ["java\tscript:alert(1)", "java\nscript:alert(1)", "java\rscript:alert(1)", "\u0001javascript:alert(1)", " \t javascript:alert(1)", "JAVA\tSCRIPT:alert(1)"];
+    const doc = new DOMParser().parseFromString('<html><body><div class="cv-page"></div></body></html>', "text/html");
+    const page = doc.querySelector(".cv-page");
+    sneaky.forEach((href, i) => { const a = doc.createElement("a"); a.id = "a" + i; a.setAttribute("href", href); a.textContent = "x"; page.append(a); });
+    const parsed = parseSource(doc.documentElement.outerHTML);
+    const out = new DOMParser().parseFromString(parsed.html, "text/html");
+    sneaky.forEach((href, i) => assert.equal(out.getElementById("a" + i).hasAttribute("href"), false, `kept a disguised script URL: ${JSON.stringify(href)}`));
+});
+
+test("parseSource keeps the links and data: images a real resume uses", () => {
+    const png = "data:image/png;base64,iVBORw0KGgo=";
+    const text = `<html><body><div class="cv-page">
+        <a id="web" href="https://example.com/a">w</a>
+        <a id="mail" href="mailto:me@example.com">m</a>
+        <a id="tel" href="tel:+15550100">t</a>
+        <a id="anchor" href="#skills">s</a>
+        <a id="rel" href="./other.html">r</a>
+        <img id="pic" src="${png}" alt="">
+    </div></body></html>`;
+    const parsed = parseSource(text);
+    const doc = new DOMParser().parseFromString(parsed.html, "text/html");
+    assert.equal(doc.getElementById("web").getAttribute("href"), "https://example.com/a");
+    assert.equal(doc.getElementById("mail").getAttribute("href"), "mailto:me@example.com");
+    assert.equal(doc.getElementById("tel").getAttribute("href"), "tel:+15550100");
+    assert.equal(doc.getElementById("anchor").getAttribute("href"), "#skills");
+    assert.equal(doc.getElementById("rel").getAttribute("href"), "./other.html");
+    assert.equal(doc.getElementById("pic").getAttribute("src"), png);   // the template's own images are data: URIs
+});
+
+/* ---------------- scopeCss: a document's CSS must not reach the product ---------------- */
+
+const sel = (css) => [...css.matchAll(/([^{}]+)\{/g)].map((m) => m[1].trim());
+
+test("scopeCss confines ordinary selectors to the sheet's container", () => {
+    assert.deepEqual(sel(scopeCss(".cv-page { color: red; }")), [".cvm-host .cv-page"]);
+    assert.deepEqual(sel(scopeCss(".cv-job .cv-flow li { margin: 0; }")), [".cvm-host .cv-job .cv-flow li"]);
+    assert.deepEqual(sel(scopeCss("h1, h2 { margin: 0; }")), [".cvm-host h1, .cvm-host h2"]);
+});
+
+test("scopeCss maps the document root onto the container, so variables and base type still inherit", () => {
+    assert.deepEqual(sel(scopeCss(":root { --cv-rule: #eee; }")), [".cvm-host"]);
+    assert.deepEqual(sel(scopeCss("body { font-family: Helvetica; }")), [".cvm-host"]);
+    assert.deepEqual(sel(scopeCss("html body .cv-page { color: red; }")), [".cvm-host .cv-page"]);
+    assert.deepEqual(sel(scopeCss("body.dark { color: #fff; }")), [".cvm-host.dark"]);
+    assert.deepEqual(sel(scopeCss("body > .cv-page { color: red; }")), [".cvm-host > .cv-page"]);
+});
+
+test("scopeCss stops a document restyling the app around it", () => {
+    // the whole point: a hostile or careless resume file cannot touch IcedCoffee's own chrome
+    const hostile = ".pt-menu-item { display: none; } #pt-bar { opacity: 0; } .cvm-ask { position: fixed; top: 0; }";
+    const out = scopeCss(hostile);
+    for (const s of sel(out)) assert.ok(s.startsWith(".cvm-host"), `escaped the scope: ${s}`);
+    assert.match(out, /\.cvm-host \.pt-menu-item/);   // reachable only inside the sheet, which holds no such element
+});
+
+test("scopeCss recurses into @media and leaves @font-face and @keyframes alone", () => {
+    const out = scopeCss("@media print { .cv-page { color: #000; } }");
+    assert.match(out, /@media print \{/);
+    assert.match(out, /\.cvm-host \.cv-page/);
+    const face = scopeCss('@font-face { font-family: "X"; src: url(x.woff2); }');
+    assert.match(face, /@font-face/);
+    assert.doesNotMatch(face, /\.cvm-host/);
+});
+
+test("scopeCss drops @import (it would come back unscoped, and off the network)", () => {
+    const out = scopeCss('@import url("https://fonts.example/x.css"); .cv-page { color: red; }');
+    assert.doesNotMatch(out, /@import/);
+    assert.match(out, /\.cvm-host \.cv-page/);
+});
+
+test("scopeCss survives malformed input without losing the rules around it", () => {
+    assert.equal(scopeCss(""), "");
+    assert.equal(scopeCss("@@@ not css at all @@@"), "");          // no rule in, no rule out
+    const ragged = ".cv-page { color: red; } .cv-job { /* unclosed";
+    assert.match(scopeCss(ragged), /\.cvm-host \.cv-page \{ color: red; \}/);
+    const unbalanced = ".cv-page { color: red;";                   // missing its closing brace
+    assert.match(scopeCss(unbalanced), /\.cvm-host \.cv-page \{/);
+});
+
+/* ---------------- migrateCss: documents saved before the column-alignment fix ---------------- */
+
+test("migrateCss rewrites the legacy `li + li { margin-top }` list gap to margin-bottom", () => {
+    assert.equal(migrateCss(".cv-page li + li { margin-top: 8pt; }"), ".cv-page li:not(:last-child) { margin-bottom: 8pt; }");
+    assert.equal(migrateCss("li+li{margin-top:8pt}"), "li:not(:last-child) { margin-bottom: 8pt; }");
+    assert.equal(migrateCss(".cv-page  li  +  li  {  margin-top : 0.5em ; }"), ".cv-page  li:not(:last-child) { margin-bottom: 0.5em; }");
+});
+
+test("migrateCss keeps the rest of the stylesheet, and the rules around the one it rewrites, intact", () => {
+    const css = [".cv-page { color: #111; }", ".cv-page li { margin-left: 12pt; break-inside: avoid; }", ".cv-page li + li { margin-top: 8pt; }", ".cv-flow { column-count: 2; }"].join("\n");
+    const out = migrateCss(css);
+    assert.match(out, /\.cv-page \{ color: #111; \}/);
+    assert.match(out, /\.cv-page li \{ margin-left: 12pt; break-inside: avoid; \}/);
+    assert.match(out, /\.cv-flow \{ column-count: 2; \}/);
+    assert.match(out, /li:not\(:last-child\) \{ margin-bottom: 8pt; \}/);
+    assert.doesNotMatch(out, /li \+ li/);
+});
+
+test("migrateCss leaves alone anything that isn't that exact rule", () => {
+    for (const css of [
+        ".cv-page li + li { margin-top: 8pt; color: red; }",   // more than the one declaration: not ours to rewrite
+        ".cv-page p + p { margin-top: 8pt; }",                 // a different selector
+        ".cv-page li + li { margin-bottom: 8pt; }",            // already migrated
+        ".cv-summary p + p { margin-top: 13.7pt; }",
+    ]) assert.equal(migrateCss(css), css, `unexpectedly rewrote: ${css}`);
+});
+
+test("parseSource migrates a legacy document's stylesheet as it reads it", () => {
+    const text = '<html><head><style>.cv-page li + li { margin-top: 8pt; }</style></head><body><div class="cv-page"><ul><li><p>a</p></li></ul></div></body></html>';
+    const parsed = parseSource(text);
+    assert.match(parsed.css, /li:not\(:last-child\) \{ margin-bottom: 8pt; \}/);
+    assert.doesNotMatch(parsed.css, /li \+ li/);
 });
 
 test("parseSource wraps loose body content in a .cv-page div when none exists", () => {
