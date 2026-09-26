@@ -1,8 +1,38 @@
 {
-  "fill": "none",
+  "fill": {
+    "automatic-gradient": "srgb:0.93000,0.66000,0.22000,1.00000"
+  },
   "groups": [
     {
-      "name": "Acrylic texture, edge to edge",
+      "name": "Cup, for Clear and Tinted",
+      "layers": [
+        {
+          "name": "Cup",
+          "image-name": "Cup.svg",
+          "glass": true,
+          "hidden-specializations": [
+            {
+              "value": true
+            },
+            {
+              "appearance": "tinted",
+              "value": false
+            }
+          ]
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.5
+      },
+      "translucency": {
+        "enabled": true,
+        "value": 0.4
+      },
+      "specular": true
+    },
+    {
+      "name": "Acrylic by day, brass on oak by night",
       "layers": [
         {
           "name": "Artwork",
@@ -24,6 +54,12 @@
             {
               "appearance": "dark",
               "value": "ArtworkDark.png"
+            }
+          ],
+          "hidden-specializations": [
+            {
+              "appearance": "tinted",
+              "value": true
             }
           ]
         }
