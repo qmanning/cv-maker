@@ -7,16 +7,23 @@
 // therefore produces. See test/unit/updater.test.mjs: the two are pinned together.
 import { spawnSync } from "node:child_process";
 import path from "node:path";
+import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import info from "./stamp.mjs";
 
 const electronDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");   // decodes spaces in the path
 // NOT a template literal: ${version} / ${arch} / ${ext} are electron-builder's own macros and must reach it intact
 const stamped = "IcedCoffee-${version}-" + info.build + "-${arch}.${ext}";
+// Icon Composer requires full Xcode; leave the user's global developer-tool selection alone.
+const buildEnv = { ...process.env };
+const installedXcode = "/Applications/Xcode.app/Contents/Developer";
+if (process.platform === "darwin" && !buildEnv.DEVELOPER_DIR && fs.existsSync(path.join(installedXcode, "usr/bin/actool"))) {
+    buildEnv.DEVELOPER_DIR = installedXcode;
+}
 const r = spawnSync("npx", [
     "electron-builder",
     `--config.mac.artifactName=${stamped}`,
     `--config.win.artifactName=${stamped}`,
     ...process.argv.slice(2),
-], { stdio: "inherit", cwd: electronDir });
+], { stdio: "inherit", cwd: electronDir, env: buildEnv });
 process.exit(r.status ?? 1);
