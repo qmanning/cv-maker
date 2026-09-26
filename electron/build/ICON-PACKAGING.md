@@ -28,8 +28,8 @@ Composer's `ictool … --export-image --platform macOS --rendition Dark` (also
 `Default`, `ClearLight`, `ClearDark`, `TintedLight`, `TintedDark`). macOS applies its
 own rounded mask and rim, so the artwork must not carry a tile shape, corners or
 transparency of its own — a baked tile is what produced the clipped bevel (and, as
-a legacy `.icns`, the gray backing plate). No glass, shadow or specular effects are
-requested in the manifest.
+a legacy `.icns`, the gray backing plate). The artwork layers request no glass, shadow or
+specular effects; only the Clear / Tinted cup is glass.
 
 Edit the package in Icon Composer (`/Applications/Xcode.app/Contents/Applications/`):
 it has per-appearance (Default / Dark / Clear / Tinted) controls for fill, opacity,
